@@ -11,7 +11,7 @@ export const minikitConfig = {
   accountAssociation: {
     "header": "eyJmaWQiOjc5MzUsInR5cGUiOiJhdXRoIiwia2V5IjoiMHgyRTc5REFFRDdjMjVFQmFGM0FEYzhBMDk3ODc3RjQ4Yzc5ZGM0MmY0In0",
     "payload": "eyJkb21haW4iOiJqdWtlYm94LXYyLnZlcmNlbC5hcHAifQ",
-    "signature": ""
+    "signature": "+wK3bLN3hTBubxxbbuPLv7XZvEmGwM1l7Pk3+jV+3oRf6c7tbaQmYdKMTwFHBx4dDPE3I9/ohWsbvUqU0F5rVRw="
   },
   miniapp: {
     version: "1",
@@ -34,7 +34,7 @@ export const minikitConfig = {
     noindex: true,
   },
   baseBuilder: {
-    ownerAddress: "0xc3118549B9bCd7Ed6672Ea2A5a3B26FfbE735F67"
+    allowedAddresses: ["0xc3118549B9bCd7Ed6672Ea2A5a3B26FfbE735F67"]
   }
 } as const;
 

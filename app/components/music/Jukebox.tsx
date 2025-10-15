@@ -423,9 +423,11 @@ export function Jukebox({
   }
 
   useEffect(() => {
-    if (selectedSong && audioRef.current) {
+    // Capture the current audio element for cleanup
+    const audio = audioRef.current;
+    
+    if (selectedSong && audio) {
       // Try to play the audio when a new song is selected
-      const audio = audioRef.current;
       audio.currentTime = 0;
       const playPromise = audio.play();
       if (playPromise !== undefined) {
@@ -437,8 +439,8 @@ export function Jukebox({
 
     // Cleanup function to pause audio when component unmounts or song changes
     return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
+      if (audio) {
+        audio.pause();
       }
     };
   }, [selectedSong]);

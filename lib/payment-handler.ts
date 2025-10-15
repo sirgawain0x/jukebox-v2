@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export type PaymentConfig = {
   price: string;
-  network: "base" | "ethereum";
+  network: "base" | "base-sepolia" | "polygon" | "polygon-amoy" | "avalanche" | "avalanche-fuji" | "iotex" | "sei" | "sei-testnet" | "solana" | "solana-devnet" | "peaq";
   config: {
     description: string;
     maxTimeoutSeconds?: number;

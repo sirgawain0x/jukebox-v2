@@ -1,32 +1,25 @@
-import { paymentMiddleware } from "x402-next";
-import { facilitator } from "@coinbase/x402"; // For mainnet
+import { NextRequest, NextResponse } from "next/server";
 
-// Configure the payment middleware
-export const middleware = paymentMiddleware(
-  (process.env.WALLET_ADDRESS || "0xYourAddress") as `0x${string}`, // your receiving wallet address
-  {
-    // Route configurations for protected endpoints
-    "/api/livepeer/text-to-image": {
-      price: "$0.04",
-      network: "base", // mainnet
-      config: {
-        description: "AI Image Generation with Livepeer - Generate custom images from text prompts using advanced AI models",
-        maxTimeoutSeconds: 120, // Allow more time for image generation
-      },
-    },
-    "/api/gemini/text-to-image": {
-      price: "$0.05",
-      network: "base", // mainnet
-      config: {
-        description: "AI Cover Art Generation with Gemini - Create professional cover art and album artwork using Google's Gemini AI",
-        maxTimeoutSeconds: 120, // Allow more time for image generation
-      },
-    },
-  },
-  facilitator // CDP mainnet facilitator
-);
+/**
+ * Lightweight middleware - payment logic moved to lib/payment-handler.ts
+ * This keeps the Edge Function bundle size under 1MB
+ */
+export const middleware = async (request: NextRequest) => {
+  // Add any lightweight middleware logic here
+  // For payment handling, use the withPayment wrapper in your API routes
+  
+  return NextResponse.next();
+};
 
-// Configure which paths the middleware should run on
+// Only run middleware on specific paths if needed
 export const config = {
-  matcher: ["/api/livepeer/text-to-image", "/api/gemini/text-to-image"],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    // '/((?!_next/static|_next/image|favicon.ico).*)',
+  ],
 };

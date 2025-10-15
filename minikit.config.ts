@@ -20,7 +20,7 @@ export const minikitConfig = {
     description: "On-chain music. Tip artists directly. AI-powered playlists.",
     screenshotUrls: [`${ROOT_URL}/screenshot.png`, `${ROOT_URL}/screenshot-2.png`, `${ROOT_URL}/screenshot-3.png`],
     iconUrl: `${ROOT_URL}/icon.png`,
-    splashImageUrl: `${ROOT_URL}/hero.png`,
+    splashImageUrl: `${ROOT_URL}/splash.png`,
     splashBackgroundColor: "#000000",
     homeUrl: ROOT_URL,
     webhookUrl: `${ROOT_URL}/api/webhook`,

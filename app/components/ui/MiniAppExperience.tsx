@@ -45,19 +45,19 @@ export default function MiniAppExperience({ frameAdded }: MiniAppExperienceProps
           </p>
           <div className="grid grid-cols-1 gap-2 text-xs text-purple-600">
             <div className="flex items-center space-x-2">
-              <Icon name="check" size="xs" />
+              <Icon name="check" size="sm" />
               <span>Auto wallet connection</span>
             </div>
             <div className="flex items-center space-x-2">
-              <Icon name="check" size="xs" />
+              <Icon name="check" size="sm" />
               <span>Share tracks directly to Farcaster</span>
             </div>
             <div className="flex items-center space-x-2">
-              <Icon name="check" size="xs" />
+              <Icon name="check" size="sm" />
               <span>Enhanced playlist features</span>
             </div>
             <div className="flex items-center space-x-2">
-              <Icon name="check" size="xs" />
+              <Icon name="check" size="sm" />
               <span>Farcaster authentication</span>
             </div>
           </div>

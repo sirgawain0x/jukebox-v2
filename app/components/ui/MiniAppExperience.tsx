@@ -8,7 +8,7 @@ interface MiniAppExperienceProps {
   frameAdded?: boolean;
 }
 
-export default function MiniAppExperience({ onAddFrame, frameAdded }: MiniAppExperienceProps) {
+export default function MiniAppExperience({ frameAdded }: MiniAppExperienceProps) {
   const openUrl = useOpenUrl();
   const isInMiniApp = useIsInMiniApp();
 

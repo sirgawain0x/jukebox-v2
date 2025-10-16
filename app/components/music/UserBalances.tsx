@@ -3,7 +3,6 @@ import { Card } from "../ui/Card";
 import { Icon } from "../ui/Icon";
 import { useAccount, useBalance } from "wagmi";
 import { formatUnits } from "viem";
-import { CircleDollarSign } from "lucide-react";
 import Image from "next/image";
 
 export function UserBalances() {

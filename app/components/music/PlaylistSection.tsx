@@ -377,7 +377,7 @@ export function PlaylistSection({
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto">
+    <div className="w-full max-w-4xl mx-auto" id="playlist-section">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -884,9 +884,9 @@ export function PlaylistSection({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 50, scale: 0.9 }}
             transition={{ duration: 0.2 }}
-            className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50"
+            className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-[9999] pointer-events-auto"
           >
-            <div className="bg-[var(--app-accent)] text-white px-6 py-3 rounded-xl shadow-2xl border border-white/20">
+            <div className="bg-black/90 text-white px-6 py-3 rounded-xl shadow-2xl border border-white/20 backdrop-blur-sm">
               <p className="font-medium">{toast}</p>
             </div>
           </motion.div>

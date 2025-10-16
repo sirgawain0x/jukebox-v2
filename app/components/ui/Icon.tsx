@@ -2,7 +2,7 @@
 import { FC } from "react";
 
 type IconProps = {
-  name: "heart" | "star" | "check" | "plus" | "arrow-right" | "chevron-down" | "share";
+  name: "heart" | "star" | "check" | "plus" | "arrow-right" | "chevron-down" | "share" | "music" | "chevron-left" | "chevron-right" | "x";
   size?: "sm" | "md" | "lg";
   className?: string;
 };
@@ -124,6 +124,69 @@ export const Icon: FC<IconProps> = ({ name, size = "md", className = "" }) => {
         <circle cx="18" cy="19" r="3" />
         <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
         <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+      </svg>
+    ),
+    music: (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <title>Music</title>
+        <path d="M9 18V5l12-2v13" />
+        <circle cx="6" cy="18" r="3" />
+        <circle cx="18" cy="16" r="3" />
+      </svg>
+    ),
+    "chevron-left": (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <title>Chevron Left</title>
+        <polyline points="15 18 9 12 15 6" />
+      </svg>
+    ),
+    "chevron-right": (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <title>Chevron Right</title>
+        <polyline points="9 18 15 12 9 6" />
+      </svg>
+    ),
+    x: (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <title>Close</title>
+        <line x1="18" y1="6" x2="6" y2="18" />
+        <line x1="6" y1="6" x2="18" y2="18" />
       </svg>
     ),
   };

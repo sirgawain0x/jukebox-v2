@@ -18,7 +18,7 @@ type HomeProps = {
 };
 
 export function Home({ setActiveTab }: HomeProps) {
-  const { address, isConnected } = useAccount();
+  const { isConnected } = useAccount();
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
   const [selectedSong, setSelectedSong] = useState<Song | null>(null);
 

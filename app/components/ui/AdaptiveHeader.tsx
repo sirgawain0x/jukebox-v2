@@ -15,7 +15,6 @@ import {
 } from "@coinbase/onchainkit/identity";
 import { Button } from './Button';
 import { Icon } from './Icon';
-import AuthButton from '../auth/AuthButton';
 
 interface AdaptiveHeaderProps {
   onAddFrame?: () => void;

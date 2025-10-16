@@ -1,7 +1,6 @@
 "use client";
 import { useState, useCallback } from "react";
 import { useAccount } from "wagmi";
-import { useIsInMiniApp } from "@coinbase/onchainkit/minikit";
 import { Playlist, Song } from "@/types/music";
 import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
@@ -20,20 +19,8 @@ type HomeProps = {
 
 export function Home({ setActiveTab }: HomeProps) {
   const { isConnected } = useAccount();
-  const isInMiniApp = useIsInMiniApp();
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
   const [selectedSong, setSelectedSong] = useState<Song | null>(null);
-
-  // More accurate Mini App detection - check for actual Farcaster environment
-  const isActuallyInMiniApp = isInMiniApp && 
-    (typeof window !== 'undefined' && 
-     (window.location.href.includes('farcaster.xyz') ||
-      window.location.href.includes('warpcast.com') ||
-      window.navigator.userAgent.includes('Farcaster') ||
-      window.navigator.userAgent.includes('Warpcast') ||
-      // Check for MiniKit specific environment variables or properties
-      !!(window as unknown as { farcaster?: unknown }).farcaster ||
-      !!(window as unknown as { minikit?: unknown }).minikit));
 
   const handleSongTipped = () => {
     // Songs are now managed by the PlaylistView component via contract
@@ -46,23 +33,11 @@ export function Home({ setActiveTab }: HomeProps) {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <Card title={isActuallyInMiniApp ? "🎵 Jukebox (Mini App)" : "Jukebox 🎵"}>
+      <Card title="🎵 Jukebox">
         <p className="text-[var(--app-foreground-muted)] mb-4">
           Discover and support independent
           artists through on-chain music streaming and direct creator tips.
         </p>
-        {/* Mini App exclusive features indicator */}
-        {isActuallyInMiniApp && (
-          <div className="bg-gradient-to-r from-purple-100 to-blue-100 border border-purple-200 rounded-lg p-3 mb-4">
-            <div className="flex items-center space-x-2">
-              <Icon name="star" size="sm" className="text-purple-600" />
-              <span className="text-sm font-medium text-purple-800">Mini App Exclusive Features</span>
-            </div>
-            <div className="mt-2 text-xs text-purple-600">
-              Enhanced sharing, auto-connection, and Farcaster integration enabled
-            </div>
-          </div>
-        )}
         <div className="flex gap-3 flex-wrap">
           <Button
             onClick={() => setActiveTab("features")}

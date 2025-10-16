@@ -1,6 +1,6 @@
 "use client";
 import { useState } from 'react';
-import { useAuthenticate, useIsInMiniApp } from '@coinbase/onchainkit/minikit';
+import { useAuthenticate } from '@coinbase/onchainkit/minikit';
 import { Button } from '../ui/Button';
 import { Icon } from '../ui/Icon';
 
@@ -11,7 +11,6 @@ interface ProtectedFeatureProps {
 
 export default function ProtectedFeature({ children, fallback }: ProtectedFeatureProps) {
   const { signIn } = useAuthenticate();
-  const isInMiniApp = useIsInMiniApp();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const handleAuth = async () => {
@@ -24,22 +23,6 @@ export default function ProtectedFeature({ children, fallback }: ProtectedFeatur
       console.error('Authentication failed:', error);
     }
   };
-
-  // More accurate Mini App detection - check for actual Farcaster environment
-  const isActuallyInMiniApp = isInMiniApp && 
-    (typeof window !== 'undefined' && 
-     (window.location.href.includes('farcaster.xyz') ||
-      window.location.href.includes('warpcast.com') ||
-      window.navigator.userAgent.includes('Farcaster') ||
-      window.navigator.userAgent.includes('Warpcast') ||
-      // Check for MiniKit specific environment variables or properties
-      !!(window as unknown as { farcaster?: unknown }).farcaster ||
-      !!(window as unknown as { minikit?: unknown }).minikit));
-
-  // Only show authentication in Mini App mode
-  if (!isActuallyInMiniApp) {
-    return <>{children}</>;
-  }
 
   if (!isAuthenticated) {
     return fallback || (

@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
-// import { SafeArea } from "@coinbase/onchainkit/minikit";
-import { minikitConfig } from "../minikit.config";
 import { RootProvider } from "./rootProvider";
 import "./globals.css";
 
@@ -13,8 +11,8 @@ const ROOT_URL =
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: minikitConfig.miniapp.name,
-    description: minikitConfig.miniapp.description,
+    title: "Jukebox",
+    description: "On-chain music. Tip artists directly. AI-powered playlists.",
     openGraph: {
       url: ROOT_URL,
       title: process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME || "Jukebox",
@@ -50,12 +48,12 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     other: {
       "fc:frame": JSON.stringify({
-        version: minikitConfig.miniapp.version,
-        imageUrl: minikitConfig.miniapp.heroImageUrl,
+        version: "1",
+        imageUrl: `${ROOT_URL}/hero.png`,
         button: {
-          title: `Play ${minikitConfig.miniapp.name}`,
+          title: "Play Jukebox",
           action: {
-            name: `Launch ${minikitConfig.miniapp.name}`,
+            name: "Launch Jukebox",
             type: "launch_frame",
           },
         },

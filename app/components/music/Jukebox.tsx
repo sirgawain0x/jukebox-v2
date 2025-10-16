@@ -15,7 +15,7 @@ import {
   TransactionStatus,
 } from "@coinbase/onchainkit/transaction";
 import type { TransactionResponseType } from "@coinbase/onchainkit/transaction";
-import { useComposeCast, useIsInMiniApp } from "@coinbase/onchainkit/minikit";
+import { useComposeCast } from "@coinbase/onchainkit/minikit";
 // import { useNotification } from "@coinbase/onchainkit/minikit";
 import { Song, Playlist } from "@/types/music";
 import { Card } from "../ui/Card";
@@ -60,18 +60,6 @@ export function Jukebox({
   // const sendNotification = useNotification();
   const minTipEth = BigInt(Math.floor(0.00001429 * 1e18));
   const { composeCast } = useComposeCast();
-  const isInMiniApp = useIsInMiniApp();
-
-  // More accurate Mini App detection - check for actual Farcaster environment
-  const isActuallyInMiniApp = isInMiniApp && 
-    (typeof window !== 'undefined' && 
-     (window.location.href.includes('farcaster.xyz') ||
-      window.location.href.includes('warpcast.com') ||
-      window.navigator.userAgent.includes('Farcaster') ||
-      window.navigator.userAgent.includes('Warpcast') ||
-      // Check for MiniKit specific environment variables or properties
-      !!(window as unknown as { farcaster?: unknown }).farcaster ||
-      !!(window as unknown as { minikit?: unknown }).minikit));
   
   // Toast notification state
   const [toast, setToast] = useState<string | null>(null);
@@ -110,24 +98,24 @@ export function Jukebox({
     setTimeout(() => setToast(null), 4000);
   }, []);
 
-  // Sharing functions - only available in Mini App mode
+  // Sharing functions
   const handleShareSong = useCallback(() => {
-    if (!selectedSong || !isActuallyInMiniApp) return;
+    if (!selectedSong) return;
     
     composeCast({
-      text: `🎵 Currently vibing to "${selectedSong.title}" by ${selectedSong.artist}! Check out this amazing track on the Jukebox Mini App 🎶`,
+      text: `🎵 Currently vibing to "${selectedSong.title}" by ${selectedSong.artist}! Check out this amazing track on Jukebox 🎶`,
       embeds: [window.location.href]
     });
-  }, [selectedSong, composeCast, isActuallyInMiniApp]);
+  }, [selectedSong, composeCast]);
 
   const handleShareTip = useCallback(() => {
-    if (!selectedSong || !isActuallyInMiniApp) return;
+    if (!selectedSong) return;
     
     composeCast({
       text: `💎 Just tipped ${selectedSong.artist} for their incredible track "${selectedSong.title}"! Supporting artists directly on the blockchain 🎵✨`,
       embeds: [window.location.href]
     });
-  }, [selectedSong, composeCast, isActuallyInMiniApp]);
+  }, [selectedSong, composeCast]);
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const sortOptions = [
@@ -619,20 +607,8 @@ export function Jukebox({
   }, [isAutoPlayEnabled, playQueue, currentQueueIndex, setSelectedSong]);
 
   return (
-    <Card title={isActuallyInMiniApp ? "🎵 Discover Music (Mini App)" : " Discover Music"}>
+    <Card title="🎵 Discover Music">
       <div className="space-y-4">
-        {/* Mini App exclusive features indicator */}
-        {isActuallyInMiniApp && (
-          <div className="bg-gradient-to-r from-purple-100 to-blue-100 border border-purple-200 rounded-lg p-3 mb-4">
-            <div className="flex items-center space-x-2">
-              <Icon name="star" size="sm" className="text-purple-600" />
-              <span className="text-sm font-medium text-purple-800">Mini App Exclusive Features Active</span>
-            </div>
-            <div className="mt-2 text-xs text-purple-600">
-              Enhanced sharing, auto-connection, and Farcaster integration enabled
-            </div>
-          </div>
-        )}
         <div className="space-y-3">
           <div className="text-sm font-medium text-[var(--app-foreground-muted)]">
             Sort by:
@@ -715,24 +691,22 @@ export function Jukebox({
                     {selectedSong?.id === song.id && (
                       <Icon name="check" className="text-[#0052ff]" />
                     )}
-                    {/* Mini App exclusive: Quick share button */}
-                    {isActuallyInMiniApp && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          composeCast({
-                            text: `🎵 Check out "${song.title}" by ${song.artist}! Discovered this amazing track on Jukebox 🎶`,
-                            embeds: [window.location.href]
-                          });
-                          showToast(`Shared "${song.title}" to Farcaster!`);
-                        }}
-                        className="p-1 hover:bg-purple-100 rounded transition-all duration-200 cursor-pointer hover:scale-110"
-                        title="Quick share to Farcaster"
-                        aria-label={`Share ${song.title} to Farcaster`}
-                      >
-                        <Icon name="share" size="sm" className="text-purple-600" />
-                      </button>
-                    )}
+                    {/* Quick share button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        composeCast({
+                          text: `🎵 Check out "${song.title}" by ${song.artist}! Discovered this amazing track on Jukebox 🎶`,
+                          embeds: [window.location.href]
+                        });
+                        showToast(`Shared "${song.title}" to Farcaster!`);
+                      }}
+                      className="p-1 hover:bg-blue-100 rounded transition-all duration-200 cursor-pointer hover:scale-110"
+                      title="Quick share to Farcaster"
+                      aria-label={`Share ${song.title} to Farcaster`}
+                    >
+                      <Icon name="share" size="sm" className="text-blue-600" />
+                    </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -881,16 +855,14 @@ export function Jukebox({
                 </TransactionToast>
               </Transaction>
 
-               {/* Share Song Button - Only show in Mini App mode */}
-               {isActuallyInMiniApp && (
-                 <button
-                   onClick={handleShareSong}
-                   className="w-full mt-3 bg-white/20 hover:bg-white/30 text-white rounded-lg py-2 px-4 transition-all duration-200 flex items-center justify-center gap-2 text-sm font-medium"
-                 >
-                   <Icon name="share" size="sm" />
-                   Share This Track
-                 </button>
-               )}
+               {/* Share Song Button */}
+               <button
+                 onClick={handleShareSong}
+                 className="w-full mt-3 bg-white/20 hover:bg-white/30 text-white rounded-lg py-2 px-4 transition-all duration-200 flex items-center justify-center gap-2 text-sm font-medium"
+               >
+                 <Icon name="share" size="sm" />
+                 Share This Track
+               </button>
             </div>
           </div>
         )}

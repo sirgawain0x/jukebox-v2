@@ -13,7 +13,7 @@ import {
   TransactionButton,
   LifecycleStatus,
 } from "@coinbase/onchainkit/transaction";
-import { useComposeCast, useIsInMiniApp } from "@coinbase/onchainkit/minikit";
+import { useComposeCast } from "@coinbase/onchainkit/minikit";
 import {
   useAccount,
   useChainId,
@@ -89,13 +89,6 @@ export function PlaylistSection({
   const { data: walletClient } = useWalletClient();
   const chainId = useChainId();
   const { composeCast } = useComposeCast();
-  const isInMiniApp = useIsInMiniApp();
-
-  // More accurate Mini App detection - check for actual Farcaster environment
-  const isActuallyInMiniApp = isInMiniApp && 
-    (typeof window !== 'undefined' && 
-     (window.location.href.includes('farcaster.xyz') ||
-      window.navigator.userAgent.includes('Farcaster')));
 
   // Check USDC balance on Base network
   const { data: usdcBalance } = useBalance({
@@ -133,16 +126,16 @@ export function PlaylistSection({
     setTimeout(() => setToast(null), 3000);
   }, []);
 
-  // Sharing function for playlist creation - only available in Mini App mode
+  // Sharing function for playlist creation
   const handleSharePlaylist = useCallback(() => {
-    if (!playlistName || !isActuallyInMiniApp) return;
+    if (!playlistName) return;
     
     const tagsText = tags.length > 0 ? ` #${tags.join(' #')}` : '';
     composeCast({
-      text: `🎵 Just created my new playlist "${playlistName}" with AI-generated cover art! Check out the Jukebox Mini App for blockchain-powered music discovery${tagsText} 🎶✨`,
+      text: `🎵 Just created my new playlist "${playlistName}" with AI-generated cover art! Check out Jukebox for blockchain-powered music discovery${tagsText} 🎶✨`,
       embeds: [window.location.href]
     });
-  }, [playlistName, tags, composeCast, isActuallyInMiniApp]);
+  }, [playlistName, tags, composeCast]);
 
   const handleGenerateImage = useCallback(async () => {
     if (!imagePrompt.trim()) return;

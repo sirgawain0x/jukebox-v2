@@ -1,18 +1,12 @@
 "use client";
-import { useAuthenticate, useIsInMiniApp } from '@coinbase/onchainkit/minikit';
+import { useAuthenticate } from '@coinbase/onchainkit/minikit';
 import { useState } from 'react';
 import { Button } from '../ui/Button';
 import { Icon } from '../ui/Icon';
 
 export default function AuthButton() {
   const { signIn } = useAuthenticate();
-  const isInMiniApp = useIsInMiniApp();
   const [isAuthenticating, setIsAuthenticating] = useState(false);
-
-  // Only show in Mini App mode
-  if (!isInMiniApp) {
-    return null;
-  }
 
   const handleAuth = async () => {
     setIsAuthenticating(true);

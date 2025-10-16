@@ -25,8 +25,19 @@ export default function ProtectedFeature({ children, fallback }: ProtectedFeatur
     }
   };
 
+  // More accurate Mini App detection - check for actual Farcaster environment
+  const isActuallyInMiniApp = isInMiniApp && 
+    (typeof window !== 'undefined' && 
+     (window.location.href.includes('farcaster.xyz') ||
+      window.location.href.includes('warpcast.com') ||
+      window.navigator.userAgent.includes('Farcaster') ||
+      window.navigator.userAgent.includes('Warpcast') ||
+      // Check for MiniKit specific environment variables or properties
+      (window as any).farcaster ||
+      (window as any).minikit));
+
   // Only show authentication in Mini App mode
-  if (!isInMiniApp) {
+  if (!isActuallyInMiniApp) {
     return <>{children}</>;
   }
 

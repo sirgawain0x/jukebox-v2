@@ -66,7 +66,12 @@ export function Jukebox({
   const isActuallyInMiniApp = isInMiniApp && 
     (typeof window !== 'undefined' && 
      (window.location.href.includes('farcaster.xyz') ||
-      window.navigator.userAgent.includes('Farcaster')));
+      window.location.href.includes('warpcast.com') ||
+      window.navigator.userAgent.includes('Farcaster') ||
+      window.navigator.userAgent.includes('Warpcast') ||
+      // Check for MiniKit specific environment variables or properties
+      (window as any).farcaster ||
+      (window as any).minikit));
   
   // Toast notification state
   const [toast, setToast] = useState<string | null>(null);
@@ -614,8 +619,20 @@ export function Jukebox({
   }, [isAutoPlayEnabled, playQueue, currentQueueIndex, setSelectedSong]);
 
   return (
-    <Card title=" Discover Music">
+    <Card title={isActuallyInMiniApp ? "🎵 Discover Music (Mini App)" : " Discover Music"}>
       <div className="space-y-4">
+        {/* Mini App exclusive features indicator */}
+        {isActuallyInMiniApp && (
+          <div className="bg-gradient-to-r from-purple-100 to-blue-100 border border-purple-200 rounded-lg p-3 mb-4">
+            <div className="flex items-center space-x-2">
+              <Icon name="star" size="sm" className="text-purple-600" />
+              <span className="text-sm font-medium text-purple-800">Mini App Exclusive Features Active</span>
+            </div>
+            <div className="mt-2 text-xs text-purple-600">
+              Enhanced sharing, auto-connection, and Farcaster integration enabled
+            </div>
+          </div>
+        )}
         <div className="space-y-3">
           <div className="text-sm font-medium text-[var(--app-foreground-muted)]">
             Sort by:
@@ -679,22 +696,42 @@ export function Jukebox({
                       />
                     </div>
                   )}
-                  <div className="flex-1">
-                    <div className="font-medium text-[var(--app-foreground)] flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-[var(--app-foreground)] truncate">
                       {song.title}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="text-xs text-[var(--app-foreground-muted)] truncate">
+                        {song.artist}
+                      </div>
                       {song.platformName && (
-                        <span className="ml-2 px-2 py-0.5 rounded text-xs font-semibold bg-[#e6edff] text-[#0052ff]">
+                        <span className="px-2 py-0.5 rounded text-xs font-semibold bg-[#e6edff] text-[#0052ff] whitespace-nowrap flex-shrink-0">
                           {song.platformName}
                         </span>
                       )}
                     </div>
-                    <div className="text-xs text-[var(--app-foreground-muted)]">
-                      {song.artist}
-                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     {selectedSong?.id === song.id && (
                       <Icon name="check" className="text-[#0052ff]" />
+                    )}
+                    {/* Mini App exclusive: Quick share button */}
+                    {isActuallyInMiniApp && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          composeCast({
+                            text: `🎵 Check out "${song.title}" by ${song.artist}! Discovered this amazing track on Jukebox 🎶`,
+                            embeds: [window.location.href]
+                          });
+                          showToast(`Shared "${song.title}" to Farcaster!`);
+                        }}
+                        className="p-1 hover:bg-purple-100 rounded transition-all duration-200 cursor-pointer hover:scale-110"
+                        title="Quick share to Farcaster"
+                        aria-label={`Share ${song.title} to Farcaster`}
+                      >
+                        <Icon name="share" size="sm" className="text-purple-600" />
+                      </button>
                     )}
                     <button
                       onClick={(e) => {

@@ -18,6 +18,7 @@ import { ErrorBoundary } from "./components/ui/ErrorBoundary";
 import MiniAppExperience from "./components/ui/MiniAppExperience";
 import AdaptiveHeader from "./components/ui/AdaptiveHeader";
 import ClientOnly from "./components/ui/ClientOnly";
+import MiniAppDebug from "./components/ui/MiniAppDebug";
 
 // Loading skeleton component
 function LoadingSkeleton() {
@@ -119,6 +120,8 @@ export default function App() {
           <div className="center-app font-sans text-[var(--app-foreground)] mini-app-theme">
             <div className="center-content flex flex-col">
               <AdaptiveHeader onAddFrame={handleAddFrame} frameAdded={frameAdded} />
+              
+              <MiniAppDebug />
               
               <MiniAppExperience onAddFrame={handleAddFrame} frameAdded={frameAdded} />
 

@@ -28,7 +28,12 @@ export default function AdaptiveHeader({ onAddFrame, frameAdded }: AdaptiveHeade
   const isActuallyInMiniApp = isInMiniApp && 
     (typeof window !== 'undefined' && 
      (window.location.href.includes('farcaster.xyz') ||
-      window.navigator.userAgent.includes('Farcaster')));
+      window.location.href.includes('warpcast.com') ||
+      window.navigator.userAgent.includes('Farcaster') ||
+      window.navigator.userAgent.includes('Warpcast') ||
+      // Check for MiniKit specific environment variables or properties
+      (window as any).farcaster ||
+      (window as any).minikit));
 
   return (
     <header className="flex justify-between items-center mb-3 h-11">

@@ -70,8 +70,8 @@ export function Jukebox({
       window.navigator.userAgent.includes('Farcaster') ||
       window.navigator.userAgent.includes('Warpcast') ||
       // Check for MiniKit specific environment variables or properties
-      (window as any).farcaster ||
-      (window as any).minikit));
+      !!(window as unknown as { farcaster?: unknown }).farcaster ||
+      !!(window as unknown as { minikit?: unknown }).minikit));
   
   // Toast notification state
   const [toast, setToast] = useState<string | null>(null);

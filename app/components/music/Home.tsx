@@ -32,8 +32,8 @@ export function Home({ setActiveTab }: HomeProps) {
       window.navigator.userAgent.includes('Farcaster') ||
       window.navigator.userAgent.includes('Warpcast') ||
       // Check for MiniKit specific environment variables or properties
-      (window as any).farcaster ||
-      (window as any).minikit));
+      !!(window as unknown as { farcaster?: unknown }).farcaster ||
+      !!(window as unknown as { minikit?: unknown }).minikit));
 
   const handleSongTipped = () => {
     // Songs are now managed by the PlaylistView component via contract

@@ -13,8 +13,8 @@ export default function MiniAppDebug() {
       isInMiniApp,
       userAgent: window.navigator.userAgent,
       href: window.location.href,
-      hasFarcaster: !!(window as any).farcaster,
-      hasMinikit: !!(window as any).minikit,
+      hasFarcaster: !!(window as unknown as { farcaster?: unknown }).farcaster,
+      hasMinikit: !!(window as unknown as { minikit?: unknown }).minikit,
     };
   }, [isInMiniApp]);
 

@@ -1,5 +1,8 @@
 "use client";
 
+// Disable static generation for this page since it uses MiniKit
+export const dynamic = 'force-dynamic';
+
 import { useComposeCast } from '@coinbase/onchainkit/minikit';
 import { minikitConfig } from "../../minikit.config";
 import styles from "./page.module.css";

@@ -4,6 +4,7 @@ import { Icon } from "../ui/Icon";
 import { useAccount, useBalance } from "wagmi";
 import { formatUnits } from "viem";
 import { CircleDollarSign } from "lucide-react";
+import Image from "next/image";
 
 export function UserBalances() {
   const { address, isConnected } = useAccount();
@@ -67,18 +68,32 @@ export function UserBalances() {
 
   return (
     <Card title="Your Balances">
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-          <div className="w-5 h-5 bg-gradient-to-br from-purple-400 to-blue-500 rounded-full flex items-center justify-center">
-            <span className="text-white text-xs font-bold">Ξ</span>
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
+            <Image 
+              src="/tokens/eth-logo.svg" 
+              alt="ETH" 
+              width={32} 
+              height={32}
+              className="w-full h-full object-contain"
+            />
           </div>
-          <span className="font-bold">ETH:</span>
-          <span className="text-xl">{ethDisplay} ETH</span>
+          <span className="font-bold text-[var(--app-foreground)]">ETH:</span>
+          <span className="text-xl font-medium text-[var(--app-foreground)]">{ethDisplay} ETH</span>
         </div>
-        <div className="flex items-center gap-2">
-          <CircleDollarSign className="w-6 h-6 text-blue-500" />
-          <span className="font-bold">USDC:</span>
-          <span className="text-xl">{usdcDisplay} USDC</span>
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
+            <Image 
+              src="/tokens/usdc-logo.svg" 
+              alt="USDC" 
+              width={32} 
+              height={32}
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <span className="font-bold text-[var(--app-foreground)]">USDC:</span>
+          <span className="text-xl font-medium text-[var(--app-foreground)]">{usdcDisplay} USDC</span>
         </div>
       </div>
     </Card>

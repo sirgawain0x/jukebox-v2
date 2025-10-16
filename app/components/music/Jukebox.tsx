@@ -14,13 +14,15 @@ import {
   TransactionStatus,
 } from "@coinbase/onchainkit/transaction";
 import type { TransactionResponseType } from "@coinbase/onchainkit/transaction";
-import { useNotification } from "@coinbase/onchainkit/minikit";
+import { useComposeCast, useIsInMiniApp } from "@coinbase/onchainkit/minikit";
+// import { useNotification } from "@coinbase/onchainkit/minikit";
 import { Song, Playlist } from "@/types/music";
 import { Card } from "../ui/Card";
 import { Icon } from "../ui/Icon";
 import { Pills } from "../ui/Pills";
 import { playlistABI } from "@/lib/contracts";
 import { Skeleton } from "@/components/ui/skeleton";
+import { motion, AnimatePresence } from "framer-motion";
 
 type JukeboxProps = {
   onSongTipped: (song: Song) => void;
@@ -54,13 +56,49 @@ export function Jukebox({
   });
   const { address } = useAccount();
   const _chainId = useChainId();
-  const sendNotification = useNotification();
+  // const sendNotification = useNotification();
   const minTipEth = BigInt(Math.floor(0.00001429 * 1e18));
+  const { composeCast } = useComposeCast();
+  const isInMiniApp = useIsInMiniApp();
+
+  // More accurate Mini App detection - check for actual Farcaster environment
+  const isActuallyInMiniApp = isInMiniApp && 
+    (typeof window !== 'undefined' && 
+     (window.location.href.includes('farcaster.xyz') ||
+      window.navigator.userAgent.includes('Farcaster')));
+  
+  // Toast notification state
+  const [toast, setToast] = useState<string | null>(null);
   const [failedImages, setFailedImages] = useState<{ [id: string]: boolean }>(
     {}
   );
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [audioLoading, setAudioLoading] = useState(false);
+
+  // Toast notification function
+  const showToast = useCallback((message: string) => {
+    setToast(message);
+    setTimeout(() => setToast(null), 4000);
+  }, []);
+
+  // Sharing functions - only available in Mini App mode
+  const handleShareSong = useCallback(() => {
+    if (!selectedSong || !isActuallyInMiniApp) return;
+    
+    composeCast({
+      text: `🎵 Currently vibing to "${selectedSong.title}" by ${selectedSong.artist}! Check out this amazing track on the Jukebox Mini App 🎶`,
+      embeds: [window.location.href]
+    });
+  }, [selectedSong, composeCast, isActuallyInMiniApp]);
+
+  const handleShareTip = useCallback(() => {
+    if (!selectedSong || !isActuallyInMiniApp) return;
+    
+    composeCast({
+      text: `💎 Just tipped ${selectedSong.artist} for their incredible track "${selectedSong.title}"! Supporting artists directly on the blockchain 🎵✨`,
+      embeds: [window.location.href]
+    });
+  }, [selectedSong, composeCast, isActuallyInMiniApp]);
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const sortOptions = [
@@ -389,8 +427,8 @@ export function Jukebox({
   }, [selectedSong, address, minTipEth, playlist]);
 
   const handleSuccess = useCallback(
-    async (response: TransactionResponseType) => {
-      const transactionHash = response.transactionReceipts[0].transactionHash;
+    async (_response: TransactionResponseType) => {
+      // const transactionHash = response.transactionReceipts[0].transactionHash;
 
       if (playlist && selectedSong) {
         // TODO: Replace with actual contract call to add song to playlist
@@ -407,15 +445,21 @@ export function Jukebox({
         // write({ args: [selectedSong.id, selectedSong.metadataUrl] });
       }
 
-      await sendNotification({
-        title: "Thank you!",
-        body: `You tipped the creator! Tx: ${transactionHash}`,
-      });
+      // await sendNotification({
+      //   title: "Thank you!",
+      //   body: `You tipped the creator! Tx: ${transactionHash}`,
+      // });
+      
+      // Show success toast
+      showToast(`🎵 Tip sent to ${selectedSong?.artist}! Thank you for supporting the artist.`);
+      
       if (selectedSong) {
         onSongTipped(selectedSong);
+        // Automatically share the tip achievement
+        handleShareTip();
       }
     },
-    [sendNotification, selectedSong, onSongTipped, playlist]
+    [selectedSong, onSongTipped, playlist, showToast, handleShareTip]
   );
   function handleSelectSong(song: Song) {
     _setSelectedSong(song);
@@ -617,14 +661,27 @@ export function Jukebox({
               <Transaction
                 calls={calls}
                 onSuccess={handleSuccess}
-                onError={(error: TransactionError) =>
-                  sendNotification({
-                    title: "Transaction failed",
-                    body: error.message,
-                  })
-                }
+                onError={(error: TransactionError) => {
+                  console.error("Transaction failed:", error.message);
+                  
+                  // Handle different error types gracefully
+                  if (error.message.includes("Request denied") || error.message.includes("User rejected")) {
+                    showToast("Transaction cancelled - no tip sent");
+                  } else if (error.message.includes("insufficient funds")) {
+                    showToast("Insufficient funds - please add more ETH to your wallet");
+                  } else if (error.message.includes("gas")) {
+                    showToast("Transaction failed - please try again");
+                  } else {
+                    showToast("Transaction failed - please try again");
+                  }
+                }}
               >
                 <div className="w-full mt-3">
+                  <div className="text-center mb-2">
+                    <p className="text-sm font-medium text-white/90">
+                      Tip {selectedSong?.artist} in ETH
+                    </p>
+                  </div>
                   <TransactionButton className="w-full bg-white text-[#0052ff] hover:bg-gray-100" />
                 </div>
                 <TransactionStatus>
@@ -637,10 +694,39 @@ export function Jukebox({
                   <TransactionToastAction />
                 </TransactionToast>
               </Transaction>
+
+               {/* Share Song Button - Only show in Mini App mode */}
+               {isActuallyInMiniApp && (
+                 <button
+                   onClick={handleShareSong}
+                   className="w-full mt-3 bg-white/20 hover:bg-white/30 text-white rounded-lg py-2 px-4 transition-all duration-200 flex items-center justify-center gap-2 text-sm font-medium"
+                 >
+                   <Icon name="share" size="sm" />
+                   Share This Track
+                 </button>
+               )}
             </div>
           </div>
         )}
       </div>
+
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            key="toast-notification"
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 50, scale: 0.9 }}
+            transition={{ duration: 0.2 }}
+            className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50"
+          >
+            <div className="bg-[var(--app-accent)] text-white px-6 py-3 rounded-xl shadow-2xl border border-white/20">
+              <p className="font-medium">{toast}</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </Card>
   );
 }

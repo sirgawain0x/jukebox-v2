@@ -103,7 +103,7 @@ export function Fund({ setActiveTab }: FundProps) {
         {!loading && onrampUrl && (
           <div className="space-y-4">
             <FundButton
-              className="w-full"
+              className="w-full text-white bg-blue-500 hover:bg-blue-600"
               fundingUrl={onrampUrl}
               openIn="tab"
               disabled={!address}

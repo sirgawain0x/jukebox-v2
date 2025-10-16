@@ -25,7 +25,7 @@ export function Pills({
           key={option.value}
           type="button"
           onClick={() => onChange(option.value)}
-          className={`px-4 py-2 text-sm font-medium rounded-full border transition-all ${
+          className={`px-4 py-2 text-sm font-medium rounded-full border transition-all cursor-pointer ${
             value === option.value
               ? "bg-[#0052ff] text-white border-[#0052ff] shadow-sm"
               : "bg-[rgba(255,255,255,0.4)] text-[#58585c] border-[rgba(0,0,0,0.1)] hover:bg-[#e6edff] hover:text-[#0052ff] hover:border-[#0052ff]"

@@ -18,8 +18,8 @@ interface SessionTokenResponse {
 
 /**
  * Generates a JWT token for CDP API authentication using the CDP SDK
- * @param keyName - The CDP API key name
- * @param keySecret - The CDP API private key
+ * @param keyName - The CDP API key name (CDP_API_KEY)
+ * @param keySecret - The CDP API private key (CDP_API_SECRET)
  * @returns Promise of signed JWT token
  */
 export async function generateJWT(
@@ -38,7 +38,7 @@ export async function generateJWT(
       requestMethod: requestMethod,
       requestHost: requestHost,
       requestPath: requestPath,
-      expiresIn: 120, // optional (defaults to 120 seconds)
+      expiresIn: 120, // 2 minutes
     });
 
     return token;

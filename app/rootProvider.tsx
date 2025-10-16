@@ -1,15 +1,32 @@
 "use client";
-import { ReactNode, useEffect } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { base } from "wagmi/chains";
 import { OnchainKitProvider } from "@coinbase/onchainkit";
-import { sdk } from "@farcaster/miniapp-sdk";
+import { useMiniKit } from '@coinbase/onchainkit/minikit';
 import "@coinbase/onchainkit/styles.css";
 
-export function RootProvider({ children }: { children: ReactNode }) {
+function MiniKitWrapper({ children }: { children: ReactNode }) {
+  const [isMounted, setIsMounted] = useState(false);
+  const { setFrameReady, isFrameReady } = useMiniKit();
+
   useEffect(() => {
-    // Call ready() to signal the MiniApp is ready to be displayed
-    // This prevents jitter and content reflows
-    sdk.actions.ready();
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (isMounted && !isFrameReady) {
+      setFrameReady();
+    }
+  }, [isMounted, setFrameReady, isFrameReady]);
+
+  return <>{children}</>;
+}
+
+export function RootProvider({ children }: { children: ReactNode }) {
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
   }, []);
 
   return (
@@ -19,6 +36,8 @@ export function RootProvider({ children }: { children: ReactNode }) {
       config={{
         appearance: {
           mode: "auto",
+          name: "Jukebox",
+          logo: `${process.env.NEXT_PUBLIC_URL}/logo.png`,
         },
         wallet: {
           display: "modal",
@@ -31,7 +50,13 @@ export function RootProvider({ children }: { children: ReactNode }) {
         notificationProxyUrl: undefined,
       }}
     >
-      {children}
+      {isMounted ? (
+        <MiniKitWrapper>
+          {children}
+        </MiniKitWrapper>
+      ) : (
+        children
+      )}
     </OnchainKitProvider>
   );
 }

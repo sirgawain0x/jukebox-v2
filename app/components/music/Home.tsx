@@ -1,5 +1,6 @@
 "use client";
 import { useState, useCallback } from "react";
+import { useAccount } from "wagmi";
 import { Playlist, Song } from "@/types/music";
 import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
@@ -10,12 +11,14 @@ import { PlaylistView } from "./PlaylistView";
 import { RecentTips } from "./RecentTips";
 import { UserBalances } from "./UserBalances";
 import { ErrorBoundary } from "../ui/ErrorBoundary";
+// import ProtectedExample from "../examples/ProtectedExample";
 
 type HomeProps = {
   setActiveTab: (tab: string) => void;
 };
 
 export function Home({ setActiveTab }: HomeProps) {
+  const { address, isConnected } = useAccount();
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
   const [selectedSong, setSelectedSong] = useState<Song | null>(null);
 
@@ -30,7 +33,7 @@ export function Home({ setActiveTab }: HomeProps) {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <Card title="JUKEBOX 🎵">
+      <Card title="Jukebox 🎵">
         <p className="text-[var(--app-foreground-muted)] mb-4">
           Discover and support independent
           artists through on-chain music streaming and direct creator tips.
@@ -46,8 +49,9 @@ export function Home({ setActiveTab }: HomeProps) {
             onClick={() => setActiveTab("fund")}
             variant="outline"
             icon={<Icon name="plus" size="sm" />}
+            disabled={!isConnected}
           >
-            Add Funds
+            {isConnected ? "Add Funds" : "Add Funds"}
           </Button>
         </div>
       </Card>
@@ -72,6 +76,9 @@ export function Home({ setActiveTab }: HomeProps) {
           </div>
         </ErrorBoundary>
       )}
+
+      {/* Example of Protected Feature - temporarily disabled */}
+      {/* <ProtectedExample /> */}
     </div>
   );
 }

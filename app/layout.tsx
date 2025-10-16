@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
-import { SafeArea } from "@coinbase/onchainkit/minikit";
+// import { SafeArea } from "@coinbase/onchainkit/minikit";
 import { minikitConfig } from "../minikit.config";
 import { RootProvider } from "./rootProvider";
 import "./globals.css";
@@ -73,7 +73,7 @@ export default function RootLayout({
     <RootProvider>
       <html lang="en" suppressHydrationWarning>
         <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
-          <SafeArea>{children}</SafeArea>
+          {children}
         </body>
       </html>
     </RootProvider>

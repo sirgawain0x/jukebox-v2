@@ -150,7 +150,7 @@
   --ock-text-foreground: var(--foreground);
   --ock-text-foreground-muted: var(--muted-foreground);
   --ock-text-error: oklch(0.577 0.245 27.325);
-  --ock-text-primary: var(--primary);
+  --ock-text-primary: oklch(0.55 0.22 250);
   --ock-text-success: oklch(0.696 0.17 162.48);
   --ock-text-warning: oklch(0.828 0.189 84.429);
   --ock-text-disabled: var(--muted-foreground);
@@ -165,7 +165,7 @@
   --ock-bg-inverse: var(--foreground);
   --ock-bg-inverse-hover: oklch(0.269 0 0);
   --ock-bg-inverse-active: oklch(0.35 0 0);
-  --ock-bg-primary: var(--primary);
+  --ock-bg-primary: oklch(0.55 0.22 250);
   --ock-bg-primary-hover: oklch(0.50 0.22 250);
   --ock-bg-primary-active: oklch(0.45 0.22 250);
   --ock-bg-primary-washed: var(--accent);
@@ -179,7 +179,7 @@
   --ock-bg-default-reverse: var(--foreground);
 
   /* Icon colors */
-  --ock-icon-color-primary: var(--primary);
+  --ock-icon-color-primary: oklch(0.55 0.22 250);
   --ock-icon-color-foreground: var(--foreground);
   --ock-icon-color-foreground-muted: var(--muted-foreground);
   --ock-icon-color-inverse: var(--background);
@@ -188,7 +188,7 @@
   --ock-icon-color-warning: oklch(0.828 0.189 84.429);
 
   /* Line colors */
-  --ock-line-primary: var(--primary);
+  --ock-line-primary: oklch(0.55 0.22 250);
   --ock-line-default: var(--border);
   --ock-line-heavy: var(--muted-foreground);
   --ock-line-inverse: var(--secondary);

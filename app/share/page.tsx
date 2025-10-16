@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
+
+// Disable static generation for this page since it uses Farcaster SDK
+export const dynamic = 'force-dynamic';
 import { useSearchParams } from "next/navigation";
-import { sdk } from "@farcaster/miniapp-sdk";
+// import { sdk } from "@farcaster/miniapp-sdk";
 import { handleSplashScreen } from "../utils/farcaster";
 
 interface MiniappUser {
@@ -82,7 +85,7 @@ function SharePage() {
     // Initialize Farcaster Frame and check for share context
     async function init() {
       await handleSplashScreen();
-      let context: unknown = sdk.context;
+      let context: unknown = null; // sdk.context;
       if (typeof (context as Promise<unknown>).then === "function") {
         context = await (context as Promise<unknown>);
       }

@@ -13,6 +13,7 @@ import {
   TransactionButton,
   LifecycleStatus,
 } from "@coinbase/onchainkit/transaction";
+import { useComposeCast, useIsInMiniApp } from "@coinbase/onchainkit/minikit";
 import {
   useAccount,
   useChainId,
@@ -87,6 +88,14 @@ export function PlaylistSection({
   const { address, isConnected } = useAccount();
   const { data: walletClient } = useWalletClient();
   const chainId = useChainId();
+  const { composeCast } = useComposeCast();
+  const isInMiniApp = useIsInMiniApp();
+
+  // More accurate Mini App detection - check for actual Farcaster environment
+  const isActuallyInMiniApp = isInMiniApp && 
+    (typeof window !== 'undefined' && 
+     (window.location.href.includes('farcaster.xyz') ||
+      window.navigator.userAgent.includes('Farcaster')));
 
   // Check USDC balance on Base network
   const { data: usdcBalance } = useBalance({
@@ -123,6 +132,17 @@ export function PlaylistSection({
     setToast(message);
     setTimeout(() => setToast(null), 3000);
   }, []);
+
+  // Sharing function for playlist creation - only available in Mini App mode
+  const handleSharePlaylist = useCallback(() => {
+    if (!playlistName || !isActuallyInMiniApp) return;
+    
+    const tagsText = tags.length > 0 ? ` #${tags.join(' #')}` : '';
+    composeCast({
+      text: `🎵 Just created my new playlist "${playlistName}" with AI-generated cover art! Check out the Jukebox Mini App for blockchain-powered music discovery${tagsText} 🎶✨`,
+      embeds: [window.location.href]
+    });
+  }, [playlistName, tags, composeCast, isActuallyInMiniApp]);
 
   const handleGenerateImage = useCallback(async () => {
     if (!imagePrompt.trim()) return;
@@ -319,6 +339,8 @@ export function PlaylistSection({
                   tags,
                   address: deployedAddress.playlistAddress,
                 });
+                // Automatically share the playlist creation achievement
+                handleSharePlaylist();
               }, 100);
               break; // Exit loop once we've found and processed the log
             }
@@ -340,6 +362,7 @@ export function PlaylistSection({
     tags,
     showToast,
     launchConfetti,
+    handleSharePlaylist,
   ]);
 
   const addTag = () => {
@@ -658,7 +681,7 @@ export function PlaylistSection({
                           setImageLoadError(false);
                           setImageLoading(false);
                         }}
-                        className="absolute -top-2 -right-2 w-8 h-8 bg-red-500/80 hover:bg-red-500 text-white rounded-full flex items-center justify-center transition-colors duration-200 shadow-lg z-10"
+                        className="absolute -top-2 -right-2 w-8 h-8 bg-red-500/80 hover:bg-red-500 text-white rounded-full flex items-center justify-center transition-colors duration-200 shadow-lg z-10 cursor-pointer"
                         aria-label="Remove cover image"
                       >
                         <X className="w-4 h-4" />
@@ -724,7 +747,7 @@ export function PlaylistSection({
                           <button
                             type="button"
                             onClick={() => removeTag(tag)}
-                            className="text-[var(--app-accent)] hover:text-red-500 transition-colors duration-200"
+                            className="text-[var(--app-accent)] hover:text-red-500 transition-colors duration-200 cursor-pointer"
                             aria-label={`Remove ${tag} tag`}
                           >
                             <X className="w-3 h-3" />

@@ -1,32 +1,23 @@
 "use client";
 
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
+
+// Disable static generation for this page since it uses MiniKit
+export const dynamic = 'force-dynamic';
 import {
-  useMiniKit,
-  useAddFrame,
   useOpenUrl,
+  useAddFrame,
 } from "@coinbase/onchainkit/minikit";
-import {
-  Name,
-  Identity,
-  Address,
-  Avatar,
-  EthBalance,
-} from "@coinbase/onchainkit/identity";
-import {
-  ConnectWallet,
-  Wallet,
-  WalletDropdown,
-  WalletDropdownDisconnect,
-} from "@coinbase/onchainkit/wallet";
 import { Button } from "./components/ui/Button";
-import { Icon } from "./components/ui/Icon";
 import { Home } from "./components/music/Home";
 import { Features } from "./components/music/Features";
 import { Fund } from "./components/music/Funds";
 import { handleSplashScreen } from "./utils/farcaster";
 import { FrameMetaTags } from "./components/ui/FrameMetaTags";
 import { ErrorBoundary } from "./components/ui/ErrorBoundary";
+import MiniAppExperience from "./components/ui/MiniAppExperience";
+import AdaptiveHeader from "./components/ui/AdaptiveHeader";
+import ClientOnly from "./components/ui/ClientOnly";
 
 // Loading skeleton component
 function LoadingSkeleton() {
@@ -67,7 +58,6 @@ function LoadingSkeleton() {
 }
 
 export default function App() {
-  const { context } = useMiniKit();
   const [frameAdded, setFrameAdded] = useState(false);
   const [activeTab, setActiveTab] = useState("home");
   const [isFrameReady, setIsFrameReady] = useState(false);
@@ -105,37 +95,11 @@ export default function App() {
     initializeApp();
   }, [isMounted]);
 
-  const handleAddFrame = useCallback(async () => {
+  const handleAddFrame = async () => {
     const frameAdded = await addFrame();
     setFrameAdded(Boolean(frameAdded));
-  }, [addFrame]);
+  };
 
-  const saveFrameButton = useMemo(() => {
-    if (context && !context.client.added) {
-      return (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleAddFrame}
-          className="text-[var(--app-accent)] p-4"
-          icon={<Icon name="plus" size="sm" />}
-        >
-          Save Frame
-        </Button>
-      );
-    }
-
-    if (frameAdded) {
-      return (
-        <div className="flex items-center space-x-1 text-sm font-medium text-[#0052FF] animate-fade-out">
-          <Icon name="check" size="sm" className="text-[#0052FF]" />
-          <span>Saved</span>
-        </div>
-      );
-    }
-
-    return null;
-  }, [context, frameAdded, handleAddFrame]);
 
   // Show loading skeleton until app is ready (only after mounting)
   if (!isMounted || !isFrameReady) {
@@ -151,51 +115,35 @@ export default function App() {
         state="jukebox"
       />
       <ErrorBoundary>
-        <div className="center-app font-sans text-[var(--app-foreground)] mini-app-theme">
-          <div className="center-content flex flex-col">
-            <header className="flex justify-between items-center mb-3 h-11">
-              <div>
-                <div className="flex items-center space-x-2">
-                  <Wallet className="z-10">
-                    <ConnectWallet>
-                      <Name className="text-inherit" />
-                    </ConnectWallet>
-                    <WalletDropdown>
-                      <Identity className="px-4 pt-3 pb-2" hasCopyAddressOnClick>
-                        <Avatar />
-                        <Name />
-                        <Address />
-                        <EthBalance />
-                      </Identity>
-                      <WalletDropdownDisconnect />
-                    </WalletDropdown>
-                  </Wallet>
-                </div>
-              </div>
-              <div>{saveFrameButton}</div>
-            </header>
+        <ClientOnly fallback={<LoadingSkeleton />}>
+          <div className="center-app font-sans text-[var(--app-foreground)] mini-app-theme">
+            <div className="center-content flex flex-col">
+              <AdaptiveHeader onAddFrame={handleAddFrame} frameAdded={frameAdded} />
+              
+              <MiniAppExperience onAddFrame={handleAddFrame} frameAdded={frameAdded} />
 
-            <main className="flex-1">
-              <ErrorBoundary>
-                {activeTab === "home" && <Home setActiveTab={setActiveTab} />}
-                {activeTab === "features" && <Features setActiveTab={setActiveTab} />}
-                {activeTab === "fund" && <Fund setActiveTab={setActiveTab} />}
-              </ErrorBoundary>
-            </main>
+              <main className="flex-1">
+                <ErrorBoundary>
+                  {activeTab === "home" && <Home setActiveTab={setActiveTab} />}
+                  {activeTab === "features" && <Features setActiveTab={setActiveTab} />}
+                  {activeTab === "fund" && <Fund setActiveTab={setActiveTab} />}
+                </ErrorBoundary>
+              </main>
 
-            <footer className="mt-2 pt-4 flex justify-center">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-[var(--ock-text-foreground-muted)] text-xs"
-                onClick={() => openUrl("https://creativeplatform.xyz")}
-              >
-                © {new Date().getFullYear()} Creative Organization DAO. All rights
-                reserved.
-              </Button>
-            </footer>
+              <footer className="mt-2 pt-4 flex justify-center">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-[var(--ock-text-foreground-muted)] text-xs"
+                  onClick={() => openUrl("https://creativeplatform.xyz")}
+                >
+                  © {new Date().getFullYear()} Creative Organization DAO. All rights
+                  reserved.
+                </Button>
+              </footer>
+            </div>
           </div>
-        </div>
+        </ClientOnly>
       </ErrorBoundary>
     </>
   );

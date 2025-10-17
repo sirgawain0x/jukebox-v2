@@ -7,6 +7,9 @@ export type Song = {
   audioUrl: string;
   playCount: number | bigint;
   platformName?: string;
+  artistFid?: number; // Farcaster FID for the artist
+  artistUsername?: string; // Farcaster username for the artist
+  artistPfpUrl?: string; // Artist's Farcaster profile picture URL
 };
 
 export type Playlist = {

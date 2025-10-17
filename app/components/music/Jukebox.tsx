@@ -18,6 +18,11 @@ import type { TransactionResponseType } from "@coinbase/onchainkit/transaction";
 import { useComposeCast } from "@coinbase/onchainkit/minikit";
 // import { useNotification } from "@coinbase/onchainkit/minikit";
 import { Song, Playlist } from "@/types/music";
+import { 
+  createArtistMention, 
+  generateCastTextWithArtist
+} from "@/app/utils/farcaster-artist";
+import { ArtistProfile } from "./ArtistProfile";
 import { Card } from "../ui/Card";
 import { Icon } from "../ui/Icon";
 import { Pills } from "../ui/Pills";
@@ -102,8 +107,12 @@ export function Jukebox({
   const handleShareSong = useCallback(() => {
     if (!selectedSong) return;
     
+    const baseText = `🎵 Currently vibing to "${selectedSong.title}" by ${selectedSong.artist}! Check out this amazing track on Jukebox 🎶`;
+    const enhancedText = generateCastTextWithArtist(baseText, selectedSong);
+    const _artistMention = createArtistMention(selectedSong);
+    
     composeCast({
-      text: `🎵 Currently vibing to "${selectedSong.title}" by ${selectedSong.artist}! Check out this amazing track on Jukebox 🎶`,
+      text: enhancedText,
       embeds: [window.location.href]
     });
   }, [selectedSong, composeCast]);
@@ -111,8 +120,12 @@ export function Jukebox({
   const handleShareTip = useCallback(() => {
     if (!selectedSong) return;
     
+    const baseText = `💎 Just tipped ${selectedSong.artist} for their incredible track "${selectedSong.title}"! Supporting artists directly on the blockchain 🎵✨`;
+    const enhancedText = generateCastTextWithArtist(baseText, selectedSong);
+    const _artistMention = createArtistMention(selectedSong);
+    
     composeCast({
-      text: `💎 Just tipped ${selectedSong.artist} for their incredible track "${selectedSong.title}"! Supporting artists directly on the blockchain 🎵✨`,
+      text: enhancedText,
       embeds: [window.location.href]
     });
   }, [selectedSong, composeCast]);
@@ -695,8 +708,12 @@ export function Jukebox({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
+                        const baseText = `🎵 Check out "${song.title}" by ${song.artist}! Discovered this amazing track on Jukebox 🎶`;
+                        const enhancedText = generateCastTextWithArtist(baseText, song);
+                        const _artistMention = createArtistMention(song);
+                        
                         composeCast({
-                          text: `🎵 Check out "${song.title}" by ${song.artist}! Discovered this amazing track on Jukebox 🎶`,
+                          text: enhancedText,
                           embeds: [window.location.href]
                         });
                         showToast(`Shared "${song.title}" to Farcaster!`);
@@ -863,6 +880,25 @@ export function Jukebox({
                  <Icon name="share" size="sm" />
                  Share This Track
                </button>
+            </div>
+            
+            {/* Artist Profile Section */}
+            <div className="mt-4">
+              <ArtistProfile 
+                song={selectedSong} 
+                onUpdate={(updatedSong) => {
+                  // Update the song in the songs array
+                  setSongs(prevSongs => 
+                    prevSongs.map(song => 
+                      song.id === updatedSong.id ? updatedSong : song
+                    )
+                  );
+                  // Update selected song if it's the same
+                  if (selectedSong.id === updatedSong.id) {
+                    setSelectedSong(updatedSong);
+                  }
+                }}
+              />
             </div>
           </div>
         )}

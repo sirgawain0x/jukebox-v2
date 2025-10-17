@@ -25,7 +25,7 @@ export function UserBalances() {
     error: usdcError,
   } = useBalance({
     address,
-    token: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+    token: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // Fixed: use correct mixed-case address
     chainId: 8453,
   });
 
@@ -51,9 +51,14 @@ export function UserBalances() {
   }
 
   if (ethError || usdcError) {
+    console.error("Balance loading errors:", { ethError, usdcError });
     return (
       <Card title="Your Balances">
-        <div className="text-red-500">Error loading balances.</div>
+        <div className="text-red-500">
+          Error loading balances. 
+          {ethError && <div>ETH: {ethError.message}</div>}
+          {usdcError && <div>USDC: {usdcError.message}</div>}
+        </div>
       </Card>
     );
   }
@@ -64,6 +69,17 @@ export function UserBalances() {
   const usdcDisplay = usdcBalance
     ? Number(formatUnits(usdcBalance.value, usdcBalance.decimals)).toFixed(4)
     : "0.0000";
+
+  // Add safety check for missing balance data
+  if (!ethBalance && !usdcBalance && !ethLoading && !usdcLoading) {
+    return (
+      <Card title="Your Balances">
+        <div className="text-yellow-600">
+          Unable to load balance data. Please check your network connection.
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card title="Your Balances">

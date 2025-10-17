@@ -27,13 +27,13 @@ export function Button({
 
   const variantClasses = {
     primary:
-      "bg-[#0052ff] hover:bg-[#0047e1] text-white",
+      "bg-blue-600 hover:bg-blue-700 text-white",
     secondary:
-      "bg-[var(--app-gray)] hover:bg-[var(--app-gray-dark)] text-[var(--app-foreground)]",
+      "bg-gray-100 hover:bg-gray-200 text-gray-900",
     outline:
-      "border border-[#0052ff] text-[#0052ff] bg-white hover:bg-[#e6edff]",
+      "border border-blue-600 text-blue-600 bg-white hover:bg-blue-50",
     ghost:
-      "hover:bg-[var(--app-accent-light)] text-[var(--app-foreground-muted)]",
+      "hover:bg-gray-100 text-gray-600",
   };
 
   const sizeClasses = {

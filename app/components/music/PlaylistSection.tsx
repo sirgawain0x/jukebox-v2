@@ -131,13 +131,8 @@ export function PlaylistSection({
     if (!playlistName) return;
     
     const tagsText = tags.length > 0 ? ` #${tags.join(' #')}` : '';
-    
-    // TODO: When playlist songs are available, include artist mentions
-    // const artistMentions = createArtistMentions(playlistSongs);
-    
     composeCast({
       text: `🎵 Just created my new playlist "${playlistName}" with AI-generated cover art! Check out Jukebox for blockchain-powered music discovery${tagsText} 🎶✨`,
-      // mentions: artistMentions, // Uncomment when songs are available
       embeds: [window.location.href]
     });
   }, [playlistName, tags, composeCast]);

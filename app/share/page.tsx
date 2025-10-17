@@ -7,10 +7,6 @@ export const dynamic = 'force-dynamic';
 import { useSearchParams } from "next/navigation";
 // import { sdk } from "@farcaster/miniapp-sdk";
 import { handleSplashScreen } from "../utils/farcaster";
-import { useComposeCast } from "@coinbase/onchainkit/minikit";
-import { Card } from "../components/ui/Card";
-import { Button } from "../components/ui/Button";
-import { Icon } from "../components/ui/Icon";
 
 interface MiniappUser {
   fid: number;
@@ -70,7 +66,6 @@ export default function SharePageWrapper() {
 
 function SharePage() {
   const searchParams = useSearchParams();
-  const { composeCast } = useComposeCast();
   const [isShareContext, setIsShareContext] = useState(false);
   const [sharedCast, setSharedCast] = useState<MiniappCast | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,26 +74,6 @@ function SharePage() {
     castFid: string | null;
     viewerFid: string | null;
   }>({ castHash: null, castFid: null, viewerFid: null });
-
-  // Helper function to share back to Farcaster with mentions
-  const handleShareBack = (text: string, _mentions: MiniappUser[] = []) => {
-    composeCast({
-      text,
-      embeds: [window.location.href]
-    });
-  };
-
-  // Helper function to create a mention from cast author
-  const createAuthorMention = (cast: MiniappCast): MiniappUser | null => {
-    if (!cast.author?.fid) return null;
-    
-    return {
-      fid: cast.author.fid,
-      username: cast.author.username,
-      displayName: cast.author.displayName,
-      pfpUrl: cast.author.pfpUrl
-    };
-  };
 
   useEffect(() => {
     // Read query params immediately (SSR/CSR)
@@ -128,93 +103,18 @@ function SharePage() {
   }
 
   if (isShareContext && sharedCast) {
-    const authorMention = createAuthorMention(sharedCast);
-    const allMentions = [
-      ...(authorMention ? [authorMention] : []),
-      ...(sharedCast.mentions || [])
-    ];
-
     return (
-      <div className="p-6 max-w-2xl mx-auto space-y-6">
-        <Card title="🎵 Shared Cast from Jukebox">
-          <div className="space-y-4">
-            {/* Cast Author Info */}
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-              {sharedCast.author?.pfpUrl && (
-                <img 
-                  src={sharedCast.author.pfpUrl} 
-                  alt="Author profile" 
-                  className="w-12 h-12 rounded-full"
-                />
-              )}
-              <div>
-                <h3 className="font-semibold">
-                  @{sharedCast.author?.username || sharedCast.author?.fid}
-                </h3>
-                {sharedCast.author?.displayName && (
-                  <p className="text-sm text-gray-600">{sharedCast.author.displayName}</p>
-                )}
-              </div>
-            </div>
-
-            {/* Cast Details */}
-            <div className="space-y-2 text-sm">
-              <p><strong>Cast Hash:</strong> {sharedCast.hash}</p>
-              {sharedCast.timestamp && (
-                <p><strong>Shared:</strong> {new Date(sharedCast.timestamp * 1000).toLocaleString()}</p>
-              )}
-              {sharedCast.mentions && sharedCast.mentions.length > 0 && (
-                <div>
-                  <strong>Mentions:</strong>
-                  <div className="flex flex-wrap gap-2 mt-1">
-                    {sharedCast.mentions.map((mention, index) => (
-                      <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
-                        @{mention.username || mention.fid}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-3 pt-4">
-              <Button
-                onClick={() => handleShareBack(
-                  `🎵 Thanks for sharing this cast! Check out Jukebox for more amazing music discovery 🎶`,
-                  authorMention ? [authorMention] : []
-                )}
-                icon={<Icon name="share" size="sm" />}
-              >
-                Share Back
-              </Button>
-              
-              <Button
-                onClick={() => handleShareBack(
-                  `🎵 Discovered this through Jukebox! Supporting artists directly on the blockchain 🎶✨`,
-                  allMentions
-                )}
-                variant="outline"
-                icon={<Icon name="music" size="sm" />}
-              >
-                Share Jukebox
-              </Button>
-            </div>
-          </div>
-        </Card>
-
-        {/* Link to main app */}
-        <Card title="🎶 Explore Jukebox">
-          <p className="text-gray-600 mb-4">
-            Discover more amazing music and support artists directly on the blockchain.
+      <div style={{ padding: 32 }}>
+        <h1>
+          Cast from @{sharedCast.author?.username || sharedCast.author?.fid}
+        </h1>
+        <p>Cast Hash: {sharedCast.hash}</p>
+        {sharedCast.timestamp && (
+          <p>
+            Timestamp: {new Date(sharedCast.timestamp * 1000).toLocaleString()}
           </p>
-          <Button
-            onClick={() => window.location.href = '/'}
-            icon={<Icon name="arrow-right" size="sm" />}
-          >
-            Go to Jukebox
-          </Button>
-        </Card>
+        )}
+        {/* Add more cast-specific UI here */}
       </div>
     );
   }
@@ -222,48 +122,22 @@ function SharePage() {
   // Fallback: show info from URL params if available
   if (urlParams.castHash && urlParams.castFid) {
     return (
-      <div className="p-6 max-w-2xl mx-auto space-y-6">
-        <Card title="🎵 Shared Cast">
-          <div className="space-y-4">
-            <div className="space-y-2 text-sm">
-              <p><strong>Cast from FID:</strong> {urlParams.castFid}</p>
-              <p><strong>Cast Hash:</strong> {urlParams.castHash}</p>
-              {urlParams.viewerFid && (
-                <p><strong>Shared by viewer FID:</strong> {urlParams.viewerFid}</p>
-              )}
-            </div>
-            <p className="text-gray-600">Waiting for Farcaster context...</p>
-            <Button
-              onClick={() => window.location.href = '/'}
-              icon={<Icon name="arrow-right" size="sm" />}
-            >
-              Go to Jukebox
-            </Button>
-          </div>
-        </Card>
+      <div style={{ padding: 32 }}>
+        <h1>Cast from FID {urlParams.castFid}</h1>
+        <p>Cast Hash: {urlParams.castHash}</p>
+        {urlParams.viewerFid && (
+          <p>Shared by viewer FID: {urlParams.viewerFid}</p>
+        )}
+        <p>Waiting for Farcaster context...</p>
       </div>
     );
   }
 
   // Default fallback UI
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-6">
-      <Card title="🎶 Welcome to Jukebox">
-        <div className="space-y-4">
-          <p className="text-gray-600">
-            No shared cast detected. This page is intended for Farcaster share extension.
-          </p>
-          <p className="text-gray-600">
-            Discover amazing music and support artists directly on the blockchain.
-          </p>
-          <Button
-            onClick={() => window.location.href = '/'}
-            icon={<Icon name="arrow-right" size="sm" />}
-          >
-            Explore Jukebox
-          </Button>
-        </div>
-      </Card>
+    <div style={{ padding: 32 }}>
+      No shared cast detected. This page is intended for Farcaster share
+      extension.
     </div>
   );
 }

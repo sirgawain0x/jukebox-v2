@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { withPayment } from "@/lib/payment-handler";
 
 /**
- * Protected API route for Gemini text-to-image generation
+ * Protected API route for Livepeer text-to-image generation
  * Payment is handled via the withPayment wrapper
  */
 const handler = async (request: NextRequest) => {
   try {
-    // Your Gemini text-to-image logic here
+    // Your Livepeer text-to-image logic here
     const body = await request.json();
     const { prompt } = body;
 
@@ -18,23 +18,23 @@ const handler = async (request: NextRequest) => {
       );
     }
 
-    // TODO: Implement Gemini API call
+    // TODO: Implement Livepeer API call
     // Example:
-    // const result = await geminiClient.generateImage({ prompt });
+    // const result = await livepeerClient.textToImage({ prompt });
 
     return NextResponse.json({
-      message: "Cover art generation endpoint - implement Gemini logic",
+      message: "Image generation endpoint - implement Livepeer logic",
       prompt,
     });
   } catch (error) {
-    console.error("Gemini text-to-image error:", error);
+    console.error("Livepeer text-to-image error:", error);
     return NextResponse.json(
-      { error: "Failed to generate cover art" },
+      { error: "Failed to generate image" },
       { status: 500 }
     );
   }
 };
 
 // Wrap with payment handler
-export const POST = withPayment("/api/gemini/text-to-image", handler);
+export const POST = withPayment("/api/livepeer/text-to-image", handler);
 

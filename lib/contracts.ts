@@ -1,68 +1,19 @@
 import { Address } from "viem";
 import { useReadContract, useWriteContract, useChainId } from "wagmi";
 
-// Fallback price feed for when Chainlink is unavailable
-const FALLBACK_ETH_PRICE = 3787; // USD per ETH - updated based on current market price
-
-// Calculate fallback ETH amount for given cents
-function calculateFallbackETH(cents: bigint): bigint {
-  const centsNumber = Number(cents);
-  const ethAmount = centsNumber / 100 / FALLBACK_ETH_PRICE;
-  return BigInt(Math.ceil(ethAmount * 1e18)); // Convert to wei and round up
-}
-
-// Utility function to test price feed directly (for debugging)
-export function useTestPriceFeed() {
-  const chainId = useChainId();
-  const addresses = getContractAddresses(chainId);
-
-  const { data: description } = useReadContract({
-    address: addresses.PRICE_FEED,
-    abi: chainlinkPriceFeedABI,
-    functionName: "description",
-  });
-
-  const { data: version } = useReadContract({
-    address: addresses.PRICE_FEED,
-    abi: chainlinkPriceFeedABI,
-    functionName: "version",
-  });
-
-  const { data: decimals } = useReadContract({
-    address: addresses.PRICE_FEED,
-    abi: chainlinkPriceFeedABI,
-    functionName: "decimals",
-  });
-
-  const { data: latestRoundData } = useReadContract({
-    address: addresses.PRICE_FEED,
-    abi: chainlinkPriceFeedABI,
-    functionName: "latestRoundData",
-  });
-
-  return {
-    description,
-    version,
-    decimals,
-    latestRoundData,
-    priceFeedAddress: addresses.PRICE_FEED,
-    chainId,
-  };
-}
-
 // Contract addresses by chain
 const CONTRACT_ADDRESSES = {
   // Base Sepolia (Testnet)
   84532: {
     CREATE2_FACTORY: "0x5A7861D29088B67Cc03d85c4D89B855201e030EB" as const,
     PLAYLIST_NFT: "0x4B9c51D7F985DD62f226dAB60EaA254975cB177B" as const,
-    PRICE_FEED: "0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1" as const, // ETH/USD - Base Sepolia Chainlink price feed
+    PRICE_FEED: "0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1" as const, // ETH/USD
   },
   // Base Mainnet (Production)
   8453: {
     CREATE2_FACTORY: "0x585571bF2BE914e0C9CE549E99E2E61888d09cC2" as const,
     PLAYLIST_NFT: "0x4B9c51D7F985DD62f226dAB60EaA254975cB177B" as const,
-    PRICE_FEED: "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70" as const, // ETH/USD - Base mainnet Chainlink price feed
+    PRICE_FEED: "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70" as const, // ETH/USD
   },
 } as const;
 
@@ -941,129 +892,11 @@ export function useDeployPlaylist() {
   return { deployPlaylist, hash, isPending, isSuccess, isError, error };
 }
 
-// Complete Chainlink AggregatorV3Interface ABI for direct price feed access
-const chainlinkPriceFeedABI = [
-  {
-    inputs: [],
-    name: "decimals",
-    outputs: [{ internalType: "uint8", name: "", type: "uint8" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "description",
-    outputs: [{ internalType: "string", name: "", type: "string" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [{ internalType: "uint80", name: "_roundId", type: "uint80" }],
-    name: "getRoundData",
-    outputs: [
-      { internalType: "uint80", name: "roundId", type: "uint80" },
-      { internalType: "int256", name: "answer", type: "int256" },
-      { internalType: "uint256", name: "startedAt", type: "uint256" },
-      { internalType: "uint256", name: "updatedAt", type: "uint256" },
-      { internalType: "uint80", name: "answeredInRound", type: "uint80" },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "latestAnswer",
-    outputs: [{ internalType: "int256", name: "", type: "int256" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "latestRound",
-    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "latestRoundData",
-    outputs: [
-      { internalType: "uint80", name: "roundId", type: "uint80" },
-      { internalType: "int256", name: "answer", type: "int256" },
-      { internalType: "uint256", name: "startedAt", type: "uint256" },
-      { internalType: "uint256", name: "updatedAt", type: "uint256" },
-      { internalType: "uint80", name: "answeredInRound", type: "uint80" },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "latestTimestamp",
-    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "version",
-    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
-    stateMutability: "view",
-    type: "function",
-  },
-] as const;
-
-export function useGetRequiredETH(cents: bigint): {
-  data: bigint | undefined;
-  isLoading: boolean;
-  isError: boolean;
-  error: Error | null;
-  refetch: () => Promise<unknown>;
-  _debug?: {
-    contractError: boolean;
-    fallbackUsed: boolean;
-    priceSource: string;
-    originalError: Error | null;
-  };
-} {
+export function useGetRequiredETH(cents: bigint) {
   const chainId = useChainId();
   const addresses = getContractAddresses(chainId);
 
-  // Try multiple methods to get price from Chainlink price feed
-  const { data: latestRoundData, isError: latestRoundError } = useReadContract({
-    address: addresses.PRICE_FEED,
-    abi: chainlinkPriceFeedABI,
-    functionName: "latestRoundData",
-    query: {
-      enabled: cents > BigInt(0),
-      retry: 2,
-      staleTime: 30000,
-    },
-  });
-
-  const { data: latestAnswer, isError: latestAnswerError } = useReadContract({
-    address: addresses.PRICE_FEED,
-    abi: chainlinkPriceFeedABI,
-    functionName: "latestAnswer",
-    query: {
-      enabled: cents > BigInt(0),
-      retry: 2,
-      staleTime: 30000,
-    },
-  });
-
-  const { data: decimals, isError: decimalsError } = useReadContract({
-    address: addresses.PRICE_FEED,
-    abi: chainlinkPriceFeedABI,
-    functionName: "decimals",
-    query: {
-      enabled: cents > BigInt(0),
-      retry: 2,
-      staleTime: 300000, // Decimals don't change often
-    },
-  });
-
-  const { data, isLoading, isError, error, refetch, ...rest } = useReadContract({
+  const { data, isLoading, isError, ...rest } = useReadContract({
     address: addresses.CREATE2_FACTORY,
     abi: create2FactoryABI,
     functionName: "getRequiredETHForCents",
@@ -1071,87 +904,15 @@ export function useGetRequiredETH(cents: bigint): {
     // Only run query if cents is greater than 0
     query: {
       enabled: cents > BigInt(0),
-      retry: 2, // Reduced retries since we have fallback
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
-      staleTime: 30000,
-      refetchInterval: 60000,
     },
   });
 
   // If cents is 0, return 0 immediately
   if (cents === BigInt(0)) {
-    return { 
-      data: BigInt(0), 
-      isLoading: false, 
-      isError: false, 
-      error: null,
-      refetch: () => Promise.resolve({ data: BigInt(0), error: null }),
-      ...rest 
-    };
+    return { data: BigInt(0), isLoading: false, isError: false, ...rest };
   }
 
-  // Calculate fallback price from Chainlink data if available
-  let fallbackData: bigint | undefined;
-  let priceSource = "none";
-  
-  if (latestRoundData && !latestRoundError) {
-    const [, answer, , updatedAt] = latestRoundData;
-    const priceDecimals = decimals && !decimalsError ? Number(decimals) : 8; // Default to 8 decimals
-    const price = Number(answer) / (10 ** priceDecimals);
-    const ethAmount = Number(cents) / 100 / price;
-    fallbackData = BigInt(Math.ceil(ethAmount * 1e18)); // Convert to wei
-    priceSource = "latestRoundData";
-    
-    // Check data freshness (warn if older than 1 hour)
-    const currentTime = Math.floor(Date.now() / 1000);
-    const dataAge = currentTime - Number(updatedAt);
-    if (dataAge > 3600) {
-      console.warn(`Price feed data is ${dataAge} seconds old (${Math.floor(dataAge / 60)} minutes)`);
-    }
-  } else if (latestAnswer && !latestAnswerError) {
-    const priceDecimals = decimals && !decimalsError ? Number(decimals) : 8;
-    const price = Number(latestAnswer) / (10 ** priceDecimals);
-    const ethAmount = Number(cents) / 100 / price;
-    fallbackData = BigInt(Math.ceil(ethAmount * 1e18));
-    priceSource = "latestAnswer";
-  }
-
-  // Use fallback calculation if contract call fails
-  const finalData = isError ? (fallbackData || calculateFallbackETH(cents)) : data;
-  const finalIsError = isError && !fallbackData;
-
-  // Log error details for debugging
-  if (isError && error) {
-    console.warn("Price feed contract call failed, using fallback:", {
-      error: error.message,
-      chainId,
-      contractAddress: addresses.CREATE2_FACTORY,
-      priceFeedAddress: addresses.PRICE_FEED,
-      cents: cents.toString(),
-      fallbackUsed: !!fallbackData,
-      priceSource,
-      fallbackPrice: fallbackData ? (Number(fallbackData) / 1e18).toFixed(6) : "none",
-      latestRoundError: latestRoundError,
-      latestAnswerError: latestAnswerError,
-      decimalsError: decimalsError,
-    });
-  }
-
-  return { 
-    data: finalData, 
-    isLoading, 
-    isError: finalIsError, 
-    error: finalIsError ? error : null, // Only return error if we truly failed
-    refetch: refetch || (() => Promise.resolve({ data: finalData, error: null })),
-    // Add debugging info for development
-    _debug: {
-      contractError: isError,
-      fallbackUsed: !!fallbackData,
-      priceSource,
-      originalError: error,
-    },
-    ...rest 
-  };
+  return { data, isLoading, isError, ...rest };
 }
 
 export function useGetPlaylistSongs(playlistAddress?: `0x${string}`) {

@@ -26,7 +26,7 @@ import {
   create2FactoryABI,
   getContractAddresses,
 } from "@/lib/contracts";
-import { extractTransactionErrorMessage } from "@/lib/utils";
+import { wrapFetchWithPayment } from "x402-fetch";
 import {
   Music,
   Image as ImageIcon,
@@ -38,6 +38,7 @@ import {
   Loader2,
   Tag,
   FileText,
+  Wallet,
 } from "lucide-react";
 import { decodeEventLog } from "viem";
 import { type ContractFunctionParameters } from "viem";
@@ -77,35 +78,12 @@ export function PlaylistSection({
   const [paymentStatus, setPaymentStatus] = useState<string>("");
   const [imageLoadError, setImageLoadError] = useState(false);
   const [imageLoading, setImageLoading] = useState(false);
-  const [aiAccessUnlocked, setAiAccessUnlocked] = useState(false);
-  const [imageGenerationCount, setImageGenerationCount] = useState(0);
-  const [useAIGeneration, setUseAIGeneration] = useState(true);
 
   // Get ETH amount for $0.10 (10 cents) for saving playlist
-  const priceQueryResult = useGetRequiredETH(BigInt(10));
-  const { data: savePlaylistCost, isLoading: isLoadingSaveCost, isError: priceError } = priceQueryResult;
-  const _debug = (priceQueryResult as Record<string, unknown>)._debug as {
-    fallbackUsed?: boolean;
-    priceSource?: string;
-  } | undefined;
+  const { data: savePlaylistCost, isLoading: isLoadingSaveCost } =
+    useGetRequiredETH(BigInt(10));
 
-  // Validate price and provide safe fallback
-  const validateAndGetCost = (cost: bigint | undefined) => {
-    if (!cost) return BigInt("26400000000000"); // ~$0.10 at ETH $3,787
-    
-    // Sanity check: ensure cost is reasonable (between $0.01 and $1.00)
-    const minCost = BigInt("2600000000000"); // ~$0.01
-    const maxCost = BigInt("260000000000000"); // ~$1.00
-    
-    if (cost < minCost || cost > maxCost) {
-      console.warn(`Price feed returned unusual value: ${cost} wei. Using fallback.`);
-      return BigInt("26400000000000"); // Safe fallback at current ETH price
-    }
-    
-    return cost;
-  };
-
-  const SAVE_PLAYLIST_COST = validateAndGetCost(savePlaylistCost);
+  const SAVE_PLAYLIST_COST = savePlaylistCost ?? BigInt("39582170607071750"); // Fallback to ~$0.10
 
   const { address, isConnected } = useAccount();
   const { data: walletClient } = useWalletClient();
@@ -121,12 +99,6 @@ export function PlaylistSection({
 
   const { data: receipt } = useWaitForTransactionReceipt({
     hash: deploymentHash,
-  });
-
-  // Check ETH balance for transaction
-  const { data: ethBalance } = useBalance({
-    address: address,
-    chainId: chainId,
   });
 
   const launchConfetti = useCallback(() => {
@@ -185,6 +157,7 @@ export function PlaylistSection({
 
     // Check if connected to Base network
     if (walletClient.chain.id !== 8453) {
+      // Base mainnet chain ID
       setImageGenerationError(
         "Please switch to Base network to use x402 payments"
       );
@@ -205,26 +178,48 @@ export function PlaylistSection({
     setPaymentStatus("Preparing payment...");
 
     try {
-      // For now, let's simulate a successful generation to test the UI flow
-      // TODO: Fix x402-fetch integration
+      // Use x402 payment for image generation
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const fetchWithPayment = wrapFetchWithPayment(fetch, walletClient as any);
+
       setPaymentStatus("Processing payment...");
-      
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Simulate successful image generation
-      const mockImageUrl = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjNjY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIyNCIgZmlsbD0iI2ZmZiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk1vY2sgSW1hZ2U8L3RleHQ+PC9zdmc+";
-      
-      setCoverImage(mockImageUrl);
-      setImageLoadError(false);
-      setImageLoading(true);
-      setPaymentStatus("Payment successful! Image generated.");
-      showToast("Image generated successfully with Gemini AI!");
-      setTimeout(() => setPaymentStatus(""), 3000);
-      
-      // Increment generation count and lock access for next generation
-      setImageGenerationCount(prev => prev + 1);
-      setAiAccessUnlocked(false);
+      console.log("Wallet connected:", isConnected, "Address:", address);
+      console.log("Wallet client:", walletClient);
+
+      const response = await fetchWithPayment("/api/gemini/text-to-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: imagePrompt,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error("API Error:", response.status, errorData);
+
+        if (response.status === 402) {
+          throw new Error(
+            "Payment required. Please ensure your wallet is connected and has sufficient USDC balance."
+          );
+        }
+
+        throw new Error(
+          `Failed to generate image: ${response.status}${errorData.error ? ` - ${errorData.error}` : ""}`
+        );
+      }
+
+      const data = await response.json();
+      if (data.imageUrl) {
+        setCoverImage(data.imageUrl);
+        setImageLoadError(false);
+        setImageLoading(true);
+        setPaymentStatus("Payment successful! Image generated.");
+        showToast("Image generated successfully with Gemini AI!");
+        setTimeout(() => setPaymentStatus(""), 3000);
+      } else {
+        throw new Error("No image URL returned");
+      }
     } catch (error: unknown) {
       console.error("Image generation error:", error);
 
@@ -232,10 +227,13 @@ export function PlaylistSection({
       if (error instanceof Error) {
         errorMessage = error.message;
 
+        // Check for specific x402 payment errors
         if (error.message.includes("402")) {
-          errorMessage = "Payment required. Please ensure your wallet is connected and has sufficient USDC balance.";
+          errorMessage =
+            "Payment failed. Please ensure you have sufficient USDC balance on Base network.";
         } else if (error.message.includes("insufficient")) {
-          errorMessage = "Insufficient USDC balance. Please add funds to your wallet.";
+          errorMessage =
+            "Insufficient USDC balance. Please add funds to your wallet.";
         } else if (error.message.includes("rejected")) {
           errorMessage = "Payment was rejected. Please try again.";
         }
@@ -248,19 +246,8 @@ export function PlaylistSection({
     }
   }, [imagePrompt, showToast, isConnected, address, walletClient, usdcBalance]);
 
-  const handlePayForAIAccess = useCallback(async () => {
-    // Set a default prompt and unlock access, then call the generation function
-    setImagePrompt("Generate a beautiful abstract cover art for a music playlist");
-    setAiAccessUnlocked(true);
-    setPaymentStatus("AI access unlocked! You can now generate images.");
-    showToast("AI image generation unlocked! You can now generate images.");
-    setTimeout(() => setPaymentStatus(""), 3000);
-  }, [showToast]);
-
   const handleOnStatus = useCallback(
     async (status: LifecycleStatus) => {
-      console.log("Transaction status:", status);
-      
       if (status.statusName === "transactionPending") {
         setSaveState("pending");
       } else if (status.statusName === "success") {
@@ -271,30 +258,7 @@ export function PlaylistSection({
         }
       } else if (status.statusName === "error") {
         setSaveState("error");
-        
-        // Enhanced error logging with better context
-        const errorContext = {
-          statusName: status.statusName,
-          statusData: status.statusData,
-          timestamp: new Date().toISOString(),
-          userAddress: address,
-          chainId: chainId
-        };
-        
-        // Only log if there's meaningful error data
-        if (status.statusData && Object.keys(status.statusData).length > 0) {
-          console.error("Transaction error:", errorContext);
-        } else {
-          console.warn("Transaction failed with empty error data:", errorContext);
-        }
-        
-        // Extract user-friendly error message using utility function
-        const errorMessage = extractTransactionErrorMessage(
-          status.statusData,
-          "Transaction failed. Please try again."
-        );
-        
-        showToast(errorMessage);
+        showToast("Transaction failed. Please try again.");
       }
     },
     [showToast, address, chainId]
@@ -304,57 +268,25 @@ export function PlaylistSection({
     if (showSaveModal && address) {
       const saltBytes = new Uint8Array(32);
       crypto.getRandomValues(saltBytes);
-      const salt = BigInt(`0x${Buffer.from(saltBytes).toString("hex")}`);
-      let addresses;
-      try {
-        addresses = getContractAddresses(chainId);
-      } catch (error) {
-        console.error("Failed to get contract addresses:", error);
-        showToast(`Unsupported network. Please switch to Base mainnet or Base Sepolia.`);
-        return;
-      }
-      
-      const transactionCall = {
-        abi: create2FactoryABI,
-        address: addresses.CREATE2_FACTORY,
-        functionName: "deployPlaylist",
-        args: [
-          playlistName,
-          coverImage,
-          description,
-          tags,
-          address as `0x${string}`,
-          addresses.PRICE_FEED,
-          salt,
-        ],
-        value: SAVE_PLAYLIST_COST,
-      };
-      
-      console.log("Setting up transaction call:", {
-        chainId,
-        addresses,
-        playlistName,
-        coverImage,
-        description,
-        tags,
-        address,
-        salt: salt.toString(),
-        value: SAVE_PLAYLIST_COST.toString(),
-        ethBalance: ethBalance?.value.toString(),
-        transactionCall
-      });
-      
-      // Validate sufficient ETH balance
-      if (ethBalance && ethBalance.value < SAVE_PLAYLIST_COST) {
-        console.error("Insufficient ETH balance:", {
-          required: SAVE_PLAYLIST_COST.toString(),
-          available: ethBalance.value.toString()
-        });
-        showToast(`Insufficient ETH balance. You need at least ${(Number(SAVE_PLAYLIST_COST) / 1e18).toFixed(6)} ETH.`);
-        return;
-      }
-      
-      setSavePlaylistCalls([transactionCall]);
+      const salt = `0x${Buffer.from(saltBytes).toString("hex")}` as const;
+      const addresses = getContractAddresses(chainId);
+      setSavePlaylistCalls([
+        {
+          abi: create2FactoryABI,
+          address: addresses.CREATE2_FACTORY,
+          functionName: "deployPlaylist",
+          args: [
+            playlistName,
+            coverImage,
+            description,
+            tags,
+            address as `0x${string}`,
+            addresses.PRICE_FEED,
+            salt,
+          ],
+          value: SAVE_PLAYLIST_COST,
+        },
+      ]);
     }
   }, [
     showSaveModal,
@@ -365,19 +297,11 @@ export function PlaylistSection({
     description,
     tags,
     SAVE_PLAYLIST_COST,
-    ethBalance,
-    showToast,
   ]);
 
   useEffect(() => {
     if (receipt) {
-      let addresses;
-      try {
-        addresses = getContractAddresses(chainId);
-      } catch (error) {
-        console.error("Failed to get contract addresses for receipt processing:", error);
-        return;
-      }
+      const addresses = getContractAddresses(chainId);
       const eventAbi = create2FactoryABI.find(
         (item) => item.type === "event" && item.name === "PlaylistDeployed"
       );
@@ -550,212 +474,162 @@ export function PlaylistSection({
                 />
               </motion.div>
 
-              {/* Cover Art Section with Toggle */}
+              {/* AI Image Generation */}
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.8 }}
                 className="space-y-4"
               >
-                <div className="flex items-center justify-between">
-                  <Label className="text-lg font-semibold flex items-center gap-3 text-[var(--app-foreground)]">
-                    <div className="p-2 bg-blue-500 rounded-lg">
-                      <ImageIcon className="w-4 h-4 text-white" />
-                    </div>
-                    Cover Art
-                  </Label>
-                  
-                  {/* Toggle Switch */}
-                  <div className="flex items-center gap-3">
-                    <span className={`text-sm font-medium transition-colors duration-200 ${
-                      !useAIGeneration ? 'text-[var(--app-foreground)]' : 'text-[var(--app-foreground-muted)]'
-                    }`}>
-                      Custom URL
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setUseAIGeneration(!useAIGeneration);
-                        // Clear any existing image when switching modes
-                        setCoverImage("");
-                        setImageLoadError(false);
-                        setImageLoading(false);
-                        setImageGenerationError(null);
-                      }}
-                      className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                      style={{
-                        backgroundColor: useAIGeneration ? '#3B82F6' : '#D1D5DB'
-                      }}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
-                          useAIGeneration ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                    </button>
-                    <span className={`text-sm font-medium transition-colors duration-200 ${
-                      useAIGeneration ? 'text-[var(--app-foreground)]' : 'text-[var(--app-foreground-muted)]'
-                    }`}>
-                      AI Generation
-                    </span>
+                <Label className="text-lg font-semibold flex items-center gap-3 text-[var(--app-foreground)]">
+                  <div className="p-2 bg-blue-500 rounded-lg">
+                    <Sparkles className="w-4 h-4 text-white" />
                   </div>
+                  AI Cover Art Generation
+                </Label>
+
+                <div className="text-center mb-4">
+                  <p className="text-sm text-[var(--app-foreground-muted)]">
+                    ✨ Google&apos;s Gemini AI - Advanced image generation with
+                    natural language understanding
+                  </p>
                 </div>
 
-                {/* AI Image Generation Section */}
-                {useAIGeneration && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="space-y-4"
-                  >
-                    <div className="text-center mb-4">
-                      <p className="text-sm text-[var(--app-foreground-muted)]">
-                        ✨ Google&apos;s Gemini AI - Advanced image generation with
-                        natural language understanding
-                      </p>
-                    </div>
+                <div className="p-6 bg-[var(--app-accent-light)] rounded-2xl border-2 border-dashed border-[var(--app-accent)]/50">
+                  <div className="space-y-4">
+                    <Textarea
+                      value={imagePrompt}
+                      onChange={(e) => {
+                        setImagePrompt(e.target.value);
+                        if (imageGenerationError) setImageGenerationError(null);
+                      }}
+                      placeholder="e.g. Futuristic neon city at night, Abstract geometric patterns with sound waves, Retro vinyl record with cosmic background..."
+                      className="min-h-[100px] bg-[var(--app-card-bg)] border border-[var(--app-card-border)] focus:border-[var(--app-accent)] rounded-xl transition-all duration-300 resize-none"
+                    />
 
-                    {/* Image Generation Counter */}
-                    {imageGenerationCount > 0 && (
-                      <div className="text-center mb-4">
-                        <p className="text-sm text-[var(--app-foreground-muted)]">
-                          🎨 Generated {imageGenerationCount} image{imageGenerationCount !== 1 ? 's' : ''} this session
-                        </p>
+                    {/* Wallet connection check */}
+                    {!isConnected && (
+                      <div className="text-center p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <div className="flex items-center justify-center gap-2 text-yellow-700">
+                          <Wallet className="w-5 h-5" />
+                          <span className="text-sm font-medium">
+                            Please connect your wallet to generate images
+                          </span>
+                        </div>
                       </div>
                     )}
 
-                    <div className="p-6 bg-[var(--app-accent-light)] rounded-2xl border-2 border-dashed border-[var(--app-accent)]/50">
-                      <div className="space-y-4">
-                        {/* LOCKED STATE - Show payment button */}
-                        {!aiAccessUnlocked && (
-                          <>
-                            {/* Disabled text input */}
-                            <Textarea
-                              value=""
-                              placeholder="Click 'Unlock AI Generation' to access the text input and generate images..."
-                              className="min-h-[100px] bg-gray-100 border border-gray-300 rounded-xl transition-all duration-300 resize-none cursor-not-allowed"
-                              disabled
-                            />
-
-                            <div className="text-center mb-2">
-                              <p className="text-sm font-medium text-[var(--app-foreground-muted)] flex items-center justify-center gap-1">
-                                Cost:{" "}
-                                <span className="text-green-600 font-bold">
-                                  $0.05 USDC
-                                </span>{" "}
-                                on Base
-                              </p>
-                            </div>
-
-                            {paymentStatus && (
-                              <div className="text-center p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                                <p className="text-sm text-blue-700">{paymentStatus}</p>
-                              </div>
-                            )}
-
-                            <Button
-                              type="button"
-                              onClick={handlePayForAIAccess}
-                              disabled={false}
-                              className="w-full h-12 bg-green-500 hover:bg-green-500/90 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              <div className="flex items-center gap-2">
-                                <Sparkles className="w-5 h-5 group-hover:scale-110 transition-transform duration-300" />
-                                Unlock AI Generation
-                              </div>
-                            </Button>
-                          </>
-                        )}
-
-                        {/* UNLOCKED STATE - Show text input and generate button */}
-                        {aiAccessUnlocked && (
-                          <>
-                            <Textarea
-                              value={imagePrompt}
-                              onChange={(e) => {
-                                setImagePrompt(e.target.value);
-                                if (imageGenerationError) setImageGenerationError(null);
-                              }}
-                              placeholder="e.g. Futuristic neon city at night, Abstract geometric patterns with sound waves, Retro vinyl record with cosmic background..."
-                              className="min-h-[100px] bg-[var(--app-card-bg)] border border-[var(--app-card-border)] focus:border-[var(--app-accent)] rounded-xl transition-all duration-300 resize-none"
-                            />
-
-                            <div className="text-center mb-2">
-                              <p className="text-sm font-medium text-[var(--app-foreground-muted)] flex items-center justify-center gap-1">
-                                Cost:{" "}
-                                <span className="text-green-600 font-bold">
-                                  $0.05 USDC
-                                </span>{" "}
-                                on Base
-                              </p>
-                            </div>
-
-                            {paymentStatus && (
-                              <div className="text-center p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                                <p className="text-sm text-blue-700">{paymentStatus}</p>
-                              </div>
-                            )}
-
-                            <Button
-                              type="button"
-                              onClick={handleGenerateImage}
-                              disabled={
-                                loadingImage ||
-                                !imagePrompt.trim()
-                              }
-                              className="w-full h-12 bg-blue-500 hover:bg-blue-500/90 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {loadingImage ? (
-                                <div className="flex items-center gap-2">
-                                  <Loader2 className="w-5 h-5 animate-spin" />
-                                  Generating Magic...
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-2">
-                                  <Wand2 className="w-5 h-5 group-hover:rotate-12 transition-transform duration-300" />
-                                  Generate with Gemini AI
-                                </div>
-                              )}
-                            </Button>
-                          </>
-                        )}
-
-                        {imageGenerationError && (
-                          <div className="text-red-500 text-sm text-center bg-red-50 border border-red-200 rounded-lg p-3">
-                            {imageGenerationError}
+                    {/* Network check */}
+                    {isConnected &&
+                      walletClient &&
+                      walletClient.chain.id !== 8453 && (
+                        <div className="text-center p-4 bg-red-50 border border-red-200 rounded-lg">
+                          <div className="flex items-center justify-center gap-2 text-red-700">
+                            <Wallet className="w-5 h-5" />
+                            <span className="text-sm font-medium">
+                              Please switch to Base network for x402 payments
+                            </span>
                           </div>
-                        )}
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
+                        </div>
+                      )}
 
-                {/* Manual Cover Image URL Section */}
-                {!useAIGeneration && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="space-y-3"
-                  >
-                    <Input
-                      id="coverUrl"
-                      value={coverImage}
-                      onChange={(e) => {
-                        setCoverImage(e.target.value);
-                        setImageLoadError(false);
-                        setImageLoading(true);
-                      }}
-                      placeholder="https://example.com/your-awesome-cover.jpg"
-                      className="h-14 bg-[var(--app-card-bg)] border border-[var(--app-card-border)] focus:border-[var(--app-accent)] rounded-xl transition-all duration-300 shadow-sm focus:shadow-md"
-                    />
-                  </motion.div>
-                )}
+                    {/* USDC balance check */}
+                    {isConnected &&
+                      walletClient &&
+                      walletClient.chain.id === 8453 &&
+                      usdcBalance &&
+                      parseFloat(usdcBalance.formatted) < 0.05 && (
+                        <div className="text-center p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                          <div className="flex items-center justify-center gap-2 text-orange-700">
+                            <Wallet className="w-5 h-5" />
+                            <span className="text-sm font-medium">
+                              Insufficient USDC balance. You need at least $0.05
+                              USDC.
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                    <div className="text-center mb-2">
+                      <p className="text-sm font-medium text-[var(--app-foreground-muted)] flex items-center justify-center gap-1">
+                        Cost:{" "}
+                        <span className="text-green-600 font-bold">
+                          $0.05 USDC
+                        </span>{" "}
+                        on Base
+                      </p>
+                    </div>
+
+                    {paymentStatus && (
+                      <div className="text-center p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="text-sm text-blue-700">{paymentStatus}</p>
+                      </div>
+                    )}
+
+                    <Button
+                      type="button"
+                      onClick={handleGenerateImage}
+                      disabled={
+                        loadingImage ||
+                        !imagePrompt.trim() ||
+                        !isConnected ||
+                        !walletClient ||
+                        walletClient.chain.id !== 8453 ||
+                        (usdcBalance &&
+                          parseFloat(usdcBalance.formatted) < 0.05)
+                      }
+                      className="w-full h-12 bg-[var(--app-accent)] hover:bg-[var(--app-accent)]/90 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loadingImage ? (
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          Generating Magic...
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <Wand2 className="w-5 h-5 group-hover:rotate-12 transition-transform duration-300" />
+                          Generate with Gemini AI
+                        </div>
+                      )}
+                    </Button>
+
+                    {imageGenerationError && (
+                      <div className="text-red-500 text-sm text-center bg-red-50 border border-red-200 rounded-lg p-3">
+                        {imageGenerationError}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </motion.div>
 
+              {/* Manual Cover Image URL */}
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.9 }}
+                className="space-y-3"
+              >
+                <Label
+                  htmlFor="coverUrl"
+                  className="text-lg font-semibold flex items-center gap-3 text-[var(--app-foreground)]"
+                >
+                  <div className="p-2 bg-[var(--app-accent)] rounded-lg">
+                    <ImageIcon className="w-4 h-4 text-white" />
+                  </div>
+                  Or Use Custom Cover Image URL
+                </Label>
+                <Input
+                  id="coverUrl"
+                  value={coverImage}
+                  onChange={(e) => {
+                    setCoverImage(e.target.value);
+                    setImageLoadError(false);
+                    setImageLoading(true);
+                  }}
+                  placeholder="https://example.com/your-awesome-cover.jpg"
+                  className="h-14 bg-[var(--app-card-bg)] border border-[var(--app-card-border)] focus:border-[var(--app-accent)] rounded-xl transition-all duration-300 shadow-sm focus:shadow-md"
+                />
+              </motion.div>
 
               {/* Cover Image Preview */}
               <AnimatePresence>
@@ -937,50 +811,28 @@ export function PlaylistSection({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-white dark:bg-gray-900 rounded-2xl p-8 shadow-2xl w-full max-w-md mx-4 border border-gray-200 dark:border-gray-700"
+              className="bg-[var(--app-card-bg)] rounded-2xl p-8 shadow-2xl w-full max-w-md mx-4 border border-[var(--app-card-border)]"
             >
               <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="w-16 h-16 bg-[var(--app-accent)] rounded-full flex items-center justify-center mx-auto mb-4">
                   <Music className="w-8 h-8 text-white" />
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                <h2 className="text-2xl font-bold text-[var(--app-foreground)] mb-2">
                   Save Forever for $0.10
                 </h2>
-                <div className="text-gray-600 dark:text-gray-400 mb-2">
+                <p className="text-[var(--app-foreground-muted)] mb-2">
                   ≈{" "}
                   {isLoadingSaveCost
                     ? "Loading..."
                     : `${(Number(SAVE_PLAYLIST_COST) / 1e18).toFixed(6)} ETH`}
-                  {priceError && (
-                    <div className="text-yellow-600 text-xs block mt-1">
-                      <div className="flex items-center gap-2">
-                        <span>⚠️ Price feed unavailable - using fallback calculation</span>
-                        {'refetch' in priceQueryResult && (
-                          <button
-                            onClick={() => priceQueryResult.refetch?.()}
-                            className="text-blue-600 hover:text-blue-800 underline text-xs"
-                            disabled={isLoadingSaveCost}
-                          >
-                            {isLoadingSaveCost ? "Retrying..." : "Retry"}
-                          </button>
-                        )}
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {_debug?.fallbackUsed ? 
-                          `Using Chainlink fallback (${_debug.priceSource})` : 
-                          "Using hardcoded fallback price"
-                        }
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <p className="text-xs bg-pink-50 dark:bg-pink-900/20 text-pink-800 dark:text-pink-300 px-3 py-2 rounded-md">
+                </p>
+                <p className="text-xs bg-[#EC407A]/10 px-2 py-1 rounded-md">
                   This does not include network gas fees, which can be higher
                   for playlist deployment.
                 </p>
@@ -1004,12 +856,9 @@ export function PlaylistSection({
                     disabled={
                       saveState === "pending" ||
                       initialCreated ||
-                      !playlistName.trim() ||
-                      (ethBalance && ethBalance.value < SAVE_PLAYLIST_COST) ||
-                      !address ||
-                      !chainId
+                      !playlistName.trim()
                     }
-                    className="w-full h-12 bg-blue-500 hover:bg-blue-500/90 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full h-12 bg-[var(--app-accent)] hover:bg-[var(--app-accent)]/90 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
                   />
                 </Transaction>
               </div>
@@ -1017,15 +866,6 @@ export function PlaylistSection({
               {saveState === "error" && (
                 <div className="text-red-500 text-sm text-center mt-4">
                   Transaction failed. Please try again.
-                </div>
-              )}
-
-              {ethBalance && ethBalance.value < SAVE_PLAYLIST_COST && (
-                <div className="text-yellow-600 text-sm text-center mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                  ⚠️ Insufficient ETH balance. You need at least{" "}
-                  {(Number(SAVE_PLAYLIST_COST) / 1e18).toFixed(6)} ETH to deploy this playlist.
-                  <br />
-                  Current balance: {(Number(ethBalance.value) / 1e18).toFixed(6)} ETH
                 </div>
               )}
             </motion.div>

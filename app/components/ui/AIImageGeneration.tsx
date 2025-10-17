@@ -19,7 +19,7 @@ interface AIImageGenerationProps {
   className?: string;
 }
 
-type AIProvider = "gemini";
+type AIProvider = "livepeer" | "gemini";
 
 export function AIImageGeneration({ className }: AIImageGenerationProps) {
   const [prompt, setPrompt] = useState("");
@@ -44,6 +44,13 @@ export function AIImageGeneration({ className }: AIImageGenerationProps) {
   });
 
   const providers = {
+    livepeer: {
+      name: "Livepeer Studio",
+      icon: Sparkles, // or another Lucide icon, not Image
+      description: "High-quality image generation with advanced controls",
+      endpoint: "/api/livepeer/text-to-image",
+      color: "bg-blue-500",
+    },
     gemini: {
       name: "Google Gemini",
       icon: Sparkles,
@@ -77,7 +84,7 @@ export function AIImageGeneration({ className }: AIImageGenerationProps) {
     }
 
     // Check USDC balance (approximate cost check)
-    const requiredAmount = 0.05; // Gemini costs $0.05 USDC
+    const requiredAmount = selectedProvider === "gemini" ? 0.05 : 0.04;
     if (usdcBalance && parseFloat(usdcBalance.formatted) < requiredAmount) {
       setError(
         `Insufficient USDC balance. You need at least $${requiredAmount} USDC to generate an image.`
@@ -101,9 +108,18 @@ export function AIImageGeneration({ className }: AIImageGenerationProps) {
       console.log("Wallet client:", walletClient);
 
       const provider = providers[selectedProvider];
-      const payload = {
-        prompt,
-      };
+      const payload =
+        selectedProvider === "livepeer"
+          ? {
+              prompt,
+              height: 576,
+              width: 1024,
+              safetyCheck: true,
+              numImagesPerPrompt: 1,
+            }
+          : {
+              prompt,
+            };
 
       const response = await fetchWithPayment(provider.endpoint, {
         method: "POST",
@@ -262,7 +278,7 @@ export function AIImageGeneration({ className }: AIImageGenerationProps) {
             <div className="text-sm text-gray-600">
               Cost:{" "}
               <span className="font-medium text-green-600">
-                $0.05 USDC
+                {selectedProvider === "livepeer" ? "$0.04 USDC" : "$0.05 USDC"}
               </span>
             </div>
             <Button
@@ -347,7 +363,8 @@ export function AIImageGeneration({ className }: AIImageGenerationProps) {
             )}
 
             <div className="text-xs text-gray-500 text-center">
-              Generated with {providers[selectedProvider].name} • Paid $0.05 USDC on Base
+              Generated with {providers[selectedProvider].name} • Paid{" "}
+              {selectedProvider === "livepeer" ? "$0.04" : "$0.05"} USDC on Base
             </div>
           </div>
         </Card>

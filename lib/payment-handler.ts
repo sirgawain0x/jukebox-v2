@@ -3,6 +3,7 @@
  * Import this in API routes instead of using middleware to keep bundle size down
  */
 
+import { facilitator } from "@coinbase/x402";
 import { NextRequest, NextResponse } from "next/server";
 
 export type PaymentConfig = {
@@ -15,9 +16,17 @@ export type PaymentConfig = {
 };
 
 export const PAYMENT_ROUTES: Record<string, PaymentConfig> = {
+  "/api/livepeer/text-to-image": {
+    price: "$0.04",
+    network: "base",
+    config: {
+      description: "AI Image Generation with Livepeer - Generate custom images from text prompts using advanced AI models",
+      maxTimeoutSeconds: 120,
+    },
+  },
   "/api/gemini/text-to-image": {
     price: "$0.05",
-    network: "base", // Using mainnet for production
+    network: "base",
     config: {
       description: "AI Cover Art Generation with Gemini - Create professional cover art and album artwork using Google's Gemini AI",
       maxTimeoutSeconds: 120,
@@ -39,55 +48,23 @@ export const handlePayment = async (
     return null; // No payment required
   }
 
-  // Validate wallet address for production
-  const walletAddress = process.env.WALLET_ADDRESS;
-  if (!walletAddress || walletAddress === "0xYourAddress") {
-    console.error("WALLET_ADDRESS environment variable not set or using placeholder");
-    return NextResponse.json(
-      { error: "Payment configuration error", details: "Wallet address not configured" },
-      { status: 500 }
-    );
-  }
+  // Import payment middleware dynamically to avoid bundling in edge runtime
+  const { paymentMiddleware } = await import("x402-next");
+  
+  const walletAddress = (process.env.WALLET_ADDRESS || "0xYourAddress") as `0x${string}`;
+  
+  const middleware = paymentMiddleware(
+    walletAddress,
+    { [routePath]: config },
+    facilitator
+  );
 
-  try {
-    // Import payment middleware dynamically to avoid bundling in edge runtime
-    const { paymentMiddleware } = await import("x402-next");
-    
-    // Use CDP facilitator for mainnet if API keys are available, otherwise use testnet
-    let facilitatorConfig;
-    
-    if (process.env.CDP_API_KEY_ID && process.env.CDP_API_KEY_SECRET) {
-      // Use CDP facilitator for mainnet
-      const { facilitator } = await import("@coinbase/x402");
-      facilitatorConfig = facilitator;
-      console.log("Using CDP facilitator for mainnet payments");
-    } else {
-      // Fallback to testnet facilitator
-      facilitatorConfig = {
-        url: "https://x402.org/facilitator" as const,
-      };
-      console.warn("CDP API keys not found, using testnet facilitator. Set CDP_API_KEY_ID and CDP_API_KEY_SECRET for mainnet.");
-    }
-    
-    const middleware = paymentMiddleware(
-      walletAddress as `0x${string}`,
-      { [routePath]: config },
-      facilitatorConfig
-    );
-
-    // Execute middleware logic
-    const response = await middleware(request);
-    
-    // If middleware returns a response (payment required), return it
-    // Otherwise return null to continue with normal request handling
-    return response as NextResponse | null;
-  } catch (error) {
-    console.error("Payment handler error:", error);
-    return NextResponse.json(
-      { error: "Payment processing failed", details: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 }
-    );
-  }
+  // Execute middleware logic
+  const response = await middleware(request);
+  
+  // If middleware returns a response (payment required), return it
+  // Otherwise return null to continue with normal request handling
+  return response as NextResponse | null;
 };
 
 /**

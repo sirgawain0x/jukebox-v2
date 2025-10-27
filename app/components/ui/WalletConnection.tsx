@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useWallet, useWalletStatus, useWalletConnectors } from '@/app/contexts/WalletContext';
+import { Connector } from 'wagmi';
 import { 
   Wallet, 
   Loader2, 
@@ -14,12 +15,6 @@ import {
 } from "lucide-react";
 import { MetaMaskTroubleshooting } from './MetaMaskTroubleshooting';
 import { useToast } from '@/app/components/ui/ToastProvider';
-
-interface Connector {
-  uid: string;
-  name: string;
-  type: string;
-}
 
 interface WalletConnectionProps {
   className?: string;

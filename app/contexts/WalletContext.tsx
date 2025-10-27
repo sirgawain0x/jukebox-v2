@@ -1,16 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { useAccount, useConnect, useDisconnect } from 'wagmi';
+import { useAccount, useConnect, useDisconnect, Connector } from 'wagmi';
 import { useOnchainKit } from '@coinbase/onchainkit';
-
-interface Connector {
-  uid: string;
-  name: string;
-  type: string;
-  connect?: () => Promise<void>;
-  disconnect?: () => Promise<void>;
-}
 
 interface WalletContextType {
   // Connection state
@@ -24,15 +16,15 @@ interface WalletContextType {
   chainName: string | undefined;
   
   // Connector info
-  connector: any;
+  connector: Connector | undefined;
   connectorName: string | undefined;
   
   // Available connectors
-  connectors: any[];
-  availableConnectors: any[];
+  connectors: readonly Connector[];
+  availableConnectors: readonly Connector[];
   
   // Actions
-  connect: (connector: any) => Promise<void>;
+  connect: (connector: Connector) => Promise<void>;
   disconnect: () => Promise<void>;
   
   // Error handling
@@ -85,7 +77,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
   }, [connectors]);
 
   // Enhanced connect function with better error handling
-  const handleConnect = async (connector: any) => {
+  const handleConnect = async (connector: Connector) => {
     try {
       setError(null);
       

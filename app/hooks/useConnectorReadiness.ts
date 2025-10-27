@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { Connector } from 'wagmi/connectors';
+import { Connector } from 'wagmi';
 
 interface ConnectorStatus {
   connector: Connector;
@@ -93,7 +93,7 @@ export function useConnectorReadiness(
 
         case 'safe':
           // Safe connectors check for Safe app context
-          return !!(window as Window & { parent?: Window }).parent !== window;
+          return typeof window !== 'undefined' && window.parent !== window;
 
         default:
           // For unknown connector types, assume they're ready

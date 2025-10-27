@@ -5,14 +5,7 @@ import { useAccount, useChainId } from "wagmi";
 import {
   Transaction,
   TransactionButton,
-  TransactionToast,
-  TransactionToastAction,
-  TransactionToastIcon,
-  TransactionToastLabel,
   TransactionError,
-  TransactionStatusAction,
-  TransactionStatusLabel,
-  TransactionStatus,
 } from "@coinbase/onchainkit/transaction";
 import type { TransactionResponseType } from "@coinbase/onchainkit/transaction";
 import { useComposeCast } from "@coinbase/onchainkit/minikit";
@@ -707,7 +700,7 @@ export function Jukebox({
       audio.addEventListener('ended', handleEnded);
       return () => audio.removeEventListener('ended', handleEnded);
     }
-  }, [isAutoPlayEnabled, playQueue, currentQueueIndex]);
+  }, [isAutoPlayEnabled, playQueue, currentQueueIndex, setSelectedSong]);
 
   // Drag and drop sensors
   const sensors = useSensors(

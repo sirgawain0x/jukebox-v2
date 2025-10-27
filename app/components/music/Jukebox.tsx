@@ -20,10 +20,28 @@ import { useComposeCast } from "@coinbase/onchainkit/minikit";
 import { Song, Playlist } from "@/types/music";
 import { Card } from "../ui/Card";
 import { Icon } from "../ui/Icon";
+import { AnimatedAudioIndicator } from "../ui/AnimatedAudioIndicator";
 import { Pills } from "../ui/Pills";
 import { playlistABI } from "@/lib/contracts";
 import { Skeleton } from "@/components/ui/skeleton";
-import { motion, AnimatePresence } from "framer-motion";
+import { useToast } from "../ui/ToastProvider";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 type JukeboxProps = {
   onSongTipped: (song: Song) => void;
@@ -60,22 +78,18 @@ export function Jukebox({
   // const sendNotification = useNotification();
   const minTipEth = BigInt(Math.floor(0.00001429 * 1e18));
   const { composeCast } = useComposeCast();
+  const { showToast, showInteractiveToast } = useToast();
   
-  // Toast notification state
-  const [toast, setToast] = useState<string | null>(null);
   const [failedImages, setFailedImages] = useState<{ [id: string]: boolean }>(
     {}
   );
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [audioLoading, setAudioLoading] = useState(false);
-
-  // Playlist promotion states
-  const [interactiveToast, setInteractiveToast] = useState<{
-    message: string;
-    action?: { label: string; onClick: () => void };
-  } | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [tipCount, setTipCount] = useState(0);
   const [hasSeenPlaylistPrompt, setHasSeenPlaylistPrompt] = useState(false);
+  const errorHandledRef = useRef(false);
+  const successHandledRef = useRef(false);
 
   // Continuous playback queue states
   const [playQueue, setPlayQueue] = useState<Song[]>([]);
@@ -90,12 +104,6 @@ export function Jukebox({
       if (savedTipCount) setTipCount(parseInt(savedTipCount, 10));
       if (savedHasSeenPrompt) setHasSeenPlaylistPrompt(savedHasSeenPrompt === 'true');
     }
-  }, []);
-
-  // Toast notification function
-  const showToast = useCallback((message: string) => {
-    setToast(message);
-    setTimeout(() => setToast(null), 4000);
   }, []);
 
   // Sharing functions
@@ -445,109 +453,182 @@ export function Jukebox({
 
   const handleSuccess = useCallback(
     async (_response: TransactionResponseType) => {
-      if (selectedSong) {
-        const newTipCount = tipCount + 1;
-        setTipCount(newTipCount);
-        
-        // Persist to localStorage
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('jukebox_tip_count', newTipCount.toString());
-        }
-        
-        if (playlist) {
-          // User has playlist - show success with confirmation
-          showToast(`🎵 Tip sent to ${selectedSong.artist}! Song automatically added to "${playlist.name}"`);
-        } else {
-          // No playlist - progressive disclosure
-          if (newTipCount === 1) {
-            // First tip - subtle educational message
-            showToast(`🎵 Tip sent to ${selectedSong.artist}! 💡 Create a playlist to auto-save songs you tip!`);
-          } else if (newTipCount >= 2 && !hasSeenPlaylistPrompt) {
-            // 2+ tips - show interactive prompt
-            setHasSeenPlaylistPrompt(true);
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('jukebox_seen_playlist_prompt', 'true');
-            }
-            
-            setInteractiveToast({
-              message: `🎵 You've tipped ${newTipCount} artists! Create a playlist to auto-save all your favorite songs!`,
-              action: {
-                label: "Create My Playlist",
-                onClick: () => {
-                  setInteractiveToast(null);
-                  // Scroll to and highlight playlist section
-                  setTimeout(() => {
-                    const playlistSection = document.getElementById('playlist-section');
-                    if (playlistSection) {
-                      playlistSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      // Add highlight animation
-                      playlistSection.classList.add('playlist-highlight');
-                      setTimeout(() => {
-                        playlistSection.classList.remove('playlist-highlight');
-                      }, 2000);
-                    }
-                  }, 100);
-                }
-              }
-            });
-          } else {
-            // Subsequent tips after seeing prompt
-            showToast(`🎵 Tip sent to ${selectedSong.artist}! Thank you for supporting the artist.`);
-          }
-        }
-        
-        onSongTipped(selectedSong);
-        handleShareTip();
+      // Prevent multiple success handling for the same transaction
+      if (successHandledRef.current || !selectedSong) {
+        return;
       }
+      
+      successHandledRef.current = true;
+      
+      // Reset the flag after a short delay
+      setTimeout(() => {
+        successHandledRef.current = false;
+      }, 1000);
+      
+      const newTipCount = tipCount + 1;
+      setTipCount(newTipCount);
+      
+      // Persist to localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('jukebox_tip_count', newTipCount.toString());
+      }
+      
+      if (playlist) {
+        // User has playlist - show success with confirmation
+        showToast(`🎵 Tip sent to ${selectedSong.artist}! Song automatically added to "${playlist.name}"`);
+      } else {
+        // No playlist - progressive disclosure
+        if (newTipCount === 1) {
+          // First tip - subtle educational message
+          showToast(`🎵 Tip sent to ${selectedSong.artist}! 💡 Create a playlist to auto-save songs you tip!`);
+        } else if (newTipCount >= 2 && !hasSeenPlaylistPrompt) {
+          // 2+ tips - show interactive prompt
+          setHasSeenPlaylistPrompt(true);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('jukebox_seen_playlist_prompt', 'true');
+          }
+          
+          showInteractiveToast({
+            message: `🎵 You've tipped ${newTipCount} artists! Create a playlist to auto-save all your favorite songs!`,
+            action: {
+              label: "Create My Playlist",
+              onClick: () => {
+                // Scroll to and highlight playlist section
+                setTimeout(() => {
+                  const playlistSection = document.getElementById('playlist-section');
+                  if (playlistSection) {
+                    playlistSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    // Add highlight animation
+                    playlistSection.classList.add('playlist-highlight');
+                    setTimeout(() => {
+                      playlistSection.classList.remove('playlist-highlight');
+                    }, 2000);
+                  }
+                }, 100);
+              }
+            }
+          });
+        } else {
+          // Subsequent tips after seeing prompt
+          showToast(`🎵 Tip sent to ${selectedSong.artist}! Thank you for supporting the artist.`);
+        }
+      }
+      
+      onSongTipped(selectedSong);
+      handleShareTip();
     },
-    [selectedSong, onSongTipped, playlist, showToast, handleShareTip, tipCount, hasSeenPlaylistPrompt]
+    [selectedSong, onSongTipped, playlist, showToast, showInteractiveToast, handleShareTip, tipCount, hasSeenPlaylistPrompt]
   );
   const handleSelectSong = useCallback((song: Song) => {
     _setSelectedSong(song);
     setSelectedSong(song);
     
-    // Add to queue if not already present
+    // Add to queue if not already present and update current index
     setPlayQueue(prevQueue => {
-      if (!prevQueue.find(s => s.id === song.id)) {
-        return [...prevQueue, song];
-      }
-      return prevQueue;
+      const newQueue = prevQueue.find(s => s.id === song.id) 
+        ? prevQueue 
+        : [...prevQueue, song];
+      
+      // Update current index based on the new queue
+      const existingIndex = newQueue.findIndex((s: Song) => s.id === song.id);
+      setCurrentQueueIndex(existingIndex >= 0 ? existingIndex : newQueue.length - 1);
+      
+      return newQueue;
     });
-    
-    // Update current index to the newly selected song
-    setCurrentQueueIndex(_prevIndex => {
-      const currentQueue = playQueue.length > 0 ? playQueue : [...playQueue, song];
-      const existingIndex = currentQueue.findIndex((s: Song) => s.id === song.id);
-      return existingIndex >= 0 ? existingIndex : currentQueue.length - 1;
-    });
-  }, [setSelectedSong, playQueue]);
+  }, [setSelectedSong]);
 
   const handleRemoveFromQueue = useCallback((songToRemove: Song, indexToRemove: number) => {
     setPlayQueue(prevQueue => {
       const newQueue = prevQueue.filter((_, index) => index !== indexToRemove);
+      
+      // Update current queue index if necessary
+      setCurrentQueueIndex(prevIndex => {
+        if (indexToRemove < prevIndex) {
+          // If we removed a song before the current one, shift the index down
+          return prevIndex - 1;
+        } else if (indexToRemove === prevIndex) {
+          // If we removed the currently playing song, stay at the same index or go to previous
+          if (newQueue.length === 0) {
+            return 0;
+          }
+          // If we're at the end, go to the previous song
+          return prevIndex >= newQueue.length ? newQueue.length - 1 : prevIndex;
+        }
+        // If we removed a song after the current one, no change needed
+        return prevIndex;
+      });
+      
       return newQueue;
     });
     
-    // Update current queue index if necessary
-    setCurrentQueueIndex(prevIndex => {
-      if (indexToRemove < prevIndex) {
-        // If we removed a song before the current one, shift the index down
-        return prevIndex - 1;
-      } else if (indexToRemove === prevIndex) {
-        // If we removed the currently playing song, stay at the same index or go to previous
-        const newQueue = playQueue.filter((_, index) => index !== indexToRemove);
-        if (newQueue.length === 0) {
-          return 0;
-        }
-        // If we're at the end, go to the previous song
-        return prevIndex >= newQueue.length ? newQueue.length - 1 : prevIndex;
-      }
-      // If we removed a song after the current one, no change needed
-      return prevIndex;
-    });
-    
     showToast(`Removed "${songToRemove.title}" from queue`);
-  }, [playQueue, showToast]);
+  }, [showToast]);
+
+  const handlePreviousSong = useCallback(() => {
+    setPlayQueue(currentQueue => {
+      if (currentQueue.length <= 1) return currentQueue;
+      
+      setCurrentQueueIndex(prevIndex => {
+        const newIndex = prevIndex > 0 ? prevIndex - 1 : currentQueue.length - 1;
+        const prevSong = currentQueue[newIndex];
+        if (prevSong) {
+          _setSelectedSong(prevSong);
+          setSelectedSong(prevSong);
+        }
+        return newIndex;
+      });
+      
+      return currentQueue;
+    });
+  }, [setSelectedSong]);
+
+  const handleNextSong = useCallback(() => {
+    setPlayQueue(currentQueue => {
+      if (currentQueue.length <= 1) return currentQueue;
+      
+      setCurrentQueueIndex(prevIndex => {
+        const newIndex = (prevIndex + 1) % currentQueue.length;
+        const nextSong = currentQueue[newIndex];
+        if (nextSong) {
+          _setSelectedSong(nextSong);
+          setSelectedSong(nextSong);
+        }
+        return newIndex;
+      });
+      
+      return currentQueue;
+    });
+  }, [setSelectedSong]);
+
+  const handleTransactionError = useCallback((error: TransactionError) => {
+    // Prevent multiple error handling for the same transaction
+    if (errorHandledRef.current) {
+      return;
+    }
+    
+    errorHandledRef.current = true;
+    
+    // Reset the flag after a short delay
+    setTimeout(() => {
+      errorHandledRef.current = false;
+    }, 1000);
+    
+    // console.error("Transaction failed:", error.message);
+    
+    // Handle different error types gracefully
+    if (error.message.includes("Request denied") || error.message.includes("User rejected") || error.message.includes("User denied")) {
+      // Don't show toast for user cancellation - this is normal behavior
+      return;
+    } else if (error.message.includes("insufficient funds") || error.message.includes("Insufficient funds")) {
+      showToast("💰 Insufficient funds - please add more ETH to your wallet");
+    } else if (error.message.includes("gas") || error.message.includes("Gas")) {
+      showToast("⛽ Transaction failed due to gas issues - please try again");
+    } else if (error.message.includes("network") || error.message.includes("Network")) {
+      showToast("🌐 Network error - please check your connection and try again");
+    } else {
+      showToast("❌ Transaction failed - please try again");
+    }
+  }, [showToast]);
 
   useEffect(() => {
     // Capture the current audio element for cleanup
@@ -568,8 +649,30 @@ export function Jukebox({
     return () => {
       if (audio) {
         audio.pause();
+        setIsPlaying(false);
       }
     };
+  }, [selectedSong]);
+
+  // Track audio playing state
+  useEffect(() => {
+    const audio = audioRef.current;
+    
+    if (audio) {
+      const handlePlay = () => setIsPlaying(true);
+      const handlePause = () => setIsPlaying(false);
+      const handleEnded = () => setIsPlaying(false);
+      
+      audio.addEventListener('play', handlePlay);
+      audio.addEventListener('pause', handlePause);
+      audio.addEventListener('ended', handleEnded);
+      
+      return () => {
+        audio.removeEventListener('play', handlePlay);
+        audio.removeEventListener('pause', handlePause);
+        audio.removeEventListener('ended', handleEnded);
+      };
+    }
   }, [selectedSong]);
 
   // Auto-play next song when current song ends
@@ -604,7 +707,140 @@ export function Jukebox({
       audio.addEventListener('ended', handleEnded);
       return () => audio.removeEventListener('ended', handleEnded);
     }
-  }, [isAutoPlayEnabled, playQueue, currentQueueIndex, setSelectedSong]);
+  }, [isAutoPlayEnabled, playQueue, currentQueueIndex]);
+
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Handle drag end event
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setPlayQueue((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+
+        const newQueue = arrayMove(items, oldIndex, newIndex);
+        
+        // Update currentQueueIndex if necessary
+        setCurrentQueueIndex(oldCurrentIndex => {
+          let newCurrentIndex = oldCurrentIndex;
+
+          if (oldIndex === oldCurrentIndex) {
+            // The currently playing song was moved
+            newCurrentIndex = newIndex;
+          } else if (oldIndex < oldCurrentIndex && newIndex >= oldCurrentIndex) {
+            // A song before the current one was moved after it
+            newCurrentIndex = oldCurrentIndex - 1;
+          } else if (oldIndex > oldCurrentIndex && newIndex <= oldCurrentIndex) {
+            // A song after the current one was moved before it
+            newCurrentIndex = oldCurrentIndex + 1;
+          }
+
+          return newCurrentIndex;
+        });
+        
+        return newQueue;
+      });
+    }
+  };
+
+  // Sortable queue item component
+  const SortableQueueItem = ({ song, index }: { song: Song; index: number }) => {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: song.id });
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+    };
+
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        {...attributes}
+        className={`flex items-center p-2 rounded text-sm transition-colors ${
+          index === currentQueueIndex
+            ? 'bg-[#0052ff]/10 border border-[#0052ff]/20'
+            : 'hover:bg-[var(--app-card-border)]'
+        } ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+      >
+        {/* Drag handle */}
+        <div
+          {...listeners}
+          className="mr-2 cursor-grab active:cursor-grabbing text-[var(--app-foreground-muted)] hover:text-[var(--app-foreground)]"
+          title="Drag to reorder"
+          aria-label="Drag to reorder queue item"
+        >
+          <svg 
+            xmlns="http://www.w3.org/2000/svg" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2" 
+            strokeLinecap="round" 
+            strokeLinejoin="round"
+            className="w-4 h-4 rotate-90"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="5" r="1" />
+            <circle cx="12" cy="12" r="1" />
+            <circle cx="12" cy="19" r="1" />
+          </svg>
+        </div>
+        
+        <span className="w-6 text-center text-xs text-[var(--app-foreground-muted)]">
+          {index + 1}
+        </span>
+        {song.cover && (
+          <Image
+            src={song.cover}
+            alt={song.title}
+            width={32}
+            height={32}
+            className="w-8 h-8 rounded object-cover ml-2"
+            unoptimized
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+        )}
+        <div className="flex-1 ml-2 min-w-0">
+          <div className="font-medium truncate">{song.title}</div>
+          <div className="text-xs text-[var(--app-foreground-muted)] truncate">
+            {song.artist}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {index === currentQueueIndex && (
+            <Icon name="music" className="text-[#0052ff]" />
+          )}
+          <button
+            onClick={() => handleRemoveFromQueue(song, index)}
+            className="p-1 hover:bg-red-100 rounded transition-colors text-red-500 hover:text-red-700 cursor-pointer"
+            title="Remove from queue"
+            aria-label={`Remove ${song.title} from queue`}
+          >
+            <Icon name="x" size="sm" />
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <Card title="🎵 Discover Music">
@@ -656,6 +892,7 @@ export function Jukebox({
                       width={48}
                       height={48}
                       className="w-12 h-12 rounded-lg object-cover mr-4"
+                      unoptimized
                       onError={() =>
                         setFailedImages((prev) => ({
                           ...prev,
@@ -689,7 +926,12 @@ export function Jukebox({
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {selectedSong?.id === song.id && (
-                      <Icon name="check" className="text-[#0052ff]" />
+                      <AnimatedAudioIndicator 
+                        isPlaying={isPlaying && selectedSong?.id === song.id}
+                        size="sm"
+                        className="text-[#0052ff]"
+                        variant="bars"
+                      />
                     )}
                     {/* Quick share button */}
                     <button
@@ -710,14 +952,25 @@ export function Jukebox({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setPlayQueue(prevQueue => [...prevQueue, song]);
-                        showToast(`Added "${song.title}" to queue`);
+                        const isInQueue = playQueue.some(queueSong => queueSong.id === song.id);
+                        if (isInQueue) {
+                          // Remove from queue
+                          setPlayQueue(prevQueue => prevQueue.filter(queueSong => queueSong.id !== song.id));
+                          showToast(`Removed "${song.title}" from queue`);
+                        } else {
+                          // Add to queue
+                          setPlayQueue(prevQueue => [...prevQueue, song]);
+                          showToast(`Added "${song.title}" to queue`);
+                        }
                       }}
                       className="p-1 hover:bg-[var(--app-card-border)] rounded transition-all duration-200 cursor-pointer hover:scale-150"
-                      title="Add to queue"
-                      aria-label={`Add ${song.title} to queue`}
+                      title={playQueue.some(queueSong => queueSong.id === song.id) ? "Remove from queue" : "Add to queue"}
+                      aria-label={playQueue.some(queueSong => queueSong.id === song.id) ? `Remove ${song.title} from queue` : `Add ${song.title} to queue`}
                     >
-                      <Icon name="plus" size="sm" />
+                      <Icon 
+                        name={playQueue.some(queueSong => queueSong.id === song.id) ? "check" : "plus"} 
+                        size="sm" 
+                      />
                     </button>
                   </div>
                 </div>
@@ -761,6 +1014,7 @@ export function Jukebox({
                     width={64}
                     height={64}
                     className="w-16 h-16 rounded-lg object-cover"
+                    unoptimized
                     onError={() =>
                       setFailedImages((prev) => ({
                         ...prev,
@@ -781,7 +1035,12 @@ export function Jukebox({
                   <h3 className="font-semibold text-lg">{selectedSong.title}</h3>
                   <p className="text-sm opacity-90">{selectedSong.artist}</p>
                 </div>
-                <Icon name="check" className="text-white" />
+                <AnimatedAudioIndicator 
+                  isPlaying={isPlaying}
+                  size="md"
+                  className="text-white"
+                  variant="bars"
+                />
               </div>
               
               {/* Audio controls */}
@@ -811,22 +1070,10 @@ export function Jukebox({
               
               {/* Tip button */}
               <Transaction
+                key={selectedSong.id}
                 calls={calls}
                 onSuccess={handleSuccess}
-                onError={(error: TransactionError) => {
-                  console.error("Transaction failed:", error.message);
-                  
-                  // Handle different error types gracefully
-                  if (error.message.includes("Request denied") || error.message.includes("User rejected")) {
-                    showToast("Transaction cancelled - no tip sent");
-                  } else if (error.message.includes("insufficient funds")) {
-                    showToast("Insufficient funds - please add more ETH to your wallet");
-                  } else if (error.message.includes("gas")) {
-                    showToast("Transaction failed - please try again");
-                  } else {
-                    showToast("Transaction failed - please try again");
-                  }
-                }}
+                onError={handleTransactionError}
               >
                 <div className="w-full mt-3">
                   <div className="text-center mb-2">
@@ -844,15 +1091,6 @@ export function Jukebox({
                     )}
                   </div>
                 </div>
-                <TransactionStatus>
-                  <TransactionStatusAction />
-                  <TransactionStatusLabel />
-                </TransactionStatus>
-                <TransactionToast className="mb-4">
-                  <TransactionToastIcon />
-                  <TransactionToastLabel />
-                  <TransactionToastAction />
-                </TransactionToast>
               </Transaction>
 
                {/* Share Song Button */}
@@ -894,64 +1132,31 @@ export function Jukebox({
               </div>
             </div>
             
-            <div className="space-y-2 max-h-40 overflow-y-auto">
-              {playQueue.map((song, index) => (
-                <div
-                  key={`${song.id}-${index}`}
-                  className={`flex items-center p-2 rounded text-sm transition-colors cursor-pointer ${
-                    index === currentQueueIndex
-                      ? 'bg-[#0052ff]/10 border border-[#0052ff]/20'
-                      : 'hover:bg-[var(--app-card-border)]'
-                  }`}
-                >
-                  <span className="w-6 text-center text-xs text-[var(--app-foreground-muted)]">
-                    {index + 1}
-                  </span>
-                  {song.cover && (
-                    <Image
-                      src={song.cover}
-                      alt={song.title}
-                      width={32}
-                      height={32}
-                      className="w-8 h-8 rounded object-cover ml-2"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={playQueue.map(song => song.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {playQueue.map((song, index) => (
+                    <SortableQueueItem
+                      key={song.id}
+                      song={song}
+                      index={index}
                     />
-                  )}
-                  <div className="flex-1 ml-2 min-w-0">
-                    <div className="font-medium truncate">{song.title}</div>
-                    <div className="text-xs text-[var(--app-foreground-muted)] truncate">
-                      {song.artist}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {index === currentQueueIndex && (
-                      <Icon name="music" className="text-[#0052ff]" />
-                    )}
-                    <button
-                      onClick={() => handleRemoveFromQueue(song, index)}
-                      className="p-1 hover:bg-red-100 rounded transition-colors text-red-500 hover:text-red-700 cursor-pointer"
-                      title="Remove from queue"
-                      aria-label={`Remove ${song.title} from queue`}
-                    >
-                      <Icon name="x" size="sm" />
-                    </button>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </SortableContext>
+            </DndContext>
             
             {playQueue.length > 1 && (
               <div className="flex justify-between items-center mt-3 pt-3 border-t border-[var(--app-card-border)]">
                 <button
-                  onClick={() => {
-                    const prevIndex = currentQueueIndex > 0 ? currentQueueIndex - 1 : playQueue.length - 1;
-                    setCurrentQueueIndex(prevIndex);
-                    const prevSong = playQueue[prevIndex];
-                    _setSelectedSong(prevSong);
-                    setSelectedSong(prevSong);
-                  }}
+                  onClick={handlePreviousSong}
                   className="flex items-center gap-1 text-sm text-[var(--app-foreground-muted)] hover:text-[var(--app-foreground)] transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                   disabled={playQueue.length <= 1}
                 >
@@ -964,13 +1169,7 @@ export function Jukebox({
                 </span>
                 
                 <button
-                  onClick={() => {
-                    const nextIndex = (currentQueueIndex + 1) % playQueue.length;
-                    setCurrentQueueIndex(nextIndex);
-                    const nextSong = playQueue[nextIndex];
-                    _setSelectedSong(nextSong);
-                    setSelectedSong(nextSong);
-                  }}
+                  onClick={handleNextSong}
                   className="flex items-center gap-1 text-sm text-[var(--app-foreground-muted)] hover:text-[var(--app-foreground)] transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                   disabled={playQueue.length <= 1}
                 >
@@ -982,59 +1181,6 @@ export function Jukebox({
           </div>
         )}
       </div>
-
-      {/* Toast Notification */}
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            key="toast-notification"
-            initial={{ opacity: 0, y: 50, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 50, scale: 0.9 }}
-            transition={{ duration: 0.2 }}
-            className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-[9999] pointer-events-auto"
-          >
-            <div className="bg-black/90 text-white px-6 py-3 rounded-xl shadow-2xl border border-white/20 backdrop-blur-sm">
-              <p className="font-medium">{toast}</p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Interactive Toast with Action Button */}
-      <AnimatePresence>
-        {interactiveToast && (
-          <motion.div
-            key="interactive-toast"
-            initial={{ opacity: 0, y: 50, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 50, scale: 0.9 }}
-            transition={{ duration: 0.2 }}
-            className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-[9999] max-w-md mx-4 pointer-events-auto"
-          >
-            <div className="bg-black/90 text-white px-6 py-4 rounded-xl shadow-2xl border border-white/20 backdrop-blur-sm">
-              <div className="flex items-start justify-between mb-3">
-                <p className="font-medium pr-8">{interactiveToast.message}</p>
-                <button
-                  onClick={() => setInteractiveToast(null)}
-                  className="text-white/70 hover:text-white transition-colors"
-                  aria-label="Close notification"
-                >
-                  <Icon name="x" size="sm" />
-                </button>
-              </div>
-              {interactiveToast.action && (
-                <button
-                  onClick={interactiveToast.action.onClick}
-                  className="w-full bg-white text-[#0052ff] py-2.5 px-4 rounded-lg font-medium hover:bg-gray-100 transition-colors"
-                >
-                  {interactiveToast.action.label}
-                </button>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </Card>
   );
 }

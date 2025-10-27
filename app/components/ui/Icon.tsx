@@ -2,7 +2,7 @@
 import { FC } from "react";
 
 type IconProps = {
-  name: "heart" | "star" | "check" | "plus" | "arrow-right" | "chevron-down" | "share" | "music" | "chevron-left" | "chevron-right" | "x";
+  name: "heart" | "star" | "check" | "plus" | "arrow-right" | "chevron-down" | "share" | "music" | "chevron-left" | "chevron-right" | "x" | "play" | "pause" | "volume";
   size?: "sm" | "md" | "lg";
   className?: string;
 };
@@ -187,6 +187,53 @@ export const Icon: FC<IconProps> = ({ name, size = "md", className = "" }) => {
         <title>Close</title>
         <line x1="18" y1="6" x2="6" y2="18" />
         <line x1="6" y1="6" x2="18" y2="18" />
+      </svg>
+    ),
+    play: (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <title>Play</title>
+        <polygon points="5 3 19 12 5 21 5 3" />
+      </svg>
+    ),
+    pause: (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <title>Pause</title>
+        <rect x="6" y="4" width="4" height="16" />
+        <rect x="14" y="4" width="4" height="16" />
+      </svg>
+    ),
+    volume: (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <title>Volume</title>
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
       </svg>
     ),
   };

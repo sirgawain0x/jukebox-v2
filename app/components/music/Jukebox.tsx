@@ -769,13 +769,13 @@ export function Jukebox({
         className={`flex items-center p-2 rounded text-sm transition-colors ${
           index === currentQueueIndex
             ? 'bg-[#0052ff]/10 border border-[#0052ff]/20'
-            : 'hover:bg-[var(--app-card-border)]'
+            : 'hover:bg-(--app-card-border)'
         } ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
       >
         {/* Drag handle */}
         <div
           {...listeners}
-          className="mr-2 cursor-grab active:cursor-grabbing text-[var(--app-foreground-muted)] hover:text-[var(--app-foreground)]"
+          className="mr-2 cursor-grab active:cursor-grabbing text-(--app-foreground-muted) hover:text-(--app-foreground)"
           title="Drag to reorder"
           aria-label="Drag to reorder queue item"
         >
@@ -796,7 +796,7 @@ export function Jukebox({
           </svg>
         </div>
         
-        <span className="w-6 text-center text-xs text-[var(--app-foreground-muted)]">
+        <span className="w-6 text-center text-xs text-(--app-foreground-muted)">
           {index + 1}
         </span>
         {song.cover && (
@@ -814,7 +814,7 @@ export function Jukebox({
         )}
         <div className="flex-1 ml-2 min-w-0">
           <div className="font-medium truncate">{song.title}</div>
-          <div className="text-xs text-[var(--app-foreground-muted)] truncate">
+          <div className="text-xs text-(--app-foreground-muted) truncate">
             {song.artist}
           </div>
         </div>
@@ -839,7 +839,7 @@ export function Jukebox({
     <Card title="🎵 Discover Music">
       <div className="space-y-4">
         <div className="space-y-3">
-          <div className="text-sm font-medium text-[var(--app-foreground-muted)]">
+          <div className="text-sm font-medium text-(--app-foreground-muted)">
             Sort by:
           </div>
           <Pills
@@ -853,7 +853,7 @@ export function Jukebox({
             {[...Array(10)].map((_, i) => (
               <div
                 key={i}
-                className="flex items-center p-3 rounded-lg border border-[var(--app-card-border)] bg-[var(--app-card-bg)]"
+                className="flex items-center p-3 rounded-lg border border-(--app-card-border) bg-(--app-card-bg)"
               >
                 <Skeleton className="w-12 h-12 rounded-lg mr-4" />
                 <div className="flex-1 space-y-2">
@@ -894,30 +894,30 @@ export function Jukebox({
                       }
                     />
                   ) : (
-                    <div className="w-12 h-12 rounded-lg bg-[var(--app-gray)] mr-4 flex items-center justify-center">
+                    <div className="w-12 h-12 rounded-lg bg-(--app-gray) mr-4 flex items-center justify-center">
                       <Icon
                         name="star"
                         size="sm"
-                        className="text-[var(--app-foreground-muted)]"
+                        className="text-(--app-foreground-muted)"
                       />
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-[var(--app-foreground)] truncate">
+                    <div className="font-medium text-(--app-foreground) truncate">
                       {song.title}
                     </div>
                     <div className="flex items-center gap-2 mt-1">
-                      <div className="text-xs text-[var(--app-foreground-muted)] truncate">
+                      <div className="text-xs text-(--app-foreground-muted) truncate">
                         {song.artist}
                       </div>
                       {song.platformName && (
-                        <span className="px-2 py-0.5 rounded text-xs font-semibold bg-[#e6edff] text-[#0052ff] whitespace-nowrap flex-shrink-0">
+                        <span className="px-2 py-0.5 rounded text-xs font-semibold bg-[#e6edff] text-[#0052ff] whitespace-nowrap shrink-0">
                           {song.platformName}
                         </span>
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="flex items-center gap-2 shrink-0">
                     {selectedSong?.id === song.id && (
                       <AnimatedAudioIndicator 
                         isPlaying={isPlaying && selectedSong?.id === song.id}
@@ -956,7 +956,7 @@ export function Jukebox({
                           showToast(`Added "${song.title}" to queue`);
                         }
                       }}
-                      className="p-1 hover:bg-[var(--app-card-border)] rounded transition-all duration-200 cursor-pointer hover:scale-150"
+                      className="p-1 hover:bg-(--app-card-border) rounded transition-all duration-200 cursor-pointer hover:scale-150"
                       title={playQueue.some(queueSong => queueSong.id === song.id) ? "Remove from queue" : "Add to queue"}
                       aria-label={playQueue.some(queueSong => queueSong.id === song.id) ? `Remove ${song.title} from queue` : `Add ${song.title} to queue`}
                     >
@@ -971,7 +971,7 @@ export function Jukebox({
             </div>
             <div className="flex justify-between mt-4">
               <button
-                className="px-4 py-2 rounded bg-gray-200 text-[var(--app-foreground-muted)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 rounded bg-gray-200 text-(--app-foreground-muted) cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => {
                   setBefore(pageInfo.startCursor);
                   setAfter(null);
@@ -982,7 +982,7 @@ export function Jukebox({
                 Previous
               </button>
               <button
-                className="px-4 py-2 rounded bg-gray-200 text-[var(--app-foreground-muted)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 rounded bg-gray-200 text-(--app-foreground-muted) cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => {
                   setAfter(pageInfo.endCursor);
                   setBefore(null);
@@ -1100,11 +1100,11 @@ export function Jukebox({
 
         {/* Play Queue UI */}
         {playQueue.length > 0 && (
-          <div className="mt-4 p-4 bg-white/50 rounded-lg border border-[var(--app-card-border)]">
+          <div className="mt-4 p-4 bg-white/50 rounded-lg border border-(--app-card-border)">
             <div className="flex items-center justify-between mb-3">
-              <h4 className="font-medium text-[var(--app-foreground)]">Play Queue</h4>
+              <h4 className="font-medium text-(--app-foreground)">Play Queue</h4>
               <div className="flex items-center gap-3">
-                <label className="flex items-center gap-2 text-sm text-[var(--app-foreground)] cursor-pointer">
+                <label className="flex items-center gap-2 text-sm text-(--app-foreground) cursor-pointer">
                   <input
                     type="checkbox"
                     checked={isAutoPlayEnabled}
@@ -1147,23 +1147,23 @@ export function Jukebox({
             </DndContext>
             
             {playQueue.length > 1 && (
-              <div className="flex justify-between items-center mt-3 pt-3 border-t border-[var(--app-card-border)]">
+              <div className="flex justify-between items-center mt-3 pt-3 border-t border-(--app-card-border)">
                 <button
                   onClick={handlePreviousSong}
-                  className="flex items-center gap-1 text-sm text-[var(--app-foreground-muted)] hover:text-[var(--app-foreground)] transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                  className="flex items-center gap-1 text-sm text-(--app-foreground-muted) hover:text-(--app-foreground) transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                   disabled={playQueue.length <= 1}
                 >
                   <Icon name="chevron-left" size="sm" />
                   Previous
                 </button>
                 
-                <span className="text-xs text-[var(--app-foreground-muted)]">
+                <span className="text-xs text-(--app-foreground-muted)">
                   {currentQueueIndex + 1} of {playQueue.length}
                 </span>
                 
                 <button
                   onClick={handleNextSong}
-                  className="flex items-center gap-1 text-sm text-[var(--app-foreground-muted)] hover:text-[var(--app-foreground)] transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                  className="flex items-center gap-1 text-sm text-(--app-foreground-muted) hover:text-(--app-foreground) transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                   disabled={playQueue.length <= 1}
                 >
                   Next

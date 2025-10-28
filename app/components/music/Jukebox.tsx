@@ -528,7 +528,7 @@ export function Jukebox({
   );
 
   // Custom transaction handler for Farcaster and regular wallets
-  const handleCustomTransaction = useCallback(async () => {
+  const _handleCustomTransaction = useCallback(async () => {
     if (!selectedSong || !address) {
       showToast("❌ No song selected or wallet not connected");
       return;
@@ -604,6 +604,18 @@ export function Jukebox({
     showToast(`Removed "${songToRemove.title}" from queue`);
   }, [globalMusic, showToast]);
 
+  const handleMoveUp = useCallback((index: number) => {
+    if (index > 0) {
+      globalMusic.reorderQueue(index, index - 1);
+    }
+  }, [globalMusic]);
+
+  const handleMoveDown = useCallback((index: number) => {
+    if (index < playQueue.length - 1) {
+      globalMusic.reorderQueue(index, index + 1);
+    }
+  }, [globalMusic, playQueue.length]);
+
   const handlePreviousSong = useCallback(() => {
     globalMusic.handlePreviousSong();
   }, [globalMusic]);
@@ -645,9 +657,13 @@ export function Jukebox({
   // Audio playback is now handled by the global MusicContext
   // No need for local audio effect hooks
 
-  // Drag and drop sensors
+  // Drag and drop sensors with mobile-friendly configuration
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // 8px of movement required before drag starts
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -680,6 +696,7 @@ export function Jukebox({
       transform: CSS.Transform.toString(transform),
       transition,
       opacity: isDragging ? 0.5 : 1,
+      zIndex: isDragging ? 999 : 'auto',
     };
 
     return (
@@ -687,16 +704,16 @@ export function Jukebox({
         ref={setNodeRef}
         style={style}
         {...attributes}
-        className={`flex items-center p-2 rounded text-sm transition-colors ${
+        className={`flex items-center p-2 rounded text-sm transition-all ${
           index === currentQueueIndex
             ? 'bg-[#0052ff]/10 border border-[#0052ff]/20'
             : 'hover:bg-(--app-card-border)'
-        } ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+        } ${isDragging ? 'shadow-lg scale-105 bg-white' : ''}`}
       >
-        {/* Drag handle */}
+        {/* Drag handle - hidden on mobile, visible on desktop */}
         <div
           {...listeners}
-          className="mr-2 cursor-grab active:cursor-grabbing text-(--app-foreground-muted) hover:text-(--app-foreground)"
+          className="mr-2 cursor-grab active:cursor-grabbing text-(--app-foreground-muted) hover:text-(--app-foreground) hidden md:block touch-none"
           title="Drag to reorder"
           aria-label="Drag to reorder queue item"
         >
@@ -715,6 +732,56 @@ export function Jukebox({
             <circle cx="12" cy="12" r="1" />
             <circle cx="12" cy="19" r="1" />
           </svg>
+        </div>
+        
+        {/* Mobile reorder buttons - visible on mobile only */}
+        <div className="flex flex-col mr-1 md:hidden">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleMoveUp(index);
+            }}
+            disabled={index === 0}
+            className="p-0.5 hover:bg-gray-200 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+            title="Move up"
+            aria-label={`Move ${song.title} up in queue`}
+          >
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+              className="w-3 h-3"
+            >
+              <polyline points="18 15 12 9 6 15" />
+            </svg>
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleMoveDown(index);
+            }}
+            disabled={index === playQueue.length - 1}
+            className="p-0.5 hover:bg-gray-200 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+            title="Move down"
+            aria-label={`Move ${song.title} down in queue`}
+          >
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+              className="w-3 h-3"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
         </div>
         
         <span className="w-6 text-center text-xs text-(--app-foreground-muted)">
@@ -744,7 +811,10 @@ export function Jukebox({
             <Icon name="music" className="text-[#0052ff]" />
           )}
           <button
-            onClick={() => handleRemoveFromQueue(song, index)}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleRemoveFromQueue(song, index);
+            }}
             className="p-1 hover:bg-red-100 rounded transition-colors text-red-500 hover:text-red-700 cursor-pointer"
             title="Remove from queue"
             aria-label={`Remove ${song.title} from queue`}
@@ -1054,37 +1124,22 @@ export function Jukebox({
                     </svg>
                   </button>
                 </div>
-                
-                {/* Audio loading indicator */}
-                {audioLoading && (
-                  <div className="flex items-center justify-center gap-2 text-white text-sm">
-                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Loading audio...
-                  </div>
-                )}
               </div>
               
               {/* Tip button */}
-              {shouldUseFarcasterWallet ? (
-                // Farcaster-specific tip button
+              <Transaction
+                key={selectedSong.id}
+                calls={calls}
+                onSuccess={handleSuccess}
+                onError={handleTransactionError}
+              >
                 <div className="w-full mt-3">
                   <div className="text-center mb-2">
                     <p className="text-sm font-medium text-white/90">
                       Tip {selectedSong?.artist} in ETH
                     </p>
-                    <p className="text-xs text-white/70">
-                      🎯 Using Farcaster wallet
-                    </p>
                   </div>
-                  <button
-                    onClick={handleCustomTransaction}
-                    className="w-full bg-white text-[#0052ff] hover:bg-gray-100 py-3 px-4 rounded-lg font-medium transition-colors"
-                  >
-                    💎 Tip Artist
-                  </button>
+                  <TransactionButton className="w-full bg-white text-[#0052ff] hover:bg-gray-100" />
                   <div className="text-center mb-2">
                     {!playlist && (
                       <p className="text-xs text-white/70 mt-1">
@@ -1093,31 +1148,7 @@ export function Jukebox({
                     )}
                   </div>
                 </div>
-              ) : (
-                // Regular wallet tip button
-                <Transaction
-                  key={selectedSong.id}
-                  calls={calls}
-                  onSuccess={handleSuccess}
-                  onError={handleTransactionError}
-                >
-                  <div className="w-full mt-3">
-                    <div className="text-center mb-2">
-                      <p className="text-sm font-medium text-white/90">
-                        Tip {selectedSong?.artist} in ETH
-                      </p>
-                    </div>
-                    <TransactionButton className="w-full bg-white text-[#0052ff] hover:bg-gray-100" />
-                    <div className="text-center mb-2">
-                      {!playlist && (
-                        <p className="text-xs text-white/70 mt-1">
-                          💡 Create a playlist to auto-save songs you tip!
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </Transaction>
-              )}
+              </Transaction>
 
                {/* Share Song Button */}
                {isMiniapp && (
@@ -1137,7 +1168,13 @@ export function Jukebox({
         {playQueue.length > 0 && (
           <div className="mt-4 p-4 bg-white/50 rounded-lg border border-(--app-card-border)">
             <div className="flex items-center justify-between mb-3">
-              <h4 className="font-medium text-(--app-foreground)">Play Queue</h4>
+              <div>
+                <h4 className="font-medium text-(--app-foreground)">Play Queue</h4>
+                <p className="text-xs text-(--app-foreground-muted) mt-1">
+                  <span className="md:hidden">Use ⬆️ ⬇️ buttons <br /> to reorder songs</span>
+                  <span className="hidden md:inline">Drag to reorder songs</span>
+                </p>
+              </div>
               <div className="flex items-center gap-3">
                 <label className="flex items-center gap-2 text-sm text-(--app-foreground) cursor-pointer">
                   <input

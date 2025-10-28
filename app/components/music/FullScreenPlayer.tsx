@@ -28,6 +28,8 @@ export function FullScreenPlayer() {
 
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const titleContainerRef = React.useRef<HTMLDivElement>(null);
+  const [shouldScroll, setShouldScroll] = useState(false);
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newVolume = parseFloat(e.target.value);
@@ -72,6 +74,47 @@ export function FullScreenPlayer() {
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+
+  const handleRewind = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.currentTime = Math.max(0, audio.currentTime - 15);
+  };
+
+  const handleFastForward = () => {
+    const audio = audioRef.current;
+    if (!audio || !duration) return;
+    audio.currentTime = Math.min(duration, audio.currentTime + 30);
+  };
+
+  // Check if title should scroll
+  useEffect(() => {
+    const checkOverflow = () => {
+      if (titleContainerRef.current && selectedSong?.title) {
+        // Create a temporary element to measure the text
+        const temp = document.createElement('h3');
+        temp.style.cssText = 'position: absolute; visibility: hidden; white-space: nowrap; font-size: 1.5rem; font-weight: 700;';
+        temp.textContent = selectedSong.title;
+        document.body.appendChild(temp);
+        
+        const textWidth = temp.offsetWidth;
+        const containerWidth = titleContainerRef.current.clientWidth;
+        const isOverflowing = textWidth > containerWidth;
+        
+        document.body.removeChild(temp);
+        setShouldScroll(isOverflowing);
+      }
+    };
+
+    // Small delay to ensure accurate measurements after render and fonts load
+    const timeout = setTimeout(checkOverflow, 100);
+    window.addEventListener('resize', checkOverflow);
+    
+    return () => {
+      clearTimeout(timeout);
+      window.removeEventListener('resize', checkOverflow);
+    };
+  }, [selectedSong?.title]);
 
   if (!selectedSong || isMinimized) {
     return null;
@@ -129,7 +172,18 @@ export function FullScreenPlayer() {
 
         {/* Song Info */}
         <div className="text-center mb-6">
-          <h3 className="text-2xl font-bold mb-2 text-gray-800 truncate">{selectedSong.title}</h3>
+          <div ref={titleContainerRef} className={`overflow-hidden mb-2 ${shouldScroll ? '' : 'mx-auto'}`}>
+            {shouldScroll ? (
+              <h3 className="text-2xl font-bold text-gray-800 animate-marquee text-left">
+                <span className="inline-block pr-8">{selectedSong.title}</span>
+                <span className="inline-block pr-8">{selectedSong.title}</span>
+              </h3>
+            ) : (
+              <h3 className="text-2xl font-bold text-gray-800 truncate">
+                {selectedSong.title}
+              </h3>
+            )}
+          </div>
           <p className="text-gray-600 truncate">{selectedSong.artist}</p>
           {selectedSong.platformName && (
             <span className="inline-block mt-2 px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-600">
@@ -191,6 +245,33 @@ export function FullScreenPlayer() {
             </svg>
           </button>
 
+          {/* 15-second rewind button */}
+          <button
+            onClick={handleRewind}
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
+            title="Rewind 15 seconds"
+            aria-label="Rewind 15 seconds"
+          >
+            <div className="relative w-6 h-6">
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+                className="w-6 h-6"
+              >
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                <path d="M3 3v5h5" />
+              </svg>
+              <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-gray-700 mt-0.5">
+                15
+              </span>
+            </div>
+          </button>
+
           <button
             onClick={togglePlayPause}
             className="p-4 bg-blue-500 hover:bg-blue-600 text-white rounded-full transition-colors shadow-lg cursor-pointer"
@@ -219,6 +300,33 @@ export function FullScreenPlayer() {
                 <polygon points="5 3 19 12 5 21 5 3" />
               </svg>
             )}
+          </button>
+
+          {/* 30-second fast forward button */}
+          <button
+            onClick={handleFastForward}
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
+            title="Fast forward 30 seconds"
+            aria-label="Fast forward 30 seconds"
+          >
+            <div className="relative w-6 h-6">
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+                className="w-6 h-6"
+              >
+                <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+                <path d="M21 3v5h-5" />
+              </svg>
+              <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-gray-700 mt-0.5">
+                30
+              </span>
+            </div>
           </button>
 
           <button

@@ -402,3 +402,24 @@
 .animate-smooth-fade {
   animation: smooth-fade 0.3s ease-in;
 }
+
+/* Marquee scrolling animation for long song titles - continuous ticker effect */
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  display: inline-block;
+  white-space: nowrap;
+  animation: marquee 15s linear infinite;
+  will-change: transform;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}

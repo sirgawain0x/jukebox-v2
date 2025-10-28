@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import Image from 'next/image';
 import { useMusic } from '@/app/contexts/MusicContext';
 import { Icon } from '../ui/Icon';
@@ -21,12 +21,15 @@ export function MinimizedPlayer() {
     setVolume,
     toggleMute,
     closePlayer,
+    audioRef,
   } = useMusic();
 
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [showControls, setShowControls] = useState(true);
   const fadeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const titleContainerRef = useRef<HTMLDivElement>(null);
+  const [shouldScroll, setShouldScroll] = useState(false);
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newVolume = parseFloat(e.target.value);
@@ -37,6 +40,20 @@ export function MinimizedPlayer() {
     if (isMuted || volume === 0) return 'volume-x';
     if (volume < 0.5) return 'volume-1';
     return 'volume-2';
+  };
+
+  const handleRewind = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.currentTime = Math.max(0, audio.currentTime - 15);
+  };
+
+  const handleFastForward = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const duration = audio.duration;
+    if (!duration) return;
+    audio.currentTime = Math.min(duration, audio.currentTime + 30);
   };
 
   // Handle showing the volume slider
@@ -86,6 +103,35 @@ export function MinimizedPlayer() {
     };
   }, [handleShowControls, isPlaying]);
 
+  // Check if title should scroll
+  useEffect(() => {
+    const checkOverflow = () => {
+      if (titleContainerRef.current && selectedSong?.title) {
+        // Create a temporary element to measure the text
+        const temp = document.createElement('div');
+        temp.style.cssText = 'position: absolute; visibility: hidden; white-space: nowrap; font-size: 0.875rem; font-weight: 500;';
+        temp.textContent = selectedSong.title;
+        document.body.appendChild(temp);
+        
+        const textWidth = temp.offsetWidth;
+        const containerWidth = titleContainerRef.current.clientWidth;
+        const isOverflowing = textWidth > containerWidth;
+        
+        document.body.removeChild(temp);
+        setShouldScroll(isOverflowing);
+      }
+    };
+
+    // Small delay to ensure accurate measurements after render and fonts load
+    const timeout = setTimeout(checkOverflow, 100);
+    window.addEventListener('resize', checkOverflow);
+    
+    return () => {
+      clearTimeout(timeout);
+      window.removeEventListener('resize', checkOverflow);
+    };
+  }, [selectedSong?.title]);
+
   if (!selectedSong || !isMinimized) {
     return null;
   }
@@ -120,10 +166,18 @@ export function MinimizedPlayer() {
 
         {/* Song Info */}
         <div 
-          className="flex-1 min-w-0 cursor-pointer"
+          ref={titleContainerRef}
+          className="flex-1 min-w-0 cursor-pointer overflow-hidden"
           onClick={() => setIsMinimized(false)}
         >
-          <div className="font-medium text-sm truncate">{selectedSong.title}</div>
+          {shouldScroll ? (
+            <div className="font-medium text-sm animate-marquee">
+              <span className="inline-block pr-8">{selectedSong.title}</span>
+              <span className="inline-block pr-8">{selectedSong.title}</span>
+            </div>
+          ) : (
+            <div className="font-medium text-sm truncate">{selectedSong.title}</div>
+          )}
           <div className="text-xs text-gray-500 truncate">{selectedSong.artist}</div>
         </div>
 
@@ -137,6 +191,33 @@ export function MinimizedPlayer() {
             aria-label="Previous song"
           >
             <Icon name="chevron-left" size="sm" />
+          </button>
+
+          {/* 15-second rewind button */}
+          <button
+            onClick={handleRewind}
+            className="p-1 hover:bg-gray-100 rounded transition-colors cursor-pointer"
+            title="Rewind 15 seconds"
+            aria-label="Rewind 15 seconds"
+          >
+            <div className="relative w-4 h-4">
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+                className="w-4 h-4"
+              >
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                <path d="M3 3v5h5" />
+              </svg>
+              <span className="absolute inset-0 flex items-center justify-center text-[6px] font-bold text-gray-700">
+                15
+              </span>
+            </div>
           </button>
 
           {/* Play/Pause button with animated indicator behind it */}
@@ -169,6 +250,33 @@ export function MinimizedPlayer() {
               )}
             </button>
           </div>
+
+          {/* 30-second fast forward button */}
+          <button
+            onClick={handleFastForward}
+            className="p-1 hover:bg-gray-100 rounded transition-colors cursor-pointer"
+            title="Fast forward 30 seconds"
+            aria-label="Fast forward 30 seconds"
+          >
+            <div className="relative w-4 h-4">
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+                className="w-4 h-4"
+              >
+                <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+                <path d="M21 3v5h-5" />
+              </svg>
+              <span className="absolute inset-0 flex items-center justify-center text-[6px] font-bold text-gray-700">
+                30
+              </span>
+            </div>
+          </button>
 
           <button
             onClick={handleNextSong}

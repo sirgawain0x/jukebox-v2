@@ -528,7 +528,7 @@ export function Jukebox({
   );
 
   // Custom transaction handler for Farcaster and regular wallets
-  const handleCustomTransaction = useCallback(async () => {
+  const _handleCustomTransaction = useCallback(async () => {
     if (!selectedSong || !address) {
       showToast("❌ No song selected or wallet not connected");
       return;

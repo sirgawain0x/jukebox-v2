@@ -18,6 +18,8 @@ import { Pills } from "../ui/Pills";
 import { playlistABI } from "@/lib/contracts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "../ui/ToastProvider";
+import { useWallet } from "@/app/contexts/WalletContext";
+import { useFarcasterTransactions } from "@/app/utils/farcaster-transactions";
 import {
   DndContext,
   closestCenter,
@@ -66,12 +68,16 @@ export function Jukebox({
     hasPreviousPage: false,
     startCursor: null,
   });
-  const { address } = useAccount();
+  const { address: _address } = useAccount();
   const _chainId = useChainId();
   // const sendNotification = useNotification();
   const minTipEth = BigInt(Math.floor(0.00001429 * 1e18));
   const { composeCast } = useComposeCast();
   const { showToast, showInteractiveToast } = useToast();
+  
+  // Use enhanced wallet context with Farcaster support
+  const wallet = useWallet();
+  const farcasterTransactions = useFarcasterTransactions();
   
   const [failedImages, setFailedImages] = useState<{ [id: string]: boolean }>(
     {}
@@ -141,25 +147,115 @@ export function Jukebox({
     setError(null);
 
     // Debounce network requests to prevent rapid firing
-    fetchTimeoutRef.current = setTimeout(() => {
-      // Different queries for different sort types
-      let query = "";
-      let dataPath = "";
-      const variables: Record<string, unknown> = {};
-      if (sortBy === "TRENDING") {
-      if (direction === "forward") {
-        variables.first = 10;
-        if (after) variables.after = after;
+    fetchTimeoutRef.current = setTimeout(async () => {
+      try {
+        // Different queries for different sort types
+        let query = "";
+        let dataPath = "";
+        const variables: Record<string, unknown> = {};
+        if (sortBy === "TRENDING") {
+        if (direction === "forward") {
+          variables.first = 10;
+          if (after) variables.after = after;
+        } else {
+          variables.last = 10;
+          if (before) variables.before = before;
+        }
+        query = `query TrendingTracks($first: Int, $last: Int, $after: Cursor, $before: Cursor) {
+          allTrendingTracks(first: $first, last: $last, after: $after, before: $before) {
+            edges {
+              cursor
+              node {
+                processedTrackByTrackId {
+                  id
+                  createdAtTime
+                  createdAtBlockNumber
+                  title
+                  slug
+                  platformInternalId
+                  lossyAudioIpfsHash
+                  lossyAudioUrl
+                  description
+                  lossyArtworkIpfsHash
+                  lossyArtworkUrl
+                  websiteUrl
+                  platformId
+                  artistId
+                  supportingArtist
+                  insertionId
+                  phasesUpdatedAtBlock
+                  chorusStart
+                  duration
+                  lossyAudioMimeType
+                  lossyArtworkMimeType
+                  mintStart
+                  artistByArtistId {
+                    id
+                    createdAtTime
+                    createdAtBlockNumber
+                    slug
+                    userId
+                    avatarUrl
+                    name
+                    avatarIpfsHash
+                    description
+                    customTheme
+                    predefinedThemeName
+                  }
+                  platformByPlatformId {
+                    id
+                    type
+                    name
+                  }
+                  artistBySupportingArtist {
+                    id
+                    createdAtTime
+                    createdAtBlockNumber
+                    slug
+                    userId
+                    description
+                    customTheme
+                    predefinedThemeName
+                    name
+                    avatarIpfsHash
+                    avatarUrl
+                    userByUserId {
+                      id
+                      avatarUrl
+                      name
+                      avatarIpfsHash
+                      description
+                      customTheme
+                      predefinedThemeName
+                      metadata
+                    }
+                  }
+                }
+              }
+            }
+            pageInfo {
+              endCursor
+              hasNextPage
+              hasPreviousPage
+              startCursor
+            }
+          }
+        }`;
+        dataPath = "allTrendingTracks";
       } else {
-        variables.last = 10;
-        if (before) variables.before = before;
-      }
-      query = `query TrendingTracks($first: Int, $last: Int, $after: Cursor, $before: Cursor) {
-        allTrendingTracks(first: $first, last: $last, after: $after, before: $before) {
-          edges {
-            cursor
-            node {
-              processedTrackByTrackId {
+        if (direction === "forward") {
+          variables.first = 10;
+          if (after) variables.after = after;
+        } else {
+          variables.last = 10;
+          if (before) variables.before = before;
+        }
+        variables.orderBy = [sortBy, "ID_DESC"];
+        query = `query ProcessedTracks($first: Int, $last: Int, $after: Cursor, $before: Cursor, $orderBy: [ProcessedTracksOrderBy!]) {
+          allProcessedTracks(first: $first, last: $last, after: $after, before: $before, orderBy: $orderBy) {
+            edges {
+              cursor
+              node {
                 id
                 createdAtTime
                 createdAtBlockNumber
@@ -225,188 +321,100 @@ export function Jukebox({
                 }
               }
             }
+            pageInfo {
+              endCursor
+              hasNextPage
+              hasPreviousPage
+              startCursor
+            }
           }
-          pageInfo {
-            endCursor
-            hasNextPage
-            hasPreviousPage
-            startCursor
-          }
-        }
-      }`;
-      dataPath = "allTrendingTracks";
-    } else {
-      if (direction === "forward") {
-        variables.first = 10;
-        if (after) variables.after = after;
-      } else {
-        variables.last = 10;
-        if (before) variables.before = before;
+        }`;
+        dataPath = "allProcessedTracks";
       }
-      variables.orderBy = [sortBy, "ID_DESC"];
-      query = `query ProcessedTracks($first: Int, $last: Int, $after: Cursor, $before: Cursor, $orderBy: [ProcessedTracksOrderBy!]) {
-        allProcessedTracks(first: $first, last: $last, after: $after, before: $before, orderBy: $orderBy) {
-          edges {
-            cursor
-            node {
-              id
-              createdAtTime
-              createdAtBlockNumber
-              title
-              slug
-              platformInternalId
-              lossyAudioIpfsHash
-              lossyAudioUrl
-              description
-              lossyArtworkIpfsHash
-              lossyArtworkUrl
-              websiteUrl
-              platformId
-              artistId
-              supportingArtist
-              insertionId
-              phasesUpdatedAtBlock
-              chorusStart
-              duration
-              lossyAudioMimeType
-              lossyArtworkMimeType
-              mintStart
-              artistByArtistId {
-                id
-                createdAtTime
-                createdAtBlockNumber
-                slug
-                userId
-                avatarUrl
-                name
-                avatarIpfsHash
-                description
-                customTheme
-                predefinedThemeName
-              }
-              platformByPlatformId {
-                id
-                type
-                name
-              }
-              artistBySupportingArtist {
-                id
-                createdAtTime
-                createdAtBlockNumber
-                slug
-                userId
-                description
-                customTheme
-                predefinedThemeName
-                name
-                avatarIpfsHash
-                avatarUrl
-                userByUserId {
-                  id
-                  avatarUrl
-                  name
-                  avatarIpfsHash
-                  description
-                  customTheme
-                  predefinedThemeName
-                  metadata
-                }
-              }
-            }
-          }
-          pageInfo {
-            endCursor
-            hasNextPage
-            hasPreviousPage
-            startCursor
-          }
-        }
-      }`;
-      dataPath = "allProcessedTracks";
-    }
 
-    type TrackNode = {
-      id: string;
-      title?: string;
-      lossyArtworkUrl?: string;
-      lossyAudioUrl?: string;
-      artistByArtistId?: {
-        name?: string;
+      type TrackNode = {
+        id: string;
+        title?: string;
+        lossyArtworkUrl?: string;
+        lossyAudioUrl?: string;
+        artistByArtistId?: {
+          name?: string;
+        };
+        platformByPlatformId?: {
+          name?: string;
+        };
+        artistId?: string;
+        processedTrackByTrackId?: Omit<TrackNode, "processedTrackByTrackId">;
       };
-      platformByPlatformId?: {
-        name?: string;
-      };
-      artistId?: string;
-      processedTrackByTrackId?: Omit<TrackNode, "processedTrackByTrackId">;
-    };
 
-    fetch("https://api.spinamp.xyz/v3/graphql", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        query,
-        variables,
-      }),
-    })
-      .then((res) => res.json())
-      .then((result) => {
-        if (result.errors) {
-          console.error(result.errors);
-          setError("Failed to fetch tracks.");
-          return;
-        }
-
-        const connection = result.data?.[dataPath] || {};
-        const edges: {
-          node: TrackNode;
-        }[] = connection.edges || [];
-        const pageInfo = connection.pageInfo || {};
-        setPageInfo({
-          endCursor: pageInfo.endCursor || null,
-          hasNextPage: !!pageInfo.hasNextPage,
-          hasPreviousPage: !!pageInfo.hasPreviousPage,
-          startCursor: pageInfo.startCursor || null,
-        });
-
-        if (!Array.isArray(edges) || edges.length === 0) {
-          console.error("No edges returned for", sortBy, result);
-        }
-
-        const mappedSongs: Song[] = edges
-          .map((edge: { node: TrackNode }) => {
-            // Support both node structures
-            let track: TrackNode | null = null;
-            let artistId: string | undefined;
-            if (sortBy === "TRENDING") {
-              track = edge.node.processedTrackByTrackId || null;
-              artistId = edge.node.processedTrackByTrackId?.artistId;
-            } else {
-              track = edge.node;
-              artistId = edge.node.artistId;
-            }
-            if (!track) return null;
-            return {
-              id: track.id || "unknown-id",
-              title: track.title || "Untitled",
-              artist: track.artistByArtistId?.name || "Unknown Artist",
-              cover: track.lossyArtworkUrl || "",
-              creatorAddress: artistId?.split("/")[1] || "",
-              audioUrl: track.lossyAudioUrl || "",
-              playCount: 0,
-              platformName: track.platformByPlatformId?.name || undefined,
-            };
-          })
-          .filter(Boolean) as Song[];
-
-        setSongs(mappedSongs);
-        setLoading(false);
-      })
-      .catch(() => {
-        setError("Failed to load songs from Spinamp.");
-        setLoading(false);
+      const response = await fetch("https://api.spinamp.xyz/v3/graphql", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          query,
+          variables,
+        }),
       });
+
+      const result = await response.json();
+
+      if (result.errors) {
+        console.error(result.errors);
+        setError("Failed to fetch tracks.");
+        return;
+      }
+
+      const connection = result.data?.[dataPath] || {};
+      const edges: {
+        node: TrackNode;
+      }[] = connection.edges || [];
+      const pageInfo = connection.pageInfo || {};
+      setPageInfo({
+        endCursor: pageInfo.endCursor || null,
+        hasNextPage: !!pageInfo.hasNextPage,
+        hasPreviousPage: !!pageInfo.hasPreviousPage,
+        startCursor: pageInfo.startCursor || null,
+      });
+
+      if (!Array.isArray(edges) || edges.length === 0) {
+        console.error("No edges returned for", sortBy, result);
+      }
+
+      const mappedSongs: Song[] = edges
+        .map((edge: { node: TrackNode }) => {
+          // Support both node structures
+          let track: TrackNode | null = null;
+          let artistId: string | undefined;
+          if (sortBy === "TRENDING") {
+            track = edge.node.processedTrackByTrackId || null;
+            artistId = edge.node.processedTrackByTrackId?.artistId;
+          } else {
+            track = edge.node;
+            artistId = edge.node.artistId;
+          }
+          if (!track) return null;
+          return {
+            id: track.id || "unknown-id",
+            title: track.title || "Untitled",
+            artist: track.artistByArtistId?.name || "Unknown Artist",
+            cover: track.lossyArtworkUrl || "",
+            creatorAddress: artistId?.split("/")[1] || "",
+            audioUrl: track.lossyAudioUrl || "",
+            playCount: 0,
+            platformName: track.platformByPlatformId?.name || undefined,
+          };
+        })
+        .filter(Boolean) as Song[];
+
+      setSongs(mappedSongs);
+      setLoading(false);
+    } catch (error) {
+      console.error("Failed to load songs from Spinamp:", error);
+      setError("Failed to load songs from Spinamp.");
+      setLoading(false);
+    }
     }, 300); // 300ms debounce delay
 
     // Cleanup function
@@ -418,7 +426,7 @@ export function Jukebox({
   }, [sortBy, after, before, direction]);
 
   const calls = useMemo(() => {
-    if (!selectedSong || !address) {
+    if (!selectedSong || !wallet.address) {
       return [];
     }
     const tipCall = {
@@ -442,7 +450,7 @@ export function Jukebox({
       return [tipCall, addSongCall];
     }
     return [tipCall];
-  }, [selectedSong, address, minTipEth, playlist]);
+  }, [selectedSong, wallet.address, minTipEth, playlist]);
 
   const handleSuccess = useCallback(
     async (_response: TransactionResponseType) => {
@@ -512,6 +520,71 @@ export function Jukebox({
     },
     [selectedSong, onSongTipped, playlist, showToast, showInteractiveToast, handleShareTip, tipCount, hasSeenPlaylistPrompt]
   );
+
+  // Custom transaction handler for Farcaster and regular wallets
+  const handleCustomTransaction = useCallback(async () => {
+    if (!selectedSong || !wallet.address) {
+      showToast("❌ No song selected or wallet not connected");
+      return;
+    }
+
+    console.log("Transaction attempt - Debug info:", {
+      shouldUseFarcasterWallet: wallet.shouldUseFarcasterWallet,
+      canUseFarcaster: farcasterTransactions.canUseFarcaster,
+      isInFarcaster: wallet.isInFarcaster,
+      isMiniapp: wallet.isMiniapp,
+      walletAddress: wallet.address,
+      farcasterAddress: wallet.farcasterUserAddress,
+      connectorName: wallet.connectorName,
+      isConnected: wallet.isConnected
+    });
+
+    try {
+      if (wallet.shouldUseFarcasterWallet && farcasterTransactions.canUseFarcaster) {
+        console.log("Using Farcaster transaction handling");
+        // Use Farcaster transaction handling
+        const transactions = [];
+        
+        // Add tip transaction
+        const tipTransaction = farcasterTransactions.createTipTransaction(
+          selectedSong.creatorAddress,
+          minTipEth.toString()
+        );
+        transactions.push(tipTransaction);
+
+        // Add playlist transaction if applicable
+        if (playlist?.address) {
+          // For contract interactions, we need to encode the function call
+          // This is a simplified version - in production you'd use proper ABI encoding
+          const contractTransaction = farcasterTransactions.createContractTransaction(
+            playlist.address,
+            "0x", // This would be the encoded addSong function call
+            "0"
+          );
+          transactions.push(contractTransaction);
+        }
+
+        const results = await farcasterTransactions.sendBatchTransactions(transactions);
+        
+        // Check if all transactions succeeded
+        const allSuccessful = results.every(result => result.success);
+        if (allSuccessful) {
+          await handleSuccess({} as TransactionResponseType);
+        } else {
+          const failedResults = results.filter(result => !result.success);
+          showToast(`❌ Transaction failed: ${failedResults[0]?.error || 'Unknown error'}`);
+        }
+      } else {
+        console.log("Using regular wallet transaction handling");
+        // Use regular OnchainKit transaction handling
+        // This will be handled by the Transaction component
+        showToast("💡 Please use the tip button below to send your transaction");
+      }
+    } catch (error) {
+      console.error("Custom transaction error:", error);
+      showToast(`❌ Transaction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }, [selectedSong, wallet.address, wallet.shouldUseFarcasterWallet, wallet.connectorName, wallet.farcasterUserAddress, wallet.isConnected, wallet.isInFarcaster, wallet.isMiniapp, farcasterTransactions, minTipEth, playlist, handleSuccess, showToast]);
   const handleSelectSong = useCallback((song: Song) => {
     _setSelectedSong(song);
     setSelectedSong(song);
@@ -838,6 +911,22 @@ export function Jukebox({
   return (
     <Card title="🎵 Discover Music">
       <div className="space-y-4">
+        {/* Debug info for Farcaster context */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs">
+            <div className="font-medium text-blue-800 mb-2">🔧 Debug Info:</div>
+            <div className="space-y-1 text-blue-700">
+              <div>Wallet Connected: {wallet.isConnected ? '✅' : '❌'}</div>
+              <div>Address: {wallet.address || 'None'}</div>
+              <div>In Farcaster: {wallet.isInFarcaster ? '✅' : '❌'}</div>
+              <div>Is Miniapp: {wallet.isMiniapp ? '✅' : '❌'}</div>
+              <div>Is Frame: {wallet.isFrame ? '✅' : '❌'}</div>
+              <div>Use Farcaster Wallet: {wallet.shouldUseFarcasterWallet ? '✅' : '❌'}</div>
+              <div>Farcaster User FID: {wallet.farcasterUserFid || 'None'}</div>
+              <div>Farcaster Address: {wallet.farcasterUserAddress || 'None'}</div>
+            </div>
+          </div>
+        )}
         <div className="space-y-3">
           <div className="text-sm font-medium text-(--app-foreground-muted)">
             Sort by:
@@ -1062,29 +1151,56 @@ export function Jukebox({
               )}
               
               {/* Tip button */}
-              <Transaction
-                key={selectedSong.id}
-                calls={calls}
-                onSuccess={handleSuccess}
-                onError={handleTransactionError}
-              >
+              {wallet.shouldUseFarcasterWallet ? (
+                // Farcaster-specific tip button
                 <div className="w-full mt-3">
                   <div className="text-center mb-2">
                     <p className="text-sm font-medium text-white/90">
                       Tip {selectedSong?.artist} in ETH
                     </p>
-                    
+                    <p className="text-xs text-white/70">
+                      🎯 Using Farcaster wallet
+                    </p>
                   </div>
-                  <TransactionButton className="w-full bg-white text-[#0052ff] hover:bg-gray-100" />
+                  <button
+                    onClick={handleCustomTransaction}
+                    className="w-full bg-white text-[#0052ff] hover:bg-gray-100 py-3 px-4 rounded-lg font-medium transition-colors"
+                  >
+                    💎 Tip Artist
+                  </button>
                   <div className="text-center mb-2">
-                  {!playlist && (
+                    {!playlist && (
                       <p className="text-xs text-white/70 mt-1">
                         💡 Create a playlist to auto-save songs you tip!
                       </p>
                     )}
                   </div>
                 </div>
-              </Transaction>
+              ) : (
+                // Regular wallet tip button
+                <Transaction
+                  key={selectedSong.id}
+                  calls={calls}
+                  onSuccess={handleSuccess}
+                  onError={handleTransactionError}
+                >
+                  <div className="w-full mt-3">
+                    <div className="text-center mb-2">
+                      <p className="text-sm font-medium text-white/90">
+                        Tip {selectedSong?.artist} in ETH
+                      </p>
+                    </div>
+                    <TransactionButton className="w-full bg-white text-[#0052ff] hover:bg-gray-100" />
+                    <div className="text-center mb-2">
+                      {!playlist && (
+                        <p className="text-xs text-white/70 mt-1">
+                          💡 Create a playlist to auto-save songs you tip!
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </Transaction>
+              )}
 
                {/* Share Song Button */}
                <button

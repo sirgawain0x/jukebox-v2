@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useAccount, useConnect, useDisconnect, Connector } from 'wagmi';
 import { useOnchainKit } from '@coinbase/onchainkit';
+import { useFarcasterContext, supportsFarcasterWallet, getFarcasterWalletAddress } from '@/app/utils/farcaster-context';
 
 interface WalletContextType {
   // Connection state
@@ -33,6 +34,14 @@ interface WalletContextType {
   
   // Connection status
   connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error';
+  
+  // Farcaster-specific properties
+  isInFarcaster: boolean;
+  isMiniapp: boolean;
+  isFrame: boolean;
+  farcasterUserFid?: number;
+  farcasterUserAddress?: string;
+  shouldUseFarcasterWallet: boolean;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
@@ -49,17 +58,33 @@ export function WalletProvider({ children }: WalletProviderProps) {
   // Use OnchainKit's hook for better compatibility
   const _onchainKit = useOnchainKit();
   
+  // Get Farcaster context
+  const farcasterContext = useFarcasterContext();
+  
   const [error, setError] = useState<Error | null>(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
+
+  // Determine if we should use Farcaster wallet
+  const shouldUseFarcasterWallet = supportsFarcasterWallet() && farcasterContext.isMiniapp;
+  
+  // Get the effective address (Farcaster address if in miniapp, otherwise wagmi address)
+  const effectiveAddress = shouldUseFarcasterWallet 
+    ? (getFarcasterWalletAddress() as `0x${string}` | undefined)
+    : address;
+  
+  // Determine effective connection state
+  const effectiveIsConnected = shouldUseFarcasterWallet 
+    ? !!farcasterContext.userAddress
+    : isConnected;
 
   // Determine connection status
   const connectionStatus: WalletContextType['connectionStatus'] = React.useMemo(() => {
     if (error || connectError) return 'error';
     if (isReconnecting) return 'reconnecting';
     if (isConnecting) return 'connecting';
-    if (isConnected) return 'connected';
+    if (effectiveIsConnected) return 'connected';
     return 'disconnected';
-  }, [error, connectError, isReconnecting, isConnecting, isConnected]);
+  }, [error, connectError, isReconnecting, isConnecting, effectiveIsConnected]);
 
   // Filter available connectors (those that are ready)
   const availableConnectors = React.useMemo(() => {
@@ -80,6 +105,12 @@ export function WalletProvider({ children }: WalletProviderProps) {
   const handleConnect = async (connector: Connector) => {
     try {
       setError(null);
+      
+      // If we're in a Farcaster miniapp, we don't need to connect externally
+      if (shouldUseFarcasterWallet) {
+        console.log('Using Farcaster wallet, no external connection needed');
+        return;
+      }
       
       // Add a small delay to prevent rapid clicking issues
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -115,6 +146,13 @@ export function WalletProvider({ children }: WalletProviderProps) {
   const handleDisconnect = async () => {
     try {
       setError(null);
+      
+      // If we're in a Farcaster miniapp, we can't disconnect externally
+      if (shouldUseFarcasterWallet) {
+        console.log('Cannot disconnect Farcaster wallet from within miniapp');
+        return;
+      }
+      
       await disconnect();
     } catch (err) {
       console.error('Disconnect error:', err);
@@ -149,12 +187,12 @@ export function WalletProvider({ children }: WalletProviderProps) {
 
   const contextValue: WalletContextType = {
     // Connection state
-    isConnected,
+    isConnected: effectiveIsConnected,
     isConnecting,
     isReconnecting,
     
     // Account info
-    address,
+    address: effectiveAddress,
     chainId: chain?.id,
     chainName: chain?.name,
     
@@ -176,6 +214,14 @@ export function WalletProvider({ children }: WalletProviderProps) {
     
     // Connection status
     connectionStatus,
+    
+    // Farcaster-specific properties
+    isInFarcaster: farcasterContext.isInFarcaster,
+    isMiniapp: farcasterContext.isMiniapp,
+    isFrame: farcasterContext.isFrame,
+    farcasterUserFid: farcasterContext.userFid,
+    farcasterUserAddress: farcasterContext.userAddress,
+    shouldUseFarcasterWallet,
   };
 
   return (
@@ -195,7 +241,7 @@ export function useWallet() {
 
 // Hook for wallet connection status
 export function useWalletStatus() {
-  const { connectionStatus, isConnected, isConnecting, isReconnecting, error } = useWallet();
+  const { connectionStatus, isConnected, isConnecting, isReconnecting, error, shouldUseFarcasterWallet } = useWallet();
   
   return {
     status: connectionStatus,
@@ -204,6 +250,7 @@ export function useWalletStatus() {
     isReconnecting,
     hasError: !!error,
     error,
+    isFarcasterWallet: shouldUseFarcasterWallet,
   };
 }
 

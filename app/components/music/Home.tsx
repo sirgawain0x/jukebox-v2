@@ -11,6 +11,7 @@ import { PlaylistView } from "./PlaylistView";
 import { RecentTips } from "./RecentTips";
 import { UserBalances } from "./UserBalances";
 import { ErrorBoundary } from "../ui/ErrorBoundary";
+import { FarcasterTestComponent } from "../examples/FarcasterTestComponent";
 // import ProtectedExample from "../examples/ProtectedExample";
 
 type HomeProps = {
@@ -58,6 +59,14 @@ export function Home({ setActiveTab }: HomeProps) {
       <ErrorBoundary>
         <UserBalances />
       </ErrorBoundary>
+      
+      {/* Farcaster Integration Test Component - only show in development */}
+      {process.env.NODE_ENV === 'development' && (
+        <ErrorBoundary>
+          <FarcasterTestComponent />
+        </ErrorBoundary>
+      )}
+      
       <ErrorBoundary>
         <Jukebox
           onSongTipped={handleSongTipped}

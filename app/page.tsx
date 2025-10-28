@@ -126,9 +126,9 @@ export default function App() {
   };
 
   // Enhanced platform detection using both SDKs
-  const isBaseApp = context?.client?.clientFid === 309857;
-  const isFarcaster = farcasterContext?.client?.clientFid === 9152;
-  const launchLocation = farcasterContext?.location?.type;
+  const _isBaseApp = context?.client?.clientFid === 309857;
+  const _isFarcaster = farcasterContext?.client?.clientFid === 9152;
+  const _launchLocation = farcasterContext?.location?.type;
 
   // Show loading skeleton until frame is ready
   if (!isMiniAppReady) {

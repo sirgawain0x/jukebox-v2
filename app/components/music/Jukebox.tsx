@@ -36,6 +36,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useFarcasterContext } from '@/app/utils/farcaster-context';
 
 type JukeboxProps = {
   onSongTipped: (song: Song) => void;
@@ -80,9 +81,8 @@ export function Jukebox({
   const { address, isConnected, connector } = useAccount();
   const farcasterTransactions = useFarcasterTransactions();
   
-  // Detect Farcaster context
-  const isInFarcaster = typeof window !== 'undefined' && window.location.href.includes('farcaster');
-  const isMiniapp = typeof window !== 'undefined' && window.location.href.includes('miniapp');
+  // Detect Farcaster context properly using the hook
+  const { isInFarcaster, isMiniapp } = useFarcasterContext();
   const shouldUseFarcasterWallet = isInFarcaster || isMiniapp;
   
   const [failedImages, setFailedImages] = useState<{ [id: string]: boolean }>(

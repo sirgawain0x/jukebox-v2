@@ -14,6 +14,7 @@ import {
 } from "@coinbase/onchainkit/identity";
 import { Button } from './Button';
 import { Icon } from './Icon';
+import { useFarcasterContext } from '@/app/utils/farcaster-context';
 
 interface AdaptiveHeaderProps {
   onAddFrame?: () => void;
@@ -21,6 +22,8 @@ interface AdaptiveHeaderProps {
 }
 
 export default function AdaptiveHeader({ onAddFrame, frameAdded }: AdaptiveHeaderProps) {
+  const { isMiniapp } = useFarcasterContext();
+
   return (
     <header className="flex justify-between items-center mb-3 h-11">
       <div className="flex items-center space-x-3">
@@ -41,25 +44,27 @@ export default function AdaptiveHeader({ onAddFrame, frameAdded }: AdaptiveHeade
         </Wallet>
       </div>
 
-      <div className="flex items-center space-x-2">
-        {!frameAdded && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onAddFrame}
-            className="text-(--app-accent) p-4"
-            icon={<Icon name="plus" size="sm" />}
-          >
-            Save Frame
-          </Button>
-        )}
-        {frameAdded && (
-          <div className="flex items-center space-x-1 text-sm font-medium text-(--app-accent)">
-            <Icon name="check" size="sm" className="text-(--app-accent)" />
-            <span>Saved</span>
-          </div>
-        )}
-      </div>
+      {isMiniapp && (
+        <div className="flex items-center space-x-2">
+          {!frameAdded && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onAddFrame}
+              className="text-(--app-accent) p-4"
+              icon={<Icon name="plus" size="sm" />}
+            >
+              Save Frame
+            </Button>
+          )}
+          {frameAdded && (
+            <div className="flex items-center space-x-1 text-sm font-medium text-(--app-accent)">
+              <Icon name="check" size="sm" className="text-(--app-accent)" />
+              <span>Saved</span>
+            </div>
+          )}
+        </div>
+      )}
     </header>
   );
 }

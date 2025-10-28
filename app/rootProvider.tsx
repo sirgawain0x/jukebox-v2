@@ -3,6 +3,8 @@ import { ReactNode, useEffect, useState } from "react";
 import { base } from "wagmi/chains";
 import { OnchainKitProvider } from "@coinbase/onchainkit";
 import { useMiniKit } from '@coinbase/onchainkit/minikit';
+import { WalletProvider } from '@/app/contexts/WalletContext';
+import { WalletErrorBoundary } from '@/app/components/ui/WalletErrorBoundary';
 import "@coinbase/onchainkit/styles.css";
 
 // Enhanced Base chain configuration with multiple RPC endpoints for better reliability
@@ -71,13 +73,17 @@ export function RootProvider({ children }: { children: ReactNode }) {
         enabled: true
       }}
     >
-      {isMounted ? (
-        <MiniKitWrapper>
-          {children}
-        </MiniKitWrapper>
-      ) : (
-        children
-      )}
+      <WalletErrorBoundary>
+        <WalletProvider>
+          {isMounted ? (
+            <MiniKitWrapper>
+              {children}
+            </MiniKitWrapper>
+          ) : (
+            children
+          )}
+        </WalletProvider>
+      </WalletErrorBoundary>
     </OnchainKitProvider>
   );
 }

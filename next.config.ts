@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Increase timeout for API routes
+  serverExternalPackages: [],
   webpack: (config) => {
     config.externals.push("pino-pretty", "lokijs", "encoding");
     return config;
@@ -13,6 +15,8 @@ const nextConfig: NextConfig = {
     },
   },
   images: {
+    dangerouslyAllowSVG: true,
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     remotePatterns: [
       {
         protocol: "https",
@@ -92,6 +96,11 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "**.cloudfront.net",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "assets.wenmint.com",
         pathname: "/**",
       },
     ],

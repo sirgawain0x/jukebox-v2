@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import { RootProvider } from "./rootProvider";
+import { ToastProvider } from "./components/ui/ToastProvider";
 import "./globals.css";
 
 const ROOT_URL =
@@ -69,11 +70,13 @@ export default function RootLayout({
 }>) {
   return (
     <RootProvider>
-      <html lang="en" suppressHydrationWarning>
-        <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
-          {children}
-        </body>
-      </html>
+      <ToastProvider>
+        <html lang="en" suppressHydrationWarning>
+          <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
+            {children}
+          </body>
+        </html>
+      </ToastProvider>
     </RootProvider>
   );
 }

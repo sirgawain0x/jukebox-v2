@@ -292,7 +292,7 @@ export function PlaylistSection({
         showToast(errorMessage);
       }
     },
-    [showToast]
+    [showToast, address, chainId]
   );
 
   useEffect(() => {

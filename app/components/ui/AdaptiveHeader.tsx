@@ -56,7 +56,7 @@ export default function AdaptiveHeader({ onAddFrame, frameAdded }: AdaptiveHeade
               className="text-(--app-accent) p-4"
               icon={<Icon name="plus" size="sm" />}
             >
-              Save MininApp
+              Save MiniApp
             </Button>
           )}
           {frameAdded && (

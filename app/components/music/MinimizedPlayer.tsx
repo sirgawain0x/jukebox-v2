@@ -25,6 +25,8 @@ export function MinimizedPlayer() {
 
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [showControls, setShowControls] = useState(true);
+  const fadeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newVolume = parseFloat(e.target.value);
@@ -56,12 +58,45 @@ export function MinimizedPlayer() {
     }, 300);
   }, []);
 
+  // Handle showing controls
+  const handleShowControls = useCallback(() => {
+    setShowControls(true);
+    
+    // Clear any existing fade timeout
+    if (fadeTimeoutRef.current) {
+      clearTimeout(fadeTimeoutRef.current);
+    }
+    
+    // Set new timeout to hide controls after 3 seconds
+    fadeTimeoutRef.current = setTimeout(() => {
+      setShowControls(false);
+      fadeTimeoutRef.current = null;
+    }, 3000);
+  }, []);
+
+  // Auto-hide controls on mount and when playing changes
+  React.useEffect(() => {
+    handleShowControls();
+    
+    // Cleanup on unmount
+    return () => {
+      if (fadeTimeoutRef.current) {
+        clearTimeout(fadeTimeoutRef.current);
+      }
+    };
+  }, [handleShowControls, isPlaying]);
+
   if (!selectedSong || !isMinimized) {
     return null;
   }
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-50 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-lg p-3 animate-slide-up">
+    <div 
+      className="fixed bottom-4 left-4 right-4 z-50 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-lg p-3 animate-slide-up"
+      onMouseEnter={handleShowControls}
+      onMouseMove={handleShowControls}
+      onTouchStart={handleShowControls}
+    >
       <div className="flex items-center gap-3">
         {/* Album Art */}
         {selectedSong.cover ? (
@@ -104,18 +139,36 @@ export function MinimizedPlayer() {
             <Icon name="chevron-left" size="sm" />
           </button>
 
-          <button
-            onClick={togglePlayPause}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
-            title={isPlaying ? "Pause" : "Play"}
-            aria-label={isPlaying ? "Pause" : "Play"}
-          >
-            {audioLoading ? (
-              <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
-            ) : (
-              <Icon name={isPlaying ? "pause" : "play"} size="sm" />
+          {/* Play/Pause button with animated indicator behind it */}
+          <div className="relative">
+            {/* Audio indicator - stays visible, positioned behind the button */}
+            {isPlaying && (
+              <div className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none">
+                <AnimatedAudioIndicator 
+                  isPlaying={isPlaying}
+                  size="sm"
+                  className="text-blue-500 opacity-60"
+                  variant="bars"
+                />
+              </div>
             )}
-          </button>
+            
+            {/* Button with fade effect */}
+            <button
+              onClick={togglePlayPause}
+              className={`relative z-10 p-2 hover:bg-gray-100 rounded-full transition-all duration-500 ease-in-out cursor-pointer ${
+                showControls ? 'opacity-100' : 'opacity-0'
+              }`}
+              title={isPlaying ? "Pause" : "Play"}
+              aria-label={isPlaying ? "Pause" : "Play"}
+            >
+              {audioLoading ? (
+                <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
+              ) : (
+                <Icon name={isPlaying ? "pause" : "play"} size="sm" />
+              )}
+            </button>
+          </div>
 
           <button
             onClick={handleNextSong}
@@ -126,16 +179,6 @@ export function MinimizedPlayer() {
           >
             <Icon name="chevron-right" size="sm" />
           </button>
-
-          {/* Audio indicator */}
-          {isPlaying && (
-            <AnimatedAudioIndicator 
-              isPlaying={isPlaying}
-              size="sm"
-              className="text-blue-500"
-              variant="bars"
-            />
-          )}
 
           {/* Volume Control */}
           <div 

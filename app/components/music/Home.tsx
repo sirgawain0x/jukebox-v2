@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useAccount } from "wagmi";
 import { Playlist, Song } from "@/types/music";
 import { Button } from "../ui/Button";
@@ -11,6 +11,7 @@ import { PlaylistView } from "./PlaylistView";
 import { RecentTips } from "./RecentTips";
 import { UserBalances } from "./UserBalances";
 import { ErrorBoundary } from "../ui/ErrorBoundary";
+import { useMusic } from "@/app/contexts/MusicContext";
 
 type HomeProps = {
   setActiveTab: (tab: string) => void;
@@ -20,6 +21,12 @@ export function Home({ setActiveTab }: HomeProps) {
   const { isConnected } = useAccount();
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
   const [selectedSong, setSelectedSong] = useState<Song | null>(null);
+  const { setIsMinimized } = useMusic();
+
+  // When on home page, keep player expanded if music is playing
+  useEffect(() => {
+    setIsMinimized(false);
+  }, [setIsMinimized]);
 
   const handleSongTipped = () => {
     // Songs are now managed by the PlaylistView component via contract

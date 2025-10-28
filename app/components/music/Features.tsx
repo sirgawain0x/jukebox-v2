@@ -1,13 +1,24 @@
 "use client";
+import { useEffect } from "react";
 import { Card } from "../ui/Card";
 import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
+import { useMusic } from "@/app/contexts/MusicContext";
 
 type FeaturesProps = {
   setActiveTab: (tab: string) => void;
 };
 
 export function Features({ setActiveTab }: FeaturesProps) {
+  const { setIsMinimized, selectedSong } = useMusic();
+
+  // Minimize player when navigating to features page
+  useEffect(() => {
+    if (selectedSong) {
+      setIsMinimized(true);
+    }
+  }, [setIsMinimized, selectedSong]);
+
   return (
     <div className="space-y-6 animate-fade-in">
       <Card title="Key Features">

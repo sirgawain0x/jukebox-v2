@@ -14,6 +14,8 @@ import { Button } from "./components/ui/Button";
 import { Home } from "./components/music/Home";
 import { Features } from "./components/music/Features";
 import { Fund } from "./components/music/Funds";
+import { MinimizedPlayer } from "./components/music/MinimizedPlayer";
+import { FullScreenPlayer } from "./components/music/FullScreenPlayer";
 import { FrameMetaTags } from "./components/ui/FrameMetaTags";
 import { ErrorBoundary } from "./components/ui/ErrorBoundary";
 import AdaptiveHeader from "./components/ui/AdaptiveHeader";
@@ -204,6 +206,10 @@ export default function App() {
               </footer>
             </div>
           </div>
+          
+          {/* Global Music Players */}
+          <MinimizedPlayer />
+          <FullScreenPlayer />
         </ClientOnly>
       </ErrorBoundary>
     </>

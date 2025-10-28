@@ -18,7 +18,6 @@ import { Pills } from "../ui/Pills";
 import { playlistABI } from "@/lib/contracts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "../ui/ToastProvider";
-import { useWallet } from "@/app/contexts/WalletContext";
 import { useFarcasterTransactions } from "@/app/utils/farcaster-transactions";
 import {
   DndContext,
@@ -75,9 +74,14 @@ export function Jukebox({
   const { composeCast } = useComposeCast();
   const { showToast, showInteractiveToast } = useToast();
   
-  // Use enhanced wallet context with Farcaster support
-  const wallet = useWallet();
+  // Use OnchainKit's built-in wallet hooks
+  const { address, isConnected, connector } = useAccount();
   const farcasterTransactions = useFarcasterTransactions();
+  
+  // Detect Farcaster context
+  const isInFarcaster = typeof window !== 'undefined' && window.location.href.includes('farcaster');
+  const isMiniapp = typeof window !== 'undefined' && window.location.href.includes('miniapp');
+  const shouldUseFarcasterWallet = isInFarcaster || isMiniapp;
   
   const [failedImages, setFailedImages] = useState<{ [id: string]: boolean }>(
     {}
@@ -426,7 +430,7 @@ export function Jukebox({
   }, [sortBy, after, before, direction]);
 
   const calls = useMemo(() => {
-    if (!selectedSong || !wallet.address) {
+    if (!selectedSong || !address) {
       return [];
     }
     const tipCall = {
@@ -450,7 +454,7 @@ export function Jukebox({
       return [tipCall, addSongCall];
     }
     return [tipCall];
-  }, [selectedSong, wallet.address, minTipEth, playlist]);
+  }, [selectedSong, address, minTipEth, playlist]);
 
   const handleSuccess = useCallback(
     async (_response: TransactionResponseType) => {
@@ -523,24 +527,23 @@ export function Jukebox({
 
   // Custom transaction handler for Farcaster and regular wallets
   const handleCustomTransaction = useCallback(async () => {
-    if (!selectedSong || !wallet.address) {
+    if (!selectedSong || !address) {
       showToast("❌ No song selected or wallet not connected");
       return;
     }
 
     console.log("Transaction attempt - Debug info:", {
-      shouldUseFarcasterWallet: wallet.shouldUseFarcasterWallet,
+      shouldUseFarcasterWallet,
       canUseFarcaster: farcasterTransactions.canUseFarcaster,
-      isInFarcaster: wallet.isInFarcaster,
-      isMiniapp: wallet.isMiniapp,
-      walletAddress: wallet.address,
-      farcasterAddress: wallet.farcasterUserAddress,
-      connectorName: wallet.connectorName,
-      isConnected: wallet.isConnected
+      isInFarcaster,
+      isMiniapp,
+      walletAddress: address,
+      connectorName: connector?.name,
+      isConnected
     });
 
     try {
-      if (wallet.shouldUseFarcasterWallet && farcasterTransactions.canUseFarcaster) {
+      if (shouldUseFarcasterWallet && farcasterTransactions.canUseFarcaster) {
         console.log("Using Farcaster transaction handling");
         // Use Farcaster transaction handling
         const transactions = [];
@@ -584,7 +587,7 @@ export function Jukebox({
       console.error("Custom transaction error:", error);
       showToast(`❌ Transaction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-  }, [selectedSong, wallet.address, wallet.shouldUseFarcasterWallet, wallet.connectorName, wallet.farcasterUserAddress, wallet.isConnected, wallet.isInFarcaster, wallet.isMiniapp, farcasterTransactions, minTipEth, playlist, handleSuccess, showToast]);
+  }, [selectedSong, address, shouldUseFarcasterWallet, connector?.name, isConnected, isInFarcaster, isMiniapp, farcasterTransactions, minTipEth, playlist, handleSuccess, showToast]);
   const handleSelectSong = useCallback((song: Song) => {
     _setSelectedSong(song);
     setSelectedSong(song);
@@ -916,14 +919,12 @@ export function Jukebox({
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs">
             <div className="font-medium text-blue-800 mb-2">🔧 Debug Info:</div>
             <div className="space-y-1 text-blue-700">
-              <div>Wallet Connected: {wallet.isConnected ? '✅' : '❌'}</div>
-              <div>Address: {wallet.address || 'None'}</div>
-              <div>In Farcaster: {wallet.isInFarcaster ? '✅' : '❌'}</div>
-              <div>Is Miniapp: {wallet.isMiniapp ? '✅' : '❌'}</div>
-              <div>Is Frame: {wallet.isFrame ? '✅' : '❌'}</div>
-              <div>Use Farcaster Wallet: {wallet.shouldUseFarcasterWallet ? '✅' : '❌'}</div>
-              <div>Farcaster User FID: {wallet.farcasterUserFid || 'None'}</div>
-              <div>Farcaster Address: {wallet.farcasterUserAddress || 'None'}</div>
+              <div>Wallet Connected: {isConnected ? '✅' : '❌'}</div>
+              <div>Address: {address || 'None'}</div>
+              <div>In Farcaster: {isInFarcaster ? '✅' : '❌'}</div>
+              <div>Is Miniapp: {isMiniapp ? '✅' : '❌'}</div>
+              <div>Use Farcaster Wallet: {shouldUseFarcasterWallet ? '✅' : '❌'}</div>
+              <div>Connector: {connector?.name || 'None'}</div>
             </div>
           </div>
         )}
@@ -1151,7 +1152,7 @@ export function Jukebox({
               )}
               
               {/* Tip button */}
-              {wallet.shouldUseFarcasterWallet ? (
+              {shouldUseFarcasterWallet ? (
                 // Farcaster-specific tip button
                 <div className="w-full mt-3">
                   <div className="text-center mb-2">
@@ -1205,7 +1206,7 @@ export function Jukebox({
                {/* Share Song Button */}
                <button
                  onClick={handleShareSong}
-                 className="w-full mt-3 bg-white/20 hover:bg-white/30 text-white rounded-lg py-2 px-4 transition-all duration-200 flex items-center justify-center gap-2 text-sm font-medium"
+                 className="w-full mt-3 bg-white/20 hover:bg-white/30 text-white rounded-lg py-2 px-4 transition-all duration-200 flex items-center justify-center gap-2 text-sm font-medium cursor-pointer"
                >
                  <Icon name="share" size="sm" />
                  Share This Track

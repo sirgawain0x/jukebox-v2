@@ -158,7 +158,7 @@ export default function App() {
               <AdaptiveHeader onAddFrame={handleAddFrame} frameAdded={frameAdded || context?.client?.added} />
 
               {/* Platform-specific features */}
-              {isBaseApp && (
+              {/* {isBaseApp && (
                 <div className="mb-4 p-2 bg-blue-50 rounded text-sm text-blue-700">
                   🎵 Base App user - Enhanced features enabled!
                 </div>
@@ -168,10 +168,10 @@ export default function App() {
                 <div className="mb-4 p-2 bg-purple-50 rounded text-sm text-purple-700">
                   🚀 Farcaster user - Social features enabled!
                 </div>
-              )}
+              )} */}
 
               {/* Location-based features */}
-              {launchLocation === 'cast_embed' && (
+              {/* {launchLocation === 'cast_embed' && (
                 <div className="mb-4 p-2 bg-green-50 rounded text-sm text-green-700">
                   📱 Launched from cast - Discovered through social sharing!
                 </div>
@@ -181,7 +181,7 @@ export default function App() {
                 <div className="mb-4 p-2 bg-yellow-50 rounded text-sm text-yellow-700">
                   🔔 Launched from notification - Welcome back!
                 </div>
-              )}
+              )} */}
 
               <main className="flex-1">
                 <ErrorBoundary>

@@ -30,7 +30,6 @@ import {
   DragEndEvent,
 } from '@dnd-kit/core';
 import {
-  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
@@ -101,7 +100,6 @@ export function Jukebox({
   const playQueue = globalMusic.playQueue;
   const currentQueueIndex = globalMusic.currentQueueIndex;
   const isAutoPlayEnabled = globalMusic.isAutoPlayEnabled;
-  const audioRef = globalMusic.audioRef;
 
   // Load tip count and prompt status from localStorage
   useEffect(() => {

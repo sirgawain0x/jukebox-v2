@@ -773,7 +773,7 @@ export function Jukebox({
             </div>
           </div>
         )}
-        <div className="space-y-3">
+        <div className="flex items-center gap-4">
           <div className="text-sm font-medium text-(--app-foreground-muted)">
             Sort by:
           </div>
@@ -809,7 +809,7 @@ export function Jukebox({
                   className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all ${
                     selectedSong?.id === song.id
                       ? "border-[#0052ff] bg-[#e6edff]"
-                      : "border-[rgba(0,0,0,0.1)] bg-[rgba(255,255,255,0.4)]"
+                      : "border-[rgba(0,0,0,0.1)] bg-[rgba(255,255,255,0.4)] hover:bg-[#e6edff]"
                   }`}
                   onClick={() => handleSelectSong(song)}
                 >

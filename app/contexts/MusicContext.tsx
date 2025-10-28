@@ -7,6 +7,8 @@ interface MusicContextType {
   selectedSong: Song | null;
   isPlaying: boolean;
   audioLoading: boolean;
+  volume: number;
+  isMuted: boolean;
   
   // Queue management
   playQueue: Song[];
@@ -19,6 +21,9 @@ interface MusicContextType {
   handlePreviousSong: () => void;
   handleNextSong: () => void;
   togglePlayPause: () => void;
+  setVolume: (volume: number) => void;
+  toggleMute: () => void;
+  closePlayer: () => void;
   
   // Queue controls
   addToQueue: (song: Song) => void;
@@ -45,6 +50,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const [currentQueueIndex, setCurrentQueueIndex] = useState(0);
   const [isAutoPlayEnabled, setIsAutoPlayEnabled] = useState(true);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [volume, setVolumeState] = useState(1); // 0 to 1
+  const [isMuted, setIsMuted] = useState(false);
+  const [previousVolume, setPreviousVolume] = useState(1);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -53,6 +61,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     if (typeof window !== 'undefined' && !audioRef.current) {
       audioRef.current = new Audio();
       audioRef.current.preload = 'auto';
+      audioRef.current.volume = 1; // Default volume
       
       // Set up event listeners
       const audio = audioRef.current;
@@ -83,6 +92,13 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       };
     }
   }, []);
+
+  // Sync volume with audio element
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
+    }
+  }, [volume]);
 
   // Auto-play next song when current song ends
   useEffect(() => {
@@ -253,10 +269,56 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  // Volume controls
+  const setVolume = useCallback((newVolume: number) => {
+    const clampedVolume = Math.max(0, Math.min(1, newVolume));
+    setVolumeState(clampedVolume);
+    if (audioRef.current) {
+      audioRef.current.volume = clampedVolume;
+    }
+    // Unmute if volume is set above 0
+    if (clampedVolume > 0 && isMuted) {
+      setIsMuted(false);
+    }
+  }, [isMuted]);
+
+  const toggleMute = useCallback(() => {
+    if (isMuted) {
+      // Unmute: restore previous volume
+      setVolumeState(previousVolume);
+      if (audioRef.current) {
+        audioRef.current.volume = previousVolume;
+      }
+      setIsMuted(false);
+    } else {
+      // Mute: save current volume and set to 0
+      setPreviousVolume(volume);
+      setVolumeState(0);
+      if (audioRef.current) {
+        audioRef.current.volume = 0;
+      }
+      setIsMuted(true);
+    }
+  }, [isMuted, volume, previousVolume]);
+
+  const closePlayer = useCallback(() => {
+    // Pause and clear audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+    }
+    // Clear state
+    setSelectedSongState(null);
+    setIsPlaying(false);
+    setIsMinimized(false);
+  }, []);
+
   const value: MusicContextType = {
     selectedSong,
     isPlaying,
     audioLoading,
+    volume,
+    isMuted,
     playQueue,
     currentQueueIndex,
     isAutoPlayEnabled,
@@ -265,6 +327,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     handlePreviousSong,
     handleNextSong,
     togglePlayPause,
+    setVolume,
+    toggleMute,
+    closePlayer,
     addToQueue,
     removeFromQueue,
     clearQueue,

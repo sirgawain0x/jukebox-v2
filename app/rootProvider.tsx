@@ -1,9 +1,7 @@
 "use client";
 import { type ReactNode } from "react";
 import { base } from "wagmi/chains";
-import { MiniKitProvider } from "@coinbase/onchainkit/minikit";
 import { OnchainKitProvider } from "@coinbase/onchainkit";
-import { WalletErrorBoundary } from '@/app/components/ui/WalletErrorBoundary';
 import "@coinbase/onchainkit/styles.css";
 
 export function RootProvider({ children }: { children: ReactNode }) {
@@ -23,11 +21,7 @@ export function RootProvider({ children }: { children: ReactNode }) {
         enabled: true
       }}
     >
-      <MiniKitProvider>
-        <WalletErrorBoundary>
-          {children}
-        </WalletErrorBoundary>
-      </MiniKitProvider>
+      {children}
     </OnchainKitProvider>
   );
 }

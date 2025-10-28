@@ -47,15 +47,15 @@ export default function AdaptiveHeader({ onAddFrame, frameAdded }: AdaptiveHeade
             variant="ghost"
             size="sm"
             onClick={onAddFrame}
-            className="text-[var(--app-accent)] p-4"
+            className="text-(--app-accent) p-4"
             icon={<Icon name="plus" size="sm" />}
           >
             Save Frame
           </Button>
         )}
         {frameAdded && (
-          <div className="flex items-center space-x-1 text-sm font-medium text-[#0052FF]">
-            <Icon name="check" size="sm" className="text-[#0052FF]" />
+          <div className="flex items-center space-x-1 text-sm font-medium text-(--app-accent)">
+            <Icon name="check" size="sm" className="text-(--app-accent)" />
             <span>Saved</span>
           </div>
         )}

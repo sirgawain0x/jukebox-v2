@@ -11,7 +11,6 @@ import { PlaylistView } from "./PlaylistView";
 import { RecentTips } from "./RecentTips";
 import { UserBalances } from "./UserBalances";
 import { ErrorBoundary } from "../ui/ErrorBoundary";
-// import ProtectedExample from "../examples/ProtectedExample";
 
 type HomeProps = {
   setActiveTab: (tab: string) => void;
@@ -34,7 +33,7 @@ export function Home({ setActiveTab }: HomeProps) {
   return (
     <div className="space-y-6 animate-fade-in">
       <Card title="🎵 Jukebox">
-        <p className="text-[var(--app-foreground-muted)] mb-4">
+        <p className="text-(--app-foreground-muted) mb-4">
           Discover and support independent
           artists through on-chain music streaming and direct creator tips.
         </p>
@@ -77,9 +76,6 @@ export function Home({ setActiveTab }: HomeProps) {
           </div>
         </ErrorBoundary>
       )}
-
-      {/* Example of Protected Feature - temporarily disabled */}
-      {/* <ProtectedExample /> */}
     </div>
   );
 }

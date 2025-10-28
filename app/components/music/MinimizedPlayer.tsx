@@ -1,5 +1,5 @@
 "use client";
-import React from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import { useMusic } from '@/app/contexts/MusicContext';
 import { Icon } from '../ui/Icon';
@@ -16,7 +16,45 @@ export function MinimizedPlayer() {
     togglePlayPause,
     handlePreviousSong,
     handleNextSong,
+    volume,
+    isMuted,
+    setVolume,
+    toggleMute,
+    closePlayer,
   } = useMusic();
+
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+  const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newVolume = parseFloat(e.target.value);
+    setVolume(newVolume);
+  };
+
+  const getVolumeIcon = () => {
+    if (isMuted || volume === 0) return 'volume-x';
+    if (volume < 0.5) return 'volume-1';
+    return 'volume-2';
+  };
+
+  // Handle showing the volume slider
+  const handleMouseEnter = useCallback(() => {
+    // Clear any existing timeout
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+    setShowVolumeSlider(true);
+  }, []);
+
+  // Handle hiding the volume slider with a delay
+  const handleMouseLeave = useCallback(() => {
+    // Set a timeout to close the slider after 300ms
+    closeTimeoutRef.current = setTimeout(() => {
+      setShowVolumeSlider(false);
+      closeTimeoutRef.current = null;
+    }, 300);
+  }, []);
 
   if (!selectedSong || !isMinimized) {
     return null;
@@ -99,6 +137,45 @@ export function MinimizedPlayer() {
             />
           )}
 
+          {/* Volume Control */}
+          <div 
+            className="relative flex items-center gap-1"
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+          >
+            <button
+              onClick={toggleMute}
+              className="p-1 hover:bg-gray-100 rounded transition-colors cursor-pointer"
+              title={isMuted ? "Unmute" : "Mute"}
+              aria-label={isMuted ? "Unmute" : "Mute"}
+            >
+              <Icon name={getVolumeIcon()} size="sm" />
+            </button>
+            
+            {showVolumeSlider && (
+              <div 
+                className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 p-2 bg-white border border-gray-200 rounded-lg shadow-lg"
+                onMouseEnter={handleMouseEnter}
+                onMouseLeave={handleMouseLeave}
+              >
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={volume}
+                  onChange={handleVolumeChange}
+                  className="w-24 h-1 accent-blue-500 cursor-pointer"
+                  style={{
+                    background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${volume * 100}%, #e5e7eb ${volume * 100}%, #e5e7eb 100%)`
+                  }}
+                  title={`Volume: ${Math.round(volume * 100)}%`}
+                  aria-label="Volume slider"
+                />
+              </div>
+            )}
+          </div>
+
           {/* Expand button */}
           <button
             onClick={() => setIsMinimized(false)}
@@ -121,6 +198,16 @@ export function MinimizedPlayer() {
               <line x1="21" y1="3" x2="14" y2="10" />
               <line x1="3" y1="21" x2="10" y2="14" />
             </svg>
+          </button>
+
+          {/* Close button */}
+          <button
+            onClick={closePlayer}
+            className="p-1 hover:bg-red-100 rounded transition-colors cursor-pointer text-gray-500 hover:text-red-600"
+            title="Close player"
+            aria-label="Close player"
+          >
+            <Icon name="x" size="sm" />
           </button>
         </div>
       </div>

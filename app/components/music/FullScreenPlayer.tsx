@@ -19,11 +19,26 @@ export function FullScreenPlayer() {
     handlePreviousSong,
     handleNextSong,
     setAutoPlayEnabled,
+    volume,
+    isMuted,
+    setVolume,
+    toggleMute,
     audioRef,
   } = useMusic();
 
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newVolume = parseFloat(e.target.value);
+    setVolume(newVolume);
+  };
+
+  const getVolumeIcon = () => {
+    if (isMuted || volume === 0) return 'volume-x';
+    if (volume < 0.5) return 'volume-1';
+    return 'volume-2';
+  };
 
   // Update progress bar
   useEffect(() => {
@@ -235,6 +250,37 @@ export function FullScreenPlayer() {
             {currentQueueIndex + 1} of {playQueue.length} songs in queue
           </div>
         )}
+
+        {/* Volume Control */}
+        <div className="mb-4 px-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={toggleMute}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
+              title={isMuted ? "Unmute" : "Mute"}
+              aria-label={isMuted ? "Unmute" : "Mute"}
+            >
+              <Icon name={getVolumeIcon()} size="sm" />
+            </button>
+            <div className="flex-1">
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={volume}
+                onChange={handleVolumeChange}
+                className="w-full h-2 accent-blue-500 cursor-pointer"
+                style={{
+                  background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${volume * 100}%, #e5e7eb ${volume * 100}%, #e5e7eb 100%)`
+                }}
+                title={`Volume: ${Math.round(volume * 100)}%`}
+                aria-label="Volume slider"
+              />
+            </div>
+            <span className="text-xs text-gray-500 w-10 text-right">{Math.round(volume * 100)}%</span>
+          </div>
+        </div>
 
         {/* Auto-play toggle */}
         <div className="flex items-center justify-center gap-2 text-sm text-gray-700">

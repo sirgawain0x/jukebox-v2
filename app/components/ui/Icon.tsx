@@ -2,7 +2,7 @@
 import { FC } from "react";
 
 type IconProps = {
-  name: "heart" | "star" | "check" | "plus" | "arrow-right" | "chevron-down" | "share" | "music" | "chevron-left" | "chevron-right" | "x" | "play" | "pause" | "volume";
+  name: "heart" | "star" | "check" | "plus" | "arrow-right" | "chevron-down" | "share" | "music" | "chevron-left" | "chevron-right" | "x" | "play" | "pause" | "volume" | "volume-x" | "volume-1" | "volume-2";
   size?: "sm" | "md" | "lg";
   className?: string;
 };
@@ -232,6 +232,55 @@ export const Icon: FC<IconProps> = ({ name, size = "md", className = "" }) => {
         aria-hidden="true"
       >
         <title>Volume</title>
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+      </svg>
+    ),
+    "volume-x": (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <title>Volume Muted</title>
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+        <line x1="23" y1="9" x2="17" y2="15" />
+        <line x1="17" y1="9" x2="23" y2="15" />
+      </svg>
+    ),
+    "volume-1": (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <title>Volume Low</title>
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+        <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+      </svg>
+    ),
+    "volume-2": (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <title>Volume High</title>
         <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
         <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
       </svg>

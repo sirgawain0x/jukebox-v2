@@ -2,6 +2,7 @@
 import { type ReactNode } from "react";
 import { base } from "wagmi/chains";
 import { OnchainKitProvider } from "@coinbase/onchainkit";
+import { MusicProvider } from '@/app/contexts/MusicContext';
 import "@coinbase/onchainkit/styles.css";
 
 export function RootProvider({ children }: { children: ReactNode }) {
@@ -21,7 +22,9 @@ export function RootProvider({ children }: { children: ReactNode }) {
         enabled: true
       }}
     >
-      {children}
+      <MusicProvider>
+        {children}
+      </MusicProvider>
     </OnchainKitProvider>
   );
 }

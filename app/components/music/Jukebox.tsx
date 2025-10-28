@@ -19,6 +19,7 @@ import { playlistABI } from "@/lib/contracts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "../ui/ToastProvider";
 import { useFarcasterTransactions } from "@/app/utils/farcaster-transactions";
+import { useMusic } from "@/app/contexts/MusicContext";
 import {
   DndContext,
   closestCenter,
@@ -48,7 +49,9 @@ export function Jukebox({
   setSelectedSong,
   playlist,
 }: JukeboxProps) {
-  const [selectedSong, _setSelectedSong] = useState<Song | null>(null);
+  // Use global music context for persistent player
+  const globalMusic = useMusic();
+  
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -86,18 +89,19 @@ export function Jukebox({
   const [failedImages, setFailedImages] = useState<{ [id: string]: boolean }>(
     {}
   );
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [audioLoading, setAudioLoading] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [tipCount, setTipCount] = useState(0);
   const [hasSeenPlaylistPrompt, setHasSeenPlaylistPrompt] = useState(false);
   const errorHandledRef = useRef(false);
   const successHandledRef = useRef(false);
 
-  // Continuous playback queue states
-  const [playQueue, setPlayQueue] = useState<Song[]>([]);
-  const [currentQueueIndex, setCurrentQueueIndex] = useState(0);
-  const [isAutoPlayEnabled, setIsAutoPlayEnabled] = useState(true);
+  // Use global music state for audio playback
+  const selectedSong = globalMusic.selectedSong;
+  const isPlaying = globalMusic.isPlaying;
+  const audioLoading = globalMusic.audioLoading;
+  const playQueue = globalMusic.playQueue;
+  const currentQueueIndex = globalMusic.currentQueueIndex;
+  const isAutoPlayEnabled = globalMusic.isAutoPlayEnabled;
+  const audioRef = globalMusic.audioRef;
 
   // Load tip count and prompt status from localStorage
   useEffect(() => {
@@ -589,85 +593,26 @@ export function Jukebox({
     }
   }, [selectedSong, address, shouldUseFarcasterWallet, connector?.name, isConnected, isInFarcaster, isMiniapp, farcasterTransactions, minTipEth, playlist, handleSuccess, showToast]);
   const handleSelectSong = useCallback((song: Song) => {
-    _setSelectedSong(song);
+    // Use global music context to set the selected song
+    globalMusic.setSelectedSong(song);
     setSelectedSong(song);
     
-    // Add to queue if not already present and update current index
-    setPlayQueue(prevQueue => {
-      const newQueue = prevQueue.find(s => s.id === song.id) 
-        ? prevQueue 
-        : [...prevQueue, song];
-      
-      // Update current index based on the new queue
-      const existingIndex = newQueue.findIndex((s: Song) => s.id === song.id);
-      setCurrentQueueIndex(existingIndex >= 0 ? existingIndex : newQueue.length - 1);
-      
-      return newQueue;
-    });
-  }, [setSelectedSong]);
+    // Start with minimized player when song is selected
+    globalMusic.setIsMinimized(true);
+  }, [globalMusic, setSelectedSong]);
 
   const handleRemoveFromQueue = useCallback((songToRemove: Song, indexToRemove: number) => {
-    setPlayQueue(prevQueue => {
-      const newQueue = prevQueue.filter((_, index) => index !== indexToRemove);
-      
-      // Update current queue index if necessary
-      setCurrentQueueIndex(prevIndex => {
-        if (indexToRemove < prevIndex) {
-          // If we removed a song before the current one, shift the index down
-          return prevIndex - 1;
-        } else if (indexToRemove === prevIndex) {
-          // If we removed the currently playing song, stay at the same index or go to previous
-          if (newQueue.length === 0) {
-            return 0;
-          }
-          // If we're at the end, go to the previous song
-          return prevIndex >= newQueue.length ? newQueue.length - 1 : prevIndex;
-        }
-        // If we removed a song after the current one, no change needed
-        return prevIndex;
-      });
-      
-      return newQueue;
-    });
-    
+    globalMusic.removeFromQueue(songToRemove.id, indexToRemove);
     showToast(`Removed "${songToRemove.title}" from queue`);
-  }, [showToast]);
+  }, [globalMusic, showToast]);
 
   const handlePreviousSong = useCallback(() => {
-    setPlayQueue(currentQueue => {
-      if (currentQueue.length <= 1) return currentQueue;
-      
-      setCurrentQueueIndex(prevIndex => {
-        const newIndex = prevIndex > 0 ? prevIndex - 1 : currentQueue.length - 1;
-        const prevSong = currentQueue[newIndex];
-        if (prevSong) {
-          _setSelectedSong(prevSong);
-          setSelectedSong(prevSong);
-        }
-        return newIndex;
-      });
-      
-      return currentQueue;
-    });
-  }, [setSelectedSong]);
+    globalMusic.handlePreviousSong();
+  }, [globalMusic]);
 
   const handleNextSong = useCallback(() => {
-    setPlayQueue(currentQueue => {
-      if (currentQueue.length <= 1) return currentQueue;
-      
-      setCurrentQueueIndex(prevIndex => {
-        const newIndex = (prevIndex + 1) % currentQueue.length;
-        const nextSong = currentQueue[newIndex];
-        if (nextSong) {
-          _setSelectedSong(nextSong);
-          setSelectedSong(nextSong);
-        }
-        return newIndex;
-      });
-      
-      return currentQueue;
-    });
-  }, [setSelectedSong]);
+    globalMusic.handleNextSong();
+  }, [globalMusic]);
 
   const handleTransactionError = useCallback((error: TransactionError) => {
     // Prevent multiple error handling for the same transaction
@@ -699,84 +644,8 @@ export function Jukebox({
     }
   }, [showToast]);
 
-  useEffect(() => {
-    // Capture the current audio element for cleanup
-    const audio = audioRef.current;
-    
-    if (selectedSong && audio) {
-      // Try to play the audio when a new song is selected
-      audio.currentTime = 0;
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(() => {
-          // Autoplay might be blocked, ignore error
-        });
-      }
-    }
-
-    // Cleanup function to pause audio when component unmounts or song changes
-    return () => {
-      if (audio) {
-        audio.pause();
-        setIsPlaying(false);
-      }
-    };
-  }, [selectedSong]);
-
-  // Track audio playing state
-  useEffect(() => {
-    const audio = audioRef.current;
-    
-    if (audio) {
-      const handlePlay = () => setIsPlaying(true);
-      const handlePause = () => setIsPlaying(false);
-      const handleEnded = () => setIsPlaying(false);
-      
-      audio.addEventListener('play', handlePlay);
-      audio.addEventListener('pause', handlePause);
-      audio.addEventListener('ended', handleEnded);
-      
-      return () => {
-        audio.removeEventListener('play', handlePlay);
-        audio.removeEventListener('pause', handlePause);
-        audio.removeEventListener('ended', handleEnded);
-      };
-    }
-  }, [selectedSong]);
-
-  // Auto-play next song when current song ends
-  useEffect(() => {
-    const audio = audioRef.current;
-    
-    const handleEnded = () => {
-      if (isAutoPlayEnabled && playQueue.length > 0) {
-        const nextIndex = (currentQueueIndex + 1) % playQueue.length;
-        setCurrentQueueIndex(nextIndex);
-        
-        // Auto-select and play next song
-        const nextSong = playQueue[nextIndex];
-        if (nextSong) {
-          _setSelectedSong(nextSong);
-          setSelectedSong(nextSong);
-          
-          // Small delay to ensure audio element is ready
-          setTimeout(() => {
-            if (audio) {
-              audio.currentTime = 0;
-              audio.play().catch(() => {
-                // Autoplay might be blocked, ignore error
-              });
-            }
-          }, 100);
-        }
-      }
-    };
-
-    if (audio) {
-      audio.addEventListener('ended', handleEnded);
-      return () => audio.removeEventListener('ended', handleEnded);
-    }
-  }, [isAutoPlayEnabled, playQueue, currentQueueIndex, setSelectedSong]);
+  // Audio playback is now handled by the global MusicContext
+  // No need for local audio effect hooks
 
   // Drag and drop sensors
   const sensors = useSensors(
@@ -791,32 +660,10 @@ export function Jukebox({
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
-      setPlayQueue((items) => {
-        const oldIndex = items.findIndex((item) => item.id === active.id);
-        const newIndex = items.findIndex((item) => item.id === over.id);
-
-        const newQueue = arrayMove(items, oldIndex, newIndex);
-        
-        // Update currentQueueIndex if necessary
-        setCurrentQueueIndex(oldCurrentIndex => {
-          let newCurrentIndex = oldCurrentIndex;
-
-          if (oldIndex === oldCurrentIndex) {
-            // The currently playing song was moved
-            newCurrentIndex = newIndex;
-          } else if (oldIndex < oldCurrentIndex && newIndex >= oldCurrentIndex) {
-            // A song before the current one was moved after it
-            newCurrentIndex = oldCurrentIndex - 1;
-          } else if (oldIndex > oldCurrentIndex && newIndex <= oldCurrentIndex) {
-            // A song after the current one was moved before it
-            newCurrentIndex = oldCurrentIndex + 1;
-          }
-
-          return newCurrentIndex;
-        });
-        
-        return newQueue;
-      });
+      const oldIndex = playQueue.findIndex((item) => item.id === active.id);
+      const newIndex = playQueue.findIndex((item) => item.id === over.id);
+      
+      globalMusic.reorderQueue(oldIndex, newIndex);
     }
   };
 
@@ -1017,32 +864,37 @@ export function Jukebox({
                       />
                     )}
                     {/* Quick share button */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        composeCast({
-                          text: `🎵 Check out "${song.title}" by ${song.artist}! Discovered this amazing track on Jukebox 🎶`,
-                          embeds: [window.location.href]
-                        });
-                        showToast(`Shared "${song.title}" to Farcaster!`);
-                      }}
-                      className="p-1 hover:bg-blue-100 rounded transition-all duration-200 cursor-pointer hover:scale-110"
-                      title="Quick share to Farcaster"
-                      aria-label={`Share ${song.title} to Farcaster`}
-                    >
-                      <Icon name="share" size="sm" className="text-blue-600" />
-                    </button>
+                    {isMiniapp && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          composeCast({
+                            text: `🎵 Check out "${song.title}" by ${song.artist}! Discovered this amazing track on Jukebox 🎶`,
+                            embeds: [window.location.href]
+                          });
+                          showToast(`Shared "${song.title}" to Farcaster!`);
+                        }}
+                        className="p-1 hover:bg-blue-100 rounded transition-all duration-200 cursor-pointer hover:scale-110"
+                        title="Quick share to Farcaster"
+                        aria-label={`Share ${song.title} to Farcaster`}
+                      >
+                        <Icon name="share" size="sm" className="text-blue-600" />
+                      </button>
+                    )}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         const isInQueue = playQueue.some(queueSong => queueSong.id === song.id);
                         if (isInQueue) {
-                          // Remove from queue
-                          setPlayQueue(prevQueue => prevQueue.filter(queueSong => queueSong.id !== song.id));
-                          showToast(`Removed "${song.title}" from queue`);
+                          // Remove from queue - find the index
+                          const index = playQueue.findIndex(queueSong => queueSong.id === song.id);
+                          if (index >= 0) {
+                            globalMusic.removeFromQueue(song.id, index);
+                            showToast(`Removed "${song.title}" from queue`);
+                          }
                         } else {
                           // Add to queue
-                          setPlayQueue(prevQueue => [...prevQueue, song]);
+                          globalMusic.addToQueue(song);
                           showToast(`Added "${song.title}" to queue`);
                         }
                       }}
@@ -1126,30 +978,96 @@ export function Jukebox({
                 />
               </div>
               
-              {/* Audio controls */}
-              <audio
-                ref={audioRef}
-                src={selectedSong.audioUrl}
-                className="w-full mt-4 rounded"
-                autoPlay
-                preload="auto"
-                onLoadStart={() => setAudioLoading(true)}
-                onCanPlay={() => setAudioLoading(false)}
-                onError={() => setAudioLoading(false)}
-                controlsList="nodownload"
-                controls
-              />
-              
-              {/* Audio loading indicator */}
-              {audioLoading && (
-                <div className="flex items-center justify-center gap-2 text-white text-sm mt-2">
-                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Loading audio...
+              {/* Audio playback is now handled by the global MusicContext */}
+              {/* Visual controls and status */}
+              <div className="mt-4 space-y-2">
+                <div className="flex items-center justify-center gap-4">
+                  <button
+                    onClick={handlePreviousSong}
+                    disabled={playQueue.length <= 1}
+                    className="p-2 hover:bg-white/20 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    title="Previous song"
+                    aria-label="Previous song"
+                  >
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      strokeWidth="2" 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round"
+                      className="w-5 h-5 text-white"
+                    >
+                      <polygon points="11 19 2 12 11 5 11 19" />
+                      <polygon points="22 19 13 12 22 5 22 19" />
+                    </svg>
+                  </button>
+
+                  <button
+                    onClick={() => globalMusic.togglePlayPause()}
+                    className="p-3 bg-white/20 hover:bg-white/30 rounded-full transition-colors cursor-pointer"
+                    title={isPlaying ? "Pause" : "Play"}
+                    aria-label={isPlaying ? "Pause" : "Play"}
+                  >
+                    {audioLoading ? (
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : isPlaying ? (
+                      <svg 
+                        xmlns="http://www.w3.org/2000/svg" 
+                        viewBox="0 0 24 24" 
+                        fill="currentColor"
+                        className="w-5 h-5 text-white"
+                      >
+                        <rect x="6" y="4" width="4" height="16" />
+                        <rect x="14" y="4" width="4" height="16" />
+                      </svg>
+                    ) : (
+                      <svg 
+                        xmlns="http://www.w3.org/2000/svg" 
+                        viewBox="0 0 24 24" 
+                        fill="currentColor"
+                        className="w-5 h-5 text-white"
+                      >
+                        <polygon points="5 3 19 12 5 21 5 3" />
+                      </svg>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={handleNextSong}
+                    disabled={playQueue.length <= 1}
+                    className="p-2 hover:bg-white/20 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    title="Next song"
+                    aria-label="Next song"
+                  >
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      strokeWidth="2" 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round"
+                      className="w-5 h-5 text-white"
+                    >
+                      <polygon points="13 19 22 12 13 5 13 19" />
+                      <polygon points="2 19 11 12 2 5 2 19" />
+                    </svg>
+                  </button>
                 </div>
-              )}
+                
+                {/* Audio loading indicator */}
+                {audioLoading && (
+                  <div className="flex items-center justify-center gap-2 text-white text-sm">
+                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Loading audio...
+                  </div>
+                )}
+              </div>
               
               {/* Tip button */}
               {shouldUseFarcasterWallet ? (
@@ -1204,13 +1122,15 @@ export function Jukebox({
               )}
 
                {/* Share Song Button */}
-               <button
-                 onClick={handleShareSong}
-                 className="w-full mt-3 bg-white/20 hover:bg-white/30 text-white rounded-lg py-2 px-4 transition-all duration-200 flex items-center justify-center gap-2 text-sm font-medium cursor-pointer"
-               >
-                 <Icon name="share" size="sm" />
-                 Share This Track
-               </button>
+               {isMiniapp && (
+                 <button
+                   onClick={handleShareSong}
+                   className="w-full mt-3 bg-white/20 hover:bg-white/30 text-white rounded-lg py-2 px-4 transition-all duration-200 flex items-center justify-center gap-2 text-sm font-medium cursor-pointer"
+                 >
+                   <Icon name="share" size="sm" />
+                   Share This Track
+                 </button>
+               )}
             </div>
           </div>
         )}
@@ -1225,15 +1145,15 @@ export function Jukebox({
                   <input
                     type="checkbox"
                     checked={isAutoPlayEnabled}
-                    onChange={(e) => setIsAutoPlayEnabled(e.target.checked)}
+                    onChange={(e) => globalMusic.setAutoPlayEnabled(e.target.checked)}
                     className="rounded cursor-pointer"
                   />
                   Auto-play next
                 </label>
                 <button
                   onClick={() => {
-                    setPlayQueue([]);
-                    setCurrentQueueIndex(0);
+                    globalMusic.clearQueue();
+                    showToast("Queue cleared");
                   }}
                   className="text-xs text-red-500 hover:text-red-700 transition-colors cursor-pointer"
                 >

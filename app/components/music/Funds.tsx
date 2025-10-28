@@ -4,6 +4,7 @@ import { useAccount } from "wagmi";
 import { FundButton } from "@coinbase/onchainkit/fund";
 import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
+import { useMusic } from "@/app/contexts/MusicContext";
 
 type FundProps = {
   setActiveTab: (tab: string) => void;
@@ -16,9 +17,17 @@ export function Fund({ setActiveTab }: FundProps) {
   const [error, setError] = useState<string | null>(null);
   const [selectedAmount, setSelectedAmount] = useState(5);
   const [selectedAsset, setSelectedAsset] = useState("ETH");
+  const { setIsMinimized, selectedSong } = useMusic();
 
   const assets = ["ETH", "USDC"];
   const amounts = [5, 10, 20];
+
+  // Minimize player when navigating to fund page
+  useEffect(() => {
+    if (selectedSong) {
+      setIsMinimized(true);
+    }
+  }, [setIsMinimized, selectedSong]);
 
   useEffect(() => {
     if (!address) return;

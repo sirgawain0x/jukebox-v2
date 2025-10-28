@@ -28,7 +28,9 @@ export default function AdaptiveHeader({ onAddFrame, frameAdded }: AdaptiveHeade
     <header className="flex justify-between items-center mb-3 h-11">
       <div className="flex items-center space-x-3">
         <Wallet className="z-10">
-            <ConnectWallet>
+            <ConnectWallet
+            className="bg-blue-600 text-white hover:bg-blue-700 rounded-md"
+            >
               <Avatar className="h-6 w-6" />
               <Name />
             </ConnectWallet>
@@ -54,7 +56,7 @@ export default function AdaptiveHeader({ onAddFrame, frameAdded }: AdaptiveHeade
               className="text-(--app-accent) p-4"
               icon={<Icon name="plus" size="sm" />}
             >
-              Save Frame
+              Save MininApp
             </Button>
           )}
           {frameAdded && (

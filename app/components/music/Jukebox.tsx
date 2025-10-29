@@ -37,6 +37,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useFarcasterContext } from '@/app/utils/farcaster-context';
+import { SongShareMetaTags } from '../ui/SongShareMetaTags';
 
 type JukeboxProps = {
   onSongTipped: (song: Song) => void;
@@ -842,6 +843,14 @@ export function Jukebox({
 
   return (
     <Card title="🎵 Discover Music">
+      {/* Dynamic meta tags for song sharing */}
+      {selectedSong && (
+        <SongShareMetaTags 
+          song={selectedSong}
+          title={`${selectedSong.title} by ${selectedSong.artist}`}
+          description={`Listen to "${selectedSong.title}" by ${selectedSong.artist} on Jukebox`}
+        />
+      )}
       <div className="space-y-4">
         {/* Debug info for Farcaster context */}
         {process.env.NODE_ENV === 'development' && (

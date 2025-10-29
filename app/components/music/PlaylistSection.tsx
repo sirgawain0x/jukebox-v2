@@ -18,7 +18,6 @@ import {
   useAccount,
   useChainId,
   useWaitForTransactionReceipt,
-  useWalletClient,
   useBalance,
 } from "wagmi";
 import {
@@ -41,10 +40,14 @@ import {
 } from "lucide-react";
 import { decodeEventLog } from "viem";
 import { type ContractFunctionParameters } from "viem";
+import { pay, getPaymentStatus } from "@base-org/account";
 
 type PayableContractFunctionParameters = ContractFunctionParameters & {
   value?: bigint;
 };
+
+// Base Pay configuration - moved outside component to avoid dependency issues
+const PAYMENT_RECIPIENT = process.env.NEXT_PUBLIC_WALLET_ADDRESS || "0x1Fde40a4046Eda0cA0539Dd6c77ABF8933B94260";
 
 export function PlaylistSection({
   onCreate,
@@ -108,16 +111,8 @@ export function PlaylistSection({
   const SAVE_PLAYLIST_COST = validateAndGetCost(savePlaylistCost);
 
   const { address, isConnected } = useAccount();
-  const { data: walletClient } = useWalletClient();
   const chainId = useChainId();
   const { composeCast } = useComposeCast();
-
-  // Check USDC balance on Base network
-  const { data: usdcBalance } = useBalance({
-    address: address,
-    token: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // USDC on Base
-    chainId: 8453, // Base mainnet
-  });
 
   const { data: receipt } = useWaitForTransactionReceipt({
     hash: deploymentHash,
@@ -173,75 +168,88 @@ export function PlaylistSection({
       return;
     }
 
-    if (!walletClient) {
-      setImageGenerationError("Wallet client not available");
-      return;
-    }
-
-    // Check if connected to Base network
-    if (walletClient.chain.id !== 8453) {
-      setImageGenerationError(
-        "Please switch to Base network to use x402 payments"
-      );
-      return;
-    }
-
-    // Check USDC balance (approximate cost check)
-    const requiredAmount = 0.05; // $0.05 USDC for Gemini
-    if (usdcBalance && parseFloat(usdcBalance.formatted) < requiredAmount) {
-      setImageGenerationError(
-        `Insufficient USDC balance. You need at least $${requiredAmount} USDC to generate an image.`
-      );
-      return;
-    }
-
     setLoadingImage(true);
     setImageGenerationError(null);
-    setPaymentStatus("Preparing payment...");
+    setPaymentStatus("Initiating payment...");
 
     try {
-      // For now, let's simulate a successful generation to test the UI flow
-      // TODO: Fix x402-fetch integration
-      setPaymentStatus("Processing payment...");
-      
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Simulate successful image generation
-      const mockImageUrl = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjNjY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIyNCIgZmlsbD0iI2ZmZiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk1vY2sgSW1hZ2U8L3RleHQ+PC9zdmc+";
-      
-      setCoverImage(mockImageUrl);
-      setImageLoadError(false);
-      setImageLoading(true);
-      setPaymentStatus("Payment successful! Image generated.");
-      showToast("Image generated successfully with Gemini AI!");
-      setTimeout(() => setPaymentStatus(""), 3000);
-      
-      // Increment generation count and lock access for next generation
-      setImageGenerationCount(prev => prev + 1);
-      setAiAccessUnlocked(false);
-    } catch (error: unknown) {
-      console.error("Image generation error:", error);
+      // Use Base Pay to handle the payment
+      const payment = await pay({
+        amount: '0.25', // $0.25 USDC
+        to: PAYMENT_RECIPIENT,
+        testnet: false, // Use mainnet
+      });
 
-      let errorMessage = "Failed to generate image. Please try again.";
-      if (error instanceof Error) {
-        errorMessage = error.message;
+      console.log("Payment initiated:", payment.id);
+      setPaymentStatus("Payment processing...");
 
-        if (error.message.includes("402")) {
-          errorMessage = "Payment required. Please ensure your wallet is connected and has sufficient USDC balance.";
-        } else if (error.message.includes("insufficient")) {
-          errorMessage = "Insufficient USDC balance. Please add funds to your wallet.";
-        } else if (error.message.includes("rejected")) {
-          errorMessage = "Payment was rejected. Please try again.";
+      // Poll for payment status
+      let paymentComplete = false;
+      let attempts = 0;
+      const maxAttempts = 30; // 30 seconds max
+
+      while (!paymentComplete && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+        
+        const status = await getPaymentStatus({
+          id: payment.id,
+          testnet: false
+        });
+        console.log("Payment status:", status);
+
+        if (status.status === 'completed') {
+          paymentComplete = true;
+          setPaymentStatus("Payment successful! Generating image...");
+
+          // Call the API to generate the image
+          const response = await fetch("/api/gemini/text-to-image", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ 
+              prompt: imagePrompt,
+              paymentId: payment.id
+            }),
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.imageUrl) {
+              setCoverImage(data.imageUrl);
+              setImageLoadError(false);
+              setImageLoading(true);
+              setPaymentStatus("Image generated successfully!");
+              showToast("Image generated successfully with Gemini AI!");
+              setTimeout(() => setPaymentStatus(""), 3000);
+              setImageGenerationCount(prev => prev + 1);
+              setAiAccessUnlocked(false);
+            } else {
+              throw new Error(data.error || "Failed to generate image");
+            }
+          } else {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || "Failed to generate image");
+          }
+        } else if (status.status === 'failed') {
+          throw new Error(status.reason || "Payment failed");
         }
+
+        attempts++;
       }
 
-      setImageGenerationError(errorMessage);
-      setPaymentStatus("");
+      if (!paymentComplete) {
+        throw new Error("Payment timeout - please try again");
+      }
+
+    } catch (error) {
+      console.error("Payment or image generation error:", error);
+      setImageGenerationError(
+        error instanceof Error ? error.message : "Failed to process payment or generate image"
+      );
     } finally {
       setLoadingImage(false);
+      setPaymentStatus("");
     }
-  }, [imagePrompt, showToast, isConnected, address, walletClient, usdcBalance]);
+  }, [imagePrompt, isConnected, address, showToast]);
 
   const handlePayForAIAccess = useCallback(async () => {
     // Set a default prompt and unlock access, then call the generation function
@@ -452,7 +460,7 @@ export function PlaylistSection({
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
       >
-        <Card className="bg-[var(--app-card-bg)] border border-[var(--app-card-border)] shadow-2xl overflow-hidden">
+        <Card className="bg-(--app-card-bg) border border-(--app-card-border) shadow-2xl overflow-hidden">
           <CardContent className="p-8">
             {/* Header */}
             <div className="text-center mb-8">
@@ -472,7 +480,7 @@ export function PlaylistSection({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.4 }}
-                className="text-4xl font-bold text-[var(--app-accent)] mb-3"
+                className="text-4xl font-bold text-(--app-accent) mb-3"
               >
                 Create A Playlist
               </motion.h1>
@@ -480,7 +488,7 @@ export function PlaylistSection({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5 }}
-                className="text-[var(--app-foreground-muted)] text-lg"
+                className="text-(--app-foreground-muted) text-lg"
               >
                 Design the perfect playlist with AI-powered cover art
               </motion.p>
@@ -503,7 +511,7 @@ export function PlaylistSection({
               >
                 <Label
                   htmlFor="name"
-                  className="text-lg font-semibold flex items-center gap-3 text-[var(--app-foreground)]"
+                  className="text-lg font-semibold flex items-center gap-3 text-(--app-foreground)"
                 >
                   <div className="p-2 bg-blue-500 rounded-lg">
                     <Music className="w-4 h-4 text-white" />
@@ -515,7 +523,7 @@ export function PlaylistSection({
                   value={playlistName}
                   onChange={(e) => setPlaylistName(e.target.value)}
                   placeholder="My Awesome Playlist"
-                  className="h-14 text-lg bg-[var(--app-card-bg)] border border-[var(--app-card-border)] focus:border-[var(--app-accent)] rounded-xl transition-all duration-300 shadow-sm focus:shadow-md"
+                  className="h-14 text-lg bg-(--app-card-bg) border border-(--app-card-border) focus:border-(--app-accent) rounded-xl transition-all duration-300 shadow-sm focus:shadow-md"
                   required
                 />
               </motion.div>
@@ -529,7 +537,7 @@ export function PlaylistSection({
               >
                 <Label
                   htmlFor="description"
-                  className="text-lg font-semibold flex items-center gap-3 text-[var(--app-foreground)]"
+                  className="text-lg font-semibold flex items-center gap-3 text-(--app-foreground)"
                 >
                   <div className="p-2 bg-blue-500 rounded-lg">
                     <FileText className="w-4 h-4 text-white" />
@@ -541,7 +549,7 @@ export function PlaylistSection({
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Describe your playlist mood and vibe..."
-                  className="min-h-[120px] bg-[var(--app-card-bg)] border border-[var(--app-card-border)] focus:border-[var(--app-accent)] rounded-xl transition-all duration-300 shadow-sm focus:shadow-md resize-none text-base"
+                  className="min-h-[120px] bg-(--app-card-bg) border border-(--app-card-border) focus:border-(--app-accent) rounded-xl transition-all duration-300 shadow-sm focus:shadow-md resize-none text-base"
                 />
               </motion.div>
 
@@ -553,7 +561,7 @@ export function PlaylistSection({
                 className="space-y-4"
               >
                 <div className="flex items-center justify-between">
-                  <Label className="text-lg font-semibold flex items-center gap-3 text-[var(--app-foreground)]">
+                  <Label className="text-lg font-semibold flex items-center gap-3 text-(--app-foreground)">
                     <div className="p-2 bg-blue-500 rounded-lg">
                       <ImageIcon className="w-4 h-4 text-white" />
                     </div>
@@ -563,7 +571,7 @@ export function PlaylistSection({
                   {/* Toggle Switch */}
                   <div className="flex items-center gap-3">
                     <span className={`text-sm font-medium transition-colors duration-200 ${
-                      !useAIGeneration ? 'text-[var(--app-foreground)]' : 'text-[var(--app-foreground-muted)]'
+                      !useAIGeneration ? 'text-(--app-foreground)' : 'text-(--app-foreground-muted)'
                     }`}>
                       Custom URL
                     </span>
@@ -589,7 +597,7 @@ export function PlaylistSection({
                       />
                     </button>
                     <span className={`text-sm font-medium transition-colors duration-200 ${
-                      useAIGeneration ? 'text-[var(--app-foreground)]' : 'text-[var(--app-foreground-muted)]'
+                      useAIGeneration ? 'text-(--app-foreground)' : 'text-(--app-foreground-muted)'
                     }`}>
                       AI Generation
                     </span>
@@ -606,7 +614,7 @@ export function PlaylistSection({
                     className="space-y-4"
                   >
                     <div className="text-center mb-4">
-                      <p className="text-sm text-[var(--app-foreground-muted)]">
+                      <p className="text-sm text-(--app-foreground-muted)">
                         ✨ Google&apos;s Gemini AI - Advanced image generation with
                         natural language understanding
                       </p>
@@ -615,13 +623,13 @@ export function PlaylistSection({
                     {/* Image Generation Counter */}
                     {imageGenerationCount > 0 && (
                       <div className="text-center mb-4">
-                        <p className="text-sm text-[var(--app-foreground-muted)]">
+                        <p className="text-sm text-(--app-foreground-muted)">
                           🎨 Generated {imageGenerationCount} image{imageGenerationCount !== 1 ? 's' : ''} this session
                         </p>
                       </div>
                     )}
 
-                    <div className="p-6 bg-[var(--app-accent-light)] rounded-2xl border-2 border-dashed border-[var(--app-accent)]/50">
+                    <div className="p-6 bg-(--app-accent-light) rounded-2xl border-2 border-dashed border-(--app-accent)/50">
                       <div className="space-y-4">
                         {/* LOCKED STATE - Show payment button */}
                         {!aiAccessUnlocked && (
@@ -635,10 +643,10 @@ export function PlaylistSection({
                             />
 
                             <div className="text-center mb-2">
-                              <p className="text-sm font-medium text-[var(--app-foreground-muted)] flex items-center justify-center gap-1">
+                              <p className="text-sm font-medium text-(--app-foreground-muted) flex items-center justify-center gap-1">
                                 Cost:{" "}
                                 <span className="text-green-600 font-bold">
-                                  $0.05 USDC
+                                  $0.25 USDC
                                 </span>{" "}
                                 on Base
                               </p>
@@ -674,14 +682,14 @@ export function PlaylistSection({
                                 if (imageGenerationError) setImageGenerationError(null);
                               }}
                               placeholder="e.g. Futuristic neon city at night, Abstract geometric patterns with sound waves, Retro vinyl record with cosmic background..."
-                              className="min-h-[100px] bg-[var(--app-card-bg)] border border-[var(--app-card-border)] focus:border-[var(--app-accent)] rounded-xl transition-all duration-300 resize-none"
+                              className="min-h-[100px] bg-(--app-card-bg) border border-(--app-card-border) focus:border-(--app-accent) rounded-xl transition-all duration-300 resize-none"
                             />
 
                             <div className="text-center mb-2">
-                              <p className="text-sm font-medium text-[var(--app-foreground-muted)] flex items-center justify-center gap-1">
+                              <p className="text-sm font-medium text-(--app-foreground-muted) flex items-center justify-center gap-1">
                                 Cost:{" "}
                                 <span className="text-green-600 font-bold">
-                                  $0.05 USDC
+                                  $0.25 USDC
                                 </span>{" "}
                                 on Base
                               </p>
@@ -745,7 +753,7 @@ export function PlaylistSection({
                         setImageLoading(true);
                       }}
                       placeholder="https://example.com/your-awesome-cover.jpg"
-                      className="h-14 bg-[var(--app-card-bg)] border border-[var(--app-card-border)] focus:border-[var(--app-accent)] rounded-xl transition-all duration-300 shadow-sm focus:shadow-md"
+                        className="h-14 bg-(--app-card-bg) border border-(--app-card-border) focus:border-(--app-accent) rounded-xl transition-all duration-300 shadow-sm focus:shadow-md"
                     />
                   </motion.div>
                 )}
@@ -817,7 +825,7 @@ export function PlaylistSection({
                 transition={{ delay: 1.0 }}
                 className="space-y-4"
               >
-                <Label className="text-lg font-semibold flex items-center gap-3 text-[var(--app-foreground)]">
+                <Label className="text-lg font-semibold flex items-center gap-3 text-(--app-foreground)">
                   <div className="p-2 bg-blue-500 rounded-lg">
                     <Hash className="w-4 h-4 text-white" />
                   </div>
@@ -835,7 +843,7 @@ export function PlaylistSection({
                       }
                     }}
                     placeholder="Add a tag and press Enter"
-                    className="h-12 bg-[var(--app-card-bg)] border border-[var(--app-card-border)] focus:border-[var(--app-accent)] rounded-xl transition-all duration-300 shadow-sm focus:shadow-md"
+                    className="h-12 bg-(--app-card-bg) border border-(--app-card-border) focus:border-(--app-accent) rounded-xl transition-all duration-300 shadow-sm focus:shadow-md"
                   />
                   <Button
                     type="button"
@@ -860,13 +868,13 @@ export function PlaylistSection({
                           animate={{ opacity: 1, scale: 1 }}
                           exit={{ opacity: 0, scale: 0.8 }}
                           layout
-                          className="bg-[var(--app-accent-light)] text-[var(--app-accent)] px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 shadow-md border border-[var(--app-card-border)]"
+                          className="bg-(--app-accent-light) text-(--app-accent) px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 shadow-md border border-(--app-card-border)"
                         >
                           #{tag}
                           <button
                             type="button"
                             onClick={() => removeTag(tag)}
-                            className="text-[var(--app-accent)] hover:text-red-500 transition-colors duration-200 cursor-pointer"
+                            className="text-(--app-accent) hover:text-red-500 transition-colors duration-200 cursor-pointer"
                             aria-label={`Remove ${tag} tag`}
                           >
                             <X className="w-3 h-3" />
@@ -932,7 +940,7 @@ export function PlaylistSection({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-9999 flex items-center justify-center bg-black/60 backdrop-blur-sm"
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -984,7 +992,7 @@ export function PlaylistSection({
               <div className="space-y-4">
                 <Button
                   variant="outline"
-                  className="w-full h-12 border border-[var(--app-card-border)] hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl transition-all duration-200"
+                  className="w-full h-12 border border-(--app-card-border) hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl transition-all duration-200"
                   onClick={() => setShowSaveModal(false)}
                   disabled={saveState === "pending"}
                 >
@@ -1037,7 +1045,7 @@ export function PlaylistSection({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 50, scale: 0.9 }}
             transition={{ duration: 0.2 }}
-            className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-[9999] pointer-events-auto"
+            className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-9999 pointer-events-auto"
           >
             <div className="bg-black/90 text-white px-6 py-3 rounded-xl shadow-2xl border border-white/20 backdrop-blur-sm">
               <p className="font-medium">{toast}</p>

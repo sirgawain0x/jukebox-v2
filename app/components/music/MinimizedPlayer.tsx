@@ -30,6 +30,8 @@ export function MinimizedPlayer() {
   const fadeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const titleContainerRef = useRef<HTMLDivElement>(null);
   const [shouldScroll, setShouldScroll] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newVolume = parseFloat(e.target.value);
@@ -42,19 +44,13 @@ export function MinimizedPlayer() {
     return 'volume-2';
   };
 
-  const handleRewind = () => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    audio.currentTime = Math.max(0, audio.currentTime - 15);
+  const formatTime = (seconds: number) => {
+    if (isNaN(seconds)) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleFastForward = () => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const duration = audio.duration;
-    if (!duration) return;
-    audio.currentTime = Math.min(duration, audio.currentTime + 30);
-  };
 
   // Handle showing the volume slider
   const handleMouseEnter = useCallback(() => {
@@ -102,6 +98,23 @@ export function MinimizedPlayer() {
       }
     };
   }, [handleShowControls, isPlaying]);
+
+  // Update progress bar
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const updateTime = () => setCurrentTime(audio.currentTime);
+    const updateDuration = () => setDuration(audio.duration);
+
+    audio.addEventListener('timeupdate', updateTime);
+    audio.addEventListener('loadedmetadata', updateDuration);
+
+    return () => {
+      audio.removeEventListener('timeupdate', updateTime);
+      audio.removeEventListener('loadedmetadata', updateDuration);
+    };
+  }, [audioRef]);
 
   // Check if title should scroll
   useEffect(() => {
@@ -179,6 +192,10 @@ export function MinimizedPlayer() {
             <div className="font-medium text-sm truncate">{selectedSong.title}</div>
           )}
           <div className="text-xs text-gray-500 truncate">{selectedSong.artist}</div>
+          {/* Time display */}
+          <div className="text-xs text-gray-400 mt-1">
+            {formatTime(currentTime)} / {formatTime(duration)}
+          </div>
         </div>
 
         {/* Controls */}
@@ -191,33 +208,6 @@ export function MinimizedPlayer() {
             aria-label="Previous song"
           >
             <Icon name="chevron-left" size="sm" />
-          </button>
-
-          {/* 15-second rewind button */}
-          <button
-            onClick={handleRewind}
-            className="p-1 hover:bg-gray-100 rounded transition-colors cursor-pointer"
-            title="Rewind 15 seconds"
-            aria-label="Rewind 15 seconds"
-          >
-            <div className="relative w-4 h-4">
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round"
-                className="w-4 h-4"
-              >
-                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                <path d="M3 3v5h5" />
-              </svg>
-              <span className="absolute inset-0 flex items-center justify-center text-[6px] font-bold text-gray-700">
-                15
-              </span>
-            </div>
           </button>
 
           {/* Play/Pause button with animated indicator behind it */}
@@ -250,33 +240,6 @@ export function MinimizedPlayer() {
               )}
             </button>
           </div>
-
-          {/* 30-second fast forward button */}
-          <button
-            onClick={handleFastForward}
-            className="p-1 hover:bg-gray-100 rounded transition-colors cursor-pointer"
-            title="Fast forward 30 seconds"
-            aria-label="Fast forward 30 seconds"
-          >
-            <div className="relative w-4 h-4">
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round"
-                className="w-4 h-4"
-              >
-                <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
-                <path d="M21 3v5h-5" />
-              </svg>
-              <span className="absolute inset-0 flex items-center justify-center text-[6px] font-bold text-gray-700">
-                30
-              </span>
-            </div>
-          </button>
 
           <button
             onClick={handleNextSong}

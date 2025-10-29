@@ -11,10 +11,10 @@ export interface ImageGenerationPrice {
 export function useImageGenerationPrice() {
   const [lastUpdated, setLastUpdated] = useState(new Date());
 
-  // Fixed pricing for both Livepeer and Gemini - x402 middleware handles the actual payment
+  // Fixed pricing for Gemini - Base Pay handles the actual payment
   const price: ImageGenerationPrice = {
-    usdPrice: 0.05, // $0.05 USDC per image (both providers)
-    ethPrice: "0.000006187", // Approximate ETH equivalent at current rates
+    usdPrice: 0.25, // $0.25 USDC per image
+    ethPrice: "0.000065789", // Approximate ETH equivalent at current rates
     lastUpdated,
     isLoading: false,
     error: undefined,

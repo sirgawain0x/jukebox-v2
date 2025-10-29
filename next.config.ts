@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Increase timeout for API routes
+  // Server configuration
   serverExternalPackages: [],
   webpack: (config) => {
     config.externals.push("pino-pretty", "lokijs", "encoding");

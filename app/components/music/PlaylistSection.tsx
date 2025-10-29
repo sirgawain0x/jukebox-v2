@@ -18,7 +18,6 @@ import {
   useAccount,
   useChainId,
   useWaitForTransactionReceipt,
-  useWalletClient,
   useBalance,
 } from "wagmi";
 import {
@@ -46,6 +45,9 @@ import { pay, getPaymentStatus } from "@base-org/account";
 type PayableContractFunctionParameters = ContractFunctionParameters & {
   value?: bigint;
 };
+
+// Base Pay configuration - moved outside component to avoid dependency issues
+const PAYMENT_RECIPIENT = process.env.NEXT_PUBLIC_WALLET_ADDRESS || "0x1Fde40a4046Eda0cA0539Dd6c77ABF8933B94260";
 
 export function PlaylistSection({
   onCreate,
@@ -109,7 +111,6 @@ export function PlaylistSection({
   const SAVE_PLAYLIST_COST = validateAndGetCost(savePlaylistCost);
 
   const { address, isConnected } = useAccount();
-  const { data: walletClient } = useWalletClient();
   const chainId = useChainId();
   const { composeCast } = useComposeCast();
 
@@ -158,9 +159,6 @@ export function PlaylistSection({
       embeds: [window.location.href]
     });
   }, [playlistName, tags, composeCast]);
-
-  // Base Pay configuration
-  const PAYMENT_RECIPIENT = process.env.NEXT_PUBLIC_WALLET_ADDRESS || "0x1Fde40a4046Eda0cA0539Dd6c77ABF8933B94260";
 
   const handleGenerateImage = useCallback(async () => {
     if (!imagePrompt.trim()) return;

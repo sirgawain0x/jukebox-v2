@@ -624,6 +624,20 @@ export function Jukebox({
     globalMusic.handleNextSong();
   }, [globalMusic]);
 
+  const handleRewind = useCallback(() => {
+    const audio = globalMusic.audioRef.current;
+    if (!audio) return;
+    audio.currentTime = Math.max(0, audio.currentTime - 15);
+  }, [globalMusic.audioRef]);
+
+  const handleFastForward = useCallback(() => {
+    const audio = globalMusic.audioRef.current;
+    if (!audio) return;
+    const duration = audio.duration;
+    if (!duration) return;
+    audio.currentTime = Math.min(duration, audio.currentTime + 30);
+  }, [globalMusic.audioRef]);
+
   const handleTransactionError = useCallback((error: TransactionError) => {
     // Prevent multiple error handling for the same transaction
     if (errorHandledRef.current) {
@@ -1072,6 +1086,33 @@ export function Jukebox({
                     </svg>
                   </button>
 
+                  {/* 15-second rewind button */}
+                  <button
+                    onClick={handleRewind}
+                    className="p-2 hover:bg-white/20 rounded-full transition-colors cursor-pointer"
+                    title="Rewind 15 seconds"
+                    aria-label="Rewind 15 seconds"
+                  >
+                    <div className="relative w-5 h-5">
+                      <svg 
+                        xmlns="http://www.w3.org/2000/svg" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        strokeWidth="2" 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round"
+                        className="w-5 h-5"
+                      >
+                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                        <path d="M3 3v5h5" />
+                      </svg>
+                      <span className="absolute inset-0 flex items-center justify-center text-[6px] font-bold text-white">
+                        15
+                      </span>
+                    </div>
+                  </button>
+
                   <button
                     onClick={() => globalMusic.togglePlayPause()}
                     className="p-3 bg-white/20 hover:bg-white/30 rounded-full transition-colors cursor-pointer"
@@ -1100,6 +1141,33 @@ export function Jukebox({
                         <polygon points="5 3 19 12 5 21 5 3" />
                       </svg>
                     )}
+                  </button>
+
+                  {/* 30-second fast forward button */}
+                  <button
+                    onClick={handleFastForward}
+                    className="p-2 hover:bg-white/20 rounded-full transition-colors cursor-pointer"
+                    title="Fast forward 30 seconds"
+                    aria-label="Fast forward 30 seconds"
+                  >
+                    <div className="relative w-5 h-5">
+                      <svg 
+                        xmlns="http://www.w3.org/2000/svg" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        strokeWidth="2" 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round"
+                        className="w-5 h-5"
+                      >
+                        <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+                        <path d="M21 3v5h-5" />
+                      </svg>
+                      <span className="absolute inset-0 flex items-center justify-center text-[6px] font-bold text-white">
+                        30
+                      </span>
+                    </div>
                   </button>
 
                   <button

@@ -14,6 +14,7 @@ import {
   LifecycleStatus,
 } from "@coinbase/onchainkit/transaction";
 import { useComposeCast } from "@coinbase/onchainkit/minikit";
+import { SongShareMetaTags } from "../ui/SongShareMetaTags";
 import {
   useAccount,
   useChainId,
@@ -455,6 +456,19 @@ export function PlaylistSection({
 
   return (
     <div className="w-full max-w-4xl mx-auto" id="playlist-section">
+      {/* Dynamic meta tags for playlist sharing */}
+      {playlistName && coverImage && (
+        <SongShareMetaTags 
+          playlist={{
+            name: playlistName,
+            coverImage: coverImage,
+            description: description,
+            tags: tags,
+          }}
+          title={`${playlistName} - Playlist`}
+          description={`Check out the playlist "${playlistName}" on Jukebox`}
+        />
+      )}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

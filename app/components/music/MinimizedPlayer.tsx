@@ -80,12 +80,14 @@ export function MinimizedPlayer() {
       clearTimeout(fadeTimeoutRef.current);
     }
     
-    // Set new timeout to hide controls after 3 seconds
-    fadeTimeoutRef.current = setTimeout(() => {
-      setShowControls(false);
-      fadeTimeoutRef.current = null;
-    }, 3000);
-  }, []);
+    // Only set fade timeout if currently playing
+    if (isPlaying) {
+      fadeTimeoutRef.current = setTimeout(() => {
+        setShowControls(false);
+        fadeTimeoutRef.current = null;
+      }, 3000);
+    }
+  }, [isPlaying]);
 
   // Auto-hide controls on mount and when playing changes
   React.useEffect(() => {
@@ -228,7 +230,7 @@ export function MinimizedPlayer() {
             <button
               onClick={togglePlayPause}
               className={`relative z-10 p-2 hover:bg-gray-100 rounded-full transition-all duration-500 ease-in-out cursor-pointer ${
-                showControls ? 'opacity-100' : 'opacity-0'
+                showControls || !isPlaying ? 'opacity-100' : 'opacity-0'
               }`}
               title={isPlaying ? "Pause" : "Play"}
               aria-label={isPlaying ? "Pause" : "Play"}

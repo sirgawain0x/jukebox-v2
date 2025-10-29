@@ -103,6 +103,16 @@ const nextConfig: NextConfig = {
         hostname: "assets.wenmint.com",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "catalog.myfilebase.com",
+        pathname: "/ipfs/**",
+      },
+      {
+        protocol: "https",
+        hostname: "content.spinamp.xyz",
+        pathname: "/**",
+      },
     ],
   },
 };

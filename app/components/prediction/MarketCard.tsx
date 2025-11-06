@@ -13,6 +13,7 @@ import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
 import { useToast } from "../ui/ToastProvider";
 import { tryGetPredictionMarketAddress, isPredictionMarketDeployed, predictionMarketABI } from "@/lib/contracts/prediction-market";
+import type { Contracts } from "@/types/transactions";
 
 type MarketCardProps = {
   market: PredictionMarket;
@@ -101,7 +102,7 @@ export function MarketCard({ market, rank }: MarketCardProps) {
             selectedSide === "YES",
           ],
         },
-      ]
+      ] as Contracts
     : [];
 
   // Get rank badge color based on position
@@ -124,7 +125,7 @@ export function MarketCard({ market, rank }: MarketCardProps) {
       <div className="space-y-4">
         {/* Rank and Song Info */}
         <div className="flex items-start gap-4">
-          <div className={`flex-shrink-0 w-14 h-14 rounded-lg ${getRankBadgeColor()} flex items-center justify-center text-white font-bold text-xl shadow-lg relative`}>
+          <div className={`shrink-0 w-14 h-14 rounded-lg ${getRankBadgeColor()} flex items-center justify-center text-white font-bold text-xl shadow-lg relative`}>
             {getRankIcon() ? (
               <span className="text-2xl">{getRankIcon()}</span>
             ) : (
@@ -144,7 +145,7 @@ export function MarketCard({ market, rank }: MarketCardProps) {
                   alt={market.songTitle}
                   width={64}
                   height={64}
-                  className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                  className="w-16 h-16 rounded-lg object-cover shrink-0"
                   unoptimized
                 />
               )}
@@ -152,7 +153,7 @@ export function MarketCard({ market, rank }: MarketCardProps) {
                 <h3 className="font-semibold text-lg text-[#111111] truncate">
                   {market.songTitle}
                 </h3>
-                <p className="text-sm text-[var(--app-foreground-muted)] truncate">
+                <p className="text-sm text-(--app-foreground-muted) truncate">
                   {market.songArtist}
                 </p>
               </div>
@@ -177,7 +178,7 @@ export function MarketCard({ market, rank }: MarketCardProps) {
               </>
             )}
           </div>
-          <span className="text-xs text-[var(--app-foreground-muted)]">
+          <span className="text-xs text-(--app-foreground-muted)">
             {daysRemaining}d {hoursRemaining}h left
           </span>
         </div>
@@ -239,15 +240,16 @@ export function MarketCard({ market, rank }: MarketCardProps) {
                 </div>
 
                 {selectedSide && betAmount && parseFloat(betAmount) > 0 && isConnected && contractAddress && marketExistsOnContract && (
-                  <Transaction calls={calls}>
-                    <TransactionButton className="w-full bg-[#0052ff] hover:bg-[#0040cc] text-white">
-                      Place {selectedSide} Bet: {betAmount} USDC
-                    </TransactionButton>
+                  <Transaction calls={calls as Contracts}>
+                    <TransactionButton 
+                      text={`Place ${selectedSide} Bet: ${betAmount} USDC`}
+                      className="w-full bg-[#0052ff] hover:bg-[#0040cc] text-white"
+                    />
                   </Transaction>
                 )}
 
                 {!isConnected && (
-                  <p className="text-xs text-center text-[var(--app-foreground-muted)]">
+                  <p className="text-xs text-center text-(--app-foreground-muted)">
                     Connect wallet to place bets
                   </p>
                 )}

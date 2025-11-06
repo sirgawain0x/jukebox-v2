@@ -6,7 +6,14 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "forge test",
+    "test:verbose": "forge test -vvv",
+    "test:gas": "forge test --gas-report",
+    "test:coverage": "forge coverage",
+    "test:snapshot": "forge test --snapshot",
+    "deploy:sepolia": "./scripts/deploy-sepolia.sh",
+    "deploy:sepolia:simulate": "forge script script/DeployPredictionMarket.s.sol:DeployPredictionMarket --rpc-url https://sepolia.base.org -vvvv"
   },
   "dependencies": {
     "@base-org/account": "^2.4.0",

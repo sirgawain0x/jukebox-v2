@@ -2,7 +2,7 @@
 import { FC } from "react";
 
 type IconProps = {
-  name: "heart" | "star" | "check" | "plus" | "arrow-right" | "chevron-down" | "share" | "music" | "chevron-left" | "chevron-right" | "x" | "play" | "pause" | "volume" | "volume-x" | "volume-1" | "volume-2";
+  name: "heart" | "star" | "check" | "plus" | "arrow-right" | "chevron-down" | "share" | "music" | "chevron-left" | "chevron-right" | "x" | "play" | "pause" | "volume" | "volume-x" | "volume-1" | "volume-2" | "trending-up";
   size?: "sm" | "md" | "lg";
   className?: string;
 };
@@ -283,6 +283,22 @@ export const Icon: FC<IconProps> = ({ name, size = "md", className = "" }) => {
         <title>Volume High</title>
         <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
         <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+      </svg>
+    ),
+    "trending-up": (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <title>Trending Up</title>
+        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+        <polyline points="17 6 23 6 23 12" />
       </svg>
     ),
   };

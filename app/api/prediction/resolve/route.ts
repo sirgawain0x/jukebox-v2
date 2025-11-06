@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
     let contractAddress: string | null = null;
     try {
       contractAddress = getPredictionMarketAddress(base.id);
-    } catch (_error) {
+    } catch {
       console.warn("Prediction market contract not deployed");
       return NextResponse.json(
         { error: "Prediction market contract not deployed on this chain" },

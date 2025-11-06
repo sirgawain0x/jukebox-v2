@@ -91,7 +91,7 @@ async function fetchUserBetsFromContract(
     let contractAddress: string | null = null;
     try {
       contractAddress = getPredictionMarketAddress(base.id);
-    } catch (_error) {
+    } catch {
       console.warn("Prediction market contract not deployed");
       return [];
     }
@@ -187,12 +187,12 @@ export async function GET(
     const publicClient = createPublicClient({
       chain: base,
       transport: http(RPC_URL),
-    });
+    }) as ReturnType<typeof createPublicClient>;
 
     let contractAddress: string | null = null;
     try {
       contractAddress = getPredictionMarketAddress(base.id);
-    } catch (_error) {
+    } catch {
       console.warn("Prediction market contract not deployed");
       return NextResponse.json({ bets: [], betCount: 0 });
     }

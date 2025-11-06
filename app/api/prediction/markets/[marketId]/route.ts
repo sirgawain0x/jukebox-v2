@@ -10,7 +10,7 @@ async function fetchMarketFromContract(marketId: string): Promise<PredictionMark
 }
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ marketId: string }> }
 ) {
   try {

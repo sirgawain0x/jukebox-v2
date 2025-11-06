@@ -9,14 +9,10 @@ import type {
   MarketSide,
 } from "@/types/prediction-market";
 import {
-  useGetMarket,
-  useGetUserBets,
-  useGetMarketCount,
   usePlaceBet as usePlaceBetContract,
   useClaimWinnings as useClaimWinningsContract,
-  useResolveMarket as useResolveMarketContract,
 } from "@/lib/contracts/prediction-market-hooks";
-import { formatUSDC, parseUSDC } from "@/lib/usdc-utils";
+import { parseUSDC } from "@/lib/usdc-utils";
 import {
   deserializePredictionMarkets,
   deserializePredictionMarket,
@@ -32,7 +28,6 @@ import {
   cacheUserBets,
   getCachedUserBets,
   calculateOdds,
-  cacheMarketOdds,
 } from "@/lib/prediction-cache";
 
 /**
@@ -170,7 +165,6 @@ export function useUserBets() {
 export function usePlaceBet() {
   const queryClient = useQueryClient();
   const { address } = useAccount();
-  const chainId = useChainId();
   const { placeBet: placeBetContract, ...rest } = usePlaceBetContract();
 
   const placeBet = useMutation({

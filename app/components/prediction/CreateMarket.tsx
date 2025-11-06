@@ -7,7 +7,6 @@ import { useCreateMarket } from "@/lib/contracts/prediction-market-hooks";
 import { tryGetPredictionMarketAddress, isPredictionMarketDeployed, predictionMarketABI } from "@/lib/contracts/prediction-market";
 import { getWeeklyEndTime, fetchTrendingSongs, type TrendingTrack } from "@/lib/trending-songs";
 import { Card } from "../ui/Card";
-import { Button } from "../ui/Button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "../ui/ToastProvider";
@@ -16,7 +15,7 @@ import { useReadContract } from "wagmi";
 import Image from "next/image";
 
 export function CreateMarket() {
-  const { address, isConnected } = useAccount();
+  const { isConnected } = useAccount();
   const chainId = useChainId();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
@@ -69,7 +68,7 @@ export function CreateMarket() {
     },
   });
 
-  const { writeContract, isPending, isSuccess, error } = useCreateMarket();
+  const { isSuccess, error } = useCreateMarket();
 
   // Calculate end time
   const getEndTime = (): bigint => {
@@ -290,7 +289,7 @@ export function CreateMarket() {
                 Will this song reach #1 in the weekly trending charts?
               </p>
               <p className="text-xs text-[var(--app-foreground-muted)] mt-1">
-                Users can bet YES (it will reach #1) or NO (it won't reach #1)
+                Users can bet YES (it will reach #1) or NO (it won&apos;t reach #1)
               </p>
             </div>
             <div className="border-t border-gray-200 pt-2 space-y-1">

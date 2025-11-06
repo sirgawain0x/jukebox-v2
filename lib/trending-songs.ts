@@ -63,7 +63,20 @@ export async function fetchTrendingSongs(limit: number = 10): Promise<TrendingTr
 
     const edges = result.data?.allTrendingTracks?.edges || [];
     
-    return edges.map((edge: any, index: number) => {
+    return edges.map((edge: {
+      node?: {
+        processedTrackByTrackId?: {
+          id: string;
+          title: string | null;
+          lossyArtworkUrl: string | null;
+          lossyAudioUrl: string | null;
+          artistByArtistId?: {
+            id: string;
+            name: string | null;
+          } | null;
+        } | null;
+      } | null;
+    }) => {
       const track = edge.node?.processedTrackByTrackId;
       if (!track) return null;
 
@@ -87,7 +100,7 @@ export async function fetchTrendingSongs(limit: number = 10): Promise<TrendingTr
  * Convert trending tracks to Song format
  */
 export function trendingTracksToSongs(tracks: TrendingTrack[]): Song[] {
-  return tracks.map((track, index) => ({
+  return tracks.map((track) => ({
     id: track.id,
     title: track.title,
     artist: track.artist,

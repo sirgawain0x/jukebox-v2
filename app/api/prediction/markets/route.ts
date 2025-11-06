@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCachedActiveMarkets, cacheActiveMarkets } from "@/lib/prediction-cache";
-import { fetchTrendingSongs, getWeeklyEndTime } from "@/lib/trending-songs";
-import { createPublicClient, http, decodeEventLog } from "viem";
+import { fetchTrendingSongs } from "@/lib/trending-songs";
+import { createPublicClient, http } from "viem";
 import { base } from "viem/chains";
 import { getPredictionMarketAddress, predictionMarketABI } from "@/lib/contracts/prediction-market";
-import { serializePredictionMarkets, deserializePredictionMarkets } from "@/lib/bigint-serialization";
+import { serializePredictionMarkets } from "@/lib/bigint-serialization";
 import type { PredictionMarket } from "@/types/prediction-market";
 
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://base-mainnet.infura.io";
@@ -35,7 +35,10 @@ async function fetchBetCounts(
     const MAX_BLOCKS_PER_QUERY = BigInt(1000);
     const MAX_BLOCKS_TO_SEARCH = BigInt(10000); // Last 10k blocks (~2 days)
     
-    let logs: any[] = [];
+    const logs: Array<{
+      args?: Record<string, unknown>;
+      topics?: readonly `0x${string}`[];
+    }> = [];
     
     try {
       const latestBlock = await publicClient.getBlockNumber();
@@ -60,10 +63,13 @@ async function fetchBetCounts(
           
           const chunkLogs = await publicClient.getLogs({
             address: contractAddress as `0x${string}`,
-            event: betPlacedEvent as any,
+            event: betPlacedEvent,
             fromBlock: currentFromBlock,
             toBlock: actualToBlock,
-          });
+          }) as Array<{
+            args?: Record<string, unknown>;
+            topics?: readonly `0x${string}`[];
+          }>;
           
           logs.push(...chunkLogs);
           console.log(`  Found ${chunkLogs.length} events in this chunk`);
@@ -75,17 +81,19 @@ async function fetchBetCounts(
           if (actualToBlock >= latestBlock) {
             break;
           }
-        } catch (chunkError: any) {
-          console.warn(`Failed to fetch chunk ${chunkCount} (blocks ${currentFromBlock}-${actualToBlock}):`, chunkError.message || chunkError);
+        } catch (chunkError: unknown) {
+          const errorMessage = chunkError instanceof Error ? chunkError.message : String(chunkError);
+          console.warn(`Failed to fetch chunk ${chunkCount} (blocks ${currentFromBlock}-${actualToBlock}):`, errorMessage);
           // Continue with next chunk instead of failing completely
           currentFromBlock = actualToBlock + BigInt(1);
         }
       }
       
       console.log(`Successfully fetched ${logs.length} total BetPlaced events across ${chunkCount} chunks`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       // If all else fails, return empty map - we'll show 0 bets but won't crash
-      console.error("Failed to fetch bet counts from events:", error.message || error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("Failed to fetch bet counts from events:", errorMessage);
       console.warn("Bet counts will be 0. Consider caching the contract deployment block to reduce query range.");
       return betCountsMap;
     }
@@ -97,7 +105,7 @@ async function fetchBetCounts(
         let marketId: number | undefined;
         
         if (log.args && typeof log.args === 'object') {
-          const args = log.args as any;
+          const args = log.args as Record<string, unknown>;
           if ('marketId' in args && args.marketId !== undefined) {
             marketId = Number(args.marketId);
           }
@@ -246,7 +254,7 @@ async function fetchMarketsFromContract(): Promise<PredictionMarket[]> {
     for (const result of marketDataResults) {
       if (!result) continue;
       
-      const { marketIndex, data: marketData } = result;
+      const { data: marketData } = result;
       // marketData structure: [songId, endTime, resolved, winner, totalPoolYes, totalPoolNo, maxBetAmount]
       const songId = marketData[0] as string;
       const endTime = Number(marketData[1]);
@@ -349,7 +357,7 @@ async function fetchMarketsFromContract(): Promise<PredictionMarket[]> {
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     // Try to get from cache first
     const cached = await getCachedActiveMarkets();
@@ -361,7 +369,7 @@ export async function GET(request: NextRequest) {
       let currentContractAddress: string | null = null;
       try {
         currentContractAddress = getPredictionMarketAddress(base.id);
-      } catch (error) {
+      } catch {
         // Contract not deployed, clear cache and fetch fresh
         console.warn("Contract not deployed, clearing cache");
         await cacheActiveMarkets([]);
@@ -436,8 +444,8 @@ export async function GET(request: NextRequest) {
     // Serialize BigInt values to strings for JSON response
     const serialized = serializePredictionMarkets(activeMarkets);
     return NextResponse.json(serialized);
-  } catch (error) {
-    console.error("Error fetching markets:", error);
+  } catch {
+    console.error("Error fetching markets");
     return NextResponse.json(
       { error: "Failed to fetch markets" },
       { status: 500 }

@@ -18,7 +18,7 @@ export interface CalculatedScore {
  * Calculate time-weighted factor based on when activity occurred
  * More recent activity gets higher weight
  */
-function calculateTimeWeight(
+function _calculateTimeWeight(
   timestamps: number[],
   startTime: number,
   endTime: number

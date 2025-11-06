@@ -3,7 +3,6 @@
 import { Address } from "viem";
 import { useReadContract, useWriteContract, useChainId, usePublicClient, useWaitForTransactionReceipt } from "wagmi";
 import { useRef, useEffect } from "react";
-import { getUSDCAddress } from "../usdc-utils";
 import { predictionMarketABI, tryGetPredictionMarketAddress, isPredictionMarketDeployed } from "./prediction-market";
 
 /**

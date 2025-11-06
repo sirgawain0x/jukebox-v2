@@ -1,6 +1,6 @@
 "use client";
 
-import { useActiveMarkets, useMarketBets } from "@/app/hooks/usePredictionMarket";
+import { useActiveMarkets } from "@/app/hooks/usePredictionMarket";
 import { formatUSDC } from "@/lib/usdc-utils";
 import { Card } from "../ui/Card";
 import { Skeleton } from "@/components/ui/skeleton";

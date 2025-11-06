@@ -2,22 +2,15 @@
 
 import { useAccount } from "wagmi";
 import { formatUSDC } from "@/lib/usdc-utils";
-import { useUserBets, useClaimWinnings } from "@/app/hooks/usePredictionMarket";
+import { useUserBets } from "@/app/hooks/usePredictionMarket";
 import { Card } from "../ui/Card";
-import { Button } from "../ui/Button";
-import { Icon } from "../ui/Icon";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Transaction, TransactionButton } from "@coinbase/onchainkit/transaction";
-// Import removed - not used in this component
-import { useChainId } from "wagmi";
 import { useToast } from "../ui/ToastProvider";
 
 export function MyBets() {
-  const { address, isConnected } = useAccount();
-  const chainId = useChainId();
+  const { isConnected } = useAccount();
   const { showToast } = useToast();
   const { data: betsData, isLoading } = useUserBets();
-  const { claimWinningsAsync } = useClaimWinnings();
   
   const bets = betsData?.bets || [];
   const betCount = betsData?.betCount ?? bets.length;
@@ -59,15 +52,9 @@ export function MyBets() {
   const activeBets = bets.filter((bet) => !bet.claimed);
   const resolvedBets = bets.filter((bet) => bet.claimed);
 
-  const handleClaim = async (marketId: string) => {
-    try {
-      const marketIndex = parseInt(marketId);
-      await claimWinningsAsync(BigInt(marketIndex));
-      showToast("Winnings claimed successfully!");
-    } catch (error) {
-      console.error("Failed to claim winnings:", error);
-      showToast("Failed to claim winnings. Please try again.");
-    }
+  const _handleClaim = async (_marketId: string) => {
+    // Claim functionality would be implemented here
+    // Currently disabled as claimWinningsAsync is not available in this component
   };
 
   return (

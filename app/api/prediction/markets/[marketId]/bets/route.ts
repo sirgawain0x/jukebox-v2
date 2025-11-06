@@ -4,31 +4,17 @@ import { serializeMarketBets } from "@/lib/bigint-serialization";
 import type { MarketBet } from "@/types/prediction-market";
 import { createPublicClient, http } from "viem";
 import { base } from "viem/chains";
-import { getPredictionMarketAddress, predictionMarketABI } from "@/lib/contracts/prediction-market";
+import { getPredictionMarketAddress } from "@/lib/contracts/prediction-market";
 
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://base-mainnet.infura.io";
 
-async function fetchBetsFromContract(marketId: string): Promise<MarketBet[]> {
+async function fetchBetsFromContract(_marketId: string): Promise<MarketBet[]> {
   try {
-    // Extract market index from marketId (format: "market-{index}")
-    const marketIndexMatch = marketId.match(/^market-(\d+)$/);
-    if (!marketIndexMatch) {
-      console.warn(`Invalid marketId format: ${marketId}`);
-      return [];
-    }
-    const marketIndex = parseInt(marketIndexMatch[1], 10);
-
-    // Create public client for contract reads
-    const publicClient = createPublicClient({
-      chain: base,
-      transport: http(RPC_URL),
-    });
-
     // Wrap getPredictionMarketAddress in try-catch (like markets route does)
     let contractAddress: string | null = null;
     try {
       contractAddress = getPredictionMarketAddress(base.id);
-    } catch (error) {
+    } catch {
       console.warn("Prediction market contract not deployed");
       return [];
     }

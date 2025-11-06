@@ -13,7 +13,7 @@ const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://base-mainnet.infura.
  * Fetch the actual number of bet transactions for a user from BetPlaced events
  */
 async function fetchUserBetCount(
-  publicClient: any,
+  publicClient: ReturnType<typeof createPublicClient>,
   contractAddress: string,
   userAddress: Address
 ): Promise<number> {
@@ -47,7 +47,7 @@ async function fetchUserBetCount(
         try {
           const chunkLogs = await publicClient.getLogs({
             address: contractAddress as `0x${string}`,
-            event: betPlacedEvent as any,
+            event: betPlacedEvent,
             args: {
               user: userAddress,
             },
@@ -62,13 +62,15 @@ async function fetchUserBetCount(
           if (actualToBlock >= latestBlock) {
             break;
           }
-        } catch (chunkError: any) {
-          console.warn(`Failed to fetch bet count chunk:`, chunkError.message || chunkError);
+        } catch (chunkError: unknown) {
+          const errorMessage = chunkError instanceof Error ? chunkError.message : String(chunkError);
+          console.warn(`Failed to fetch bet count chunk:`, errorMessage);
           currentFromBlock = actualToBlock + BigInt(1);
         }
       }
-    } catch (error: any) {
-      console.error("Failed to fetch user bet count from events:", error.message || error);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("Failed to fetch user bet count from events:", errorMessage);
       return 0;
     }
     
@@ -81,7 +83,7 @@ async function fetchUserBetCount(
 
 async function fetchUserBetsFromContract(
   address: Address,
-  publicClient: any
+  publicClient: ReturnType<typeof createPublicClient>
 ): Promise<MarketBet[]> {
   try {
 
@@ -207,8 +209,8 @@ export async function GET(
       // Fetch actual bet count from events
       try {
         betCount = await fetchUserBetCount(publicClient, contractAddress, address as Address);
-      } catch (error) {
-        console.warn("Could not fetch bet count, using length as fallback:", error);
+      } catch {
+        console.warn("Could not fetch bet count, using length as fallback");
         betCount = cached.length;
       }
       return NextResponse.json({ bets: serialized, betCount });
@@ -226,14 +228,14 @@ export async function GET(
     // Fetch actual bet count from events
     try {
       betCount = await fetchUserBetCount(publicClient, contractAddress, address as Address);
-    } catch (error) {
-      console.warn("Could not fetch bet count, using length as fallback:", error);
+    } catch {
+      console.warn("Could not fetch bet count, using length as fallback");
       betCount = bets.length;
     }
     
     return NextResponse.json({ bets: serialized, betCount });
-  } catch (error) {
-    console.error("Error fetching user bets:", error);
+  } catch {
+    console.error("Error fetching user bets");
     return NextResponse.json(
       { error: "Failed to fetch user bets" },
       { status: 500 }

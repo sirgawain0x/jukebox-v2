@@ -28,7 +28,7 @@ export function MarketCard({ market, rank }: MarketCardProps) {
   const [isPlacingBet, setIsPlacingBet] = useState(false);
 
   const { data: odds } = useMarketOdds(market);
-  const { placeBetAsync, isPending } = usePlaceBet();
+  const { placeBetAsync } = usePlaceBet();
   const isContractDeployed = isPredictionMarketDeployed(chainId);
   const contractAddress = tryGetPredictionMarketAddress(chainId);
   
@@ -43,7 +43,7 @@ export function MarketCard({ market, rank }: MarketCardProps) {
     market.endTime > Math.floor(Date.now() / 1000)
   );
 
-  const handlePlaceBet = async (side: MarketSide) => {
+  const _handlePlaceBet = async (side: MarketSide) => {
     if (!isConnected || !address) {
       showToast("Please connect your wallet");
       return;

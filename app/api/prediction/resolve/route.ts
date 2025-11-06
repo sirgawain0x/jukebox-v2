@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createPublicClient, http, Address } from "viem";
+import { createPublicClient, http } from "viem";
 import { base } from "viem/chains";
 import {
   calculateScoresForSongs,

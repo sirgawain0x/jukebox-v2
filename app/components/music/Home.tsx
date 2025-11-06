@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useAccount } from "wagmi";
 import { Playlist, Song } from "@/types/music";
 import { Button } from "../ui/Button";
@@ -11,15 +11,21 @@ import { PlaylistView } from "./PlaylistView";
 import { RecentTips } from "./RecentTips";
 import { UserBalances } from "./UserBalances";
 import { ErrorBoundary } from "../ui/ErrorBoundary";
+import { PredictionMarket } from "../prediction/PredictionMarket";
+import { MyBets } from "../prediction/MyBets";
+import { MarketLeaderboard } from "../prediction/MarketLeaderboard";
+import { CreateMarket } from "../prediction/CreateMarket";
 
 type HomeProps = {
   setActiveTab: (tab: string) => void;
+  initialSection?: "music" | "predictions";
 };
 
-export function Home({ setActiveTab }: HomeProps) {
+export function Home({ setActiveTab, initialSection = "music" }: HomeProps) {
   const { isConnected } = useAccount();
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
   const [selectedSong, setSelectedSong] = useState<Song | null>(null);
+  const [activeSection, setActiveSection] = useState<"music" | "predictions">(initialSection);
 
   const handleSongTipped = () => {
     // Songs are now managed by the PlaylistView component via contract
@@ -30,51 +36,99 @@ export function Home({ setActiveTab }: HomeProps) {
   const artistId =
     selectedSong?.artist || "sound-0x7e4c2e6e6e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e";
 
+  // Sync activeSection when initialSection prop changes
+  useEffect(() => {
+    setActiveSection(initialSection);
+  }, [initialSection]);
+
   return (
     <div className="space-y-6 animate-fade-in">
-      <Card title="🎵 Jukebox">
-        <p className="text-(--app-foreground-muted) mb-4">
-          Discover and support independent
-          artists through on-chain music streaming and direct creator tips.
-        </p>
-        <div className="flex gap-3 flex-wrap">
+      {/* Section Tabs */}
+      <Card>
+        <div className="flex gap-2">
           <Button
-            onClick={() => setActiveTab("features")}
-            icon={<Icon name="arrow-right" size="sm" />}
+            variant={activeSection === "music" ? "primary" : "outline"}
+            onClick={() => setActiveSection("music")}
+            className="flex-1"
           >
-            Explore Features
+            <Icon name="music" size="sm" className="mr-2" />
+            Music
           </Button>
           <Button
-            onClick={() => setActiveTab("fund")}
-            variant="outline"
-            icon={<Icon name="plus" size="sm" />}
-            disabled={!isConnected}
+            variant={activeSection === "predictions" ? "primary" : "outline"}
+            onClick={() => setActiveSection("predictions")}
+            className="flex-1"
           >
-            {isConnected ? "Add Funds" : "Add Funds"}
+            <Icon name="trending-up" size="sm" className="mr-2" />
+            Predictions
           </Button>
         </div>
       </Card>
-      <ErrorBoundary>
-        <UserBalances />
-      </ErrorBoundary>
-      
-      <ErrorBoundary>
-        <Jukebox
-          onSongTipped={handleSongTipped}
-          setSelectedSong={setSelectedSong}
-          playlist={playlist}
-        />
-      </ErrorBoundary>
-      <ErrorBoundary>
-        <PlaylistSection onCreate={handlePlaylistCreate} created={!!playlist} />
-      </ErrorBoundary>
-      {playlist && (
-        <ErrorBoundary>
-          <div>
-            <PlaylistView playlist={playlist} />
-            <RecentTips artistId={artistId} />
-          </div>
-        </ErrorBoundary>
+
+      {activeSection === "music" && (
+        <>
+          <Card title="🎵 Jukebox">
+            <p className="text-(--app-foreground-muted) mb-4">
+              Discover and support independent
+              artists through on-chain music streaming and direct creator tips.
+            </p>
+            <div className="flex gap-3 flex-wrap">
+              <Button
+                onClick={() => setActiveTab("features")}
+                icon={<Icon name="arrow-right" size="sm" />}
+              >
+                Explore Features
+              </Button>
+              <Button
+                onClick={() => setActiveTab("fund")}
+                variant="outline"
+                icon={<Icon name="plus" size="sm" />}
+                disabled={!isConnected}
+              >
+                {isConnected ? "Add Funds" : "Add Funds"}
+              </Button>
+            </div>
+          </Card>
+          <ErrorBoundary>
+            <UserBalances />
+          </ErrorBoundary>
+          
+          <ErrorBoundary>
+            <Jukebox
+              onSongTipped={handleSongTipped}
+              setSelectedSong={setSelectedSong}
+              playlist={playlist}
+            />
+          </ErrorBoundary>
+          <ErrorBoundary>
+            <PlaylistSection onCreate={handlePlaylistCreate} created={!!playlist} />
+          </ErrorBoundary>
+          {playlist && (
+            <ErrorBoundary>
+              <div>
+                <PlaylistView playlist={playlist} />
+                <RecentTips artistId={artistId} />
+              </div>
+            </ErrorBoundary>
+          )}
+        </>
+      )}
+
+      {activeSection === "predictions" && (
+        <>
+          <ErrorBoundary>
+            <CreateMarket />
+          </ErrorBoundary>
+          <ErrorBoundary>
+            <PredictionMarket />
+          </ErrorBoundary>
+          <ErrorBoundary>
+            <MyBets />
+          </ErrorBoundary>
+          <ErrorBoundary>
+            <MarketLeaderboard />
+          </ErrorBoundary>
+        </>
       )}
     </div>
   );

@@ -237,6 +237,95 @@ export async function getSubgraphMeta() {
   return querySubgraph(SUBGRAPH_QUERIES.meta);
 }
 
+// Prediction Market Queries
+export const PREDICTION_MARKET_QUERIES = {
+  activeMarkets: `
+    query GetActiveMarkets($currentTime: BigInt!) {
+      markets(
+        where: { resolved: false, endTime_gt: $currentTime }
+        orderBy: createdAt
+        orderDirection: desc
+      ) {
+        id
+        songId
+        endTime
+        resolved
+        winner
+        totalPoolYes
+        totalPoolNo
+        createdAt
+      }
+    }
+  `,
+  marketBets: `
+    query GetMarketBets($marketId: ID!) {
+      bets(where: { market: $marketId }, orderBy: timestamp, orderDirection: desc) {
+        id
+        market
+        user
+        side
+        amount
+        timestamp
+        claimed
+        txHash
+      }
+    }
+  `,
+  userBets: `
+    query GetUserBets($user: Bytes!) {
+      bets(where: { user: $user }, orderBy: timestamp, orderDirection: desc) {
+        id
+        market
+        user
+        side
+        amount
+        timestamp
+        claimed
+        txHash
+      }
+    }
+  `,
+  resolvedMarkets: `
+    query GetResolvedMarkets($first: Int = 10) {
+      markets(
+        where: { resolved: true }
+        first: $first
+        orderBy: resolvedAt
+        orderDirection: desc
+      ) {
+        id
+        songId
+        endTime
+        resolved
+        winner
+        totalPoolYes
+        totalPoolNo
+        resolvedAt
+      }
+    }
+  `,
+};
+
+export async function getActiveMarkets(currentTime: bigint) {
+  return querySubgraph(PREDICTION_MARKET_QUERIES.activeMarkets, {
+    currentTime: currentTime.toString(),
+  });
+}
+
+export async function getMarketBets(marketId: string) {
+  return querySubgraph(PREDICTION_MARKET_QUERIES.marketBets, { marketId });
+}
+
+export async function getUserBets(userAddress: string) {
+  return querySubgraph(PREDICTION_MARKET_QUERIES.userBets, {
+    user: userAddress.toLowerCase(),
+  });
+}
+
+export async function getResolvedMarkets(first: number = 10) {
+  return querySubgraph(PREDICTION_MARKET_QUERIES.resolvedMarkets, { first });
+}
+
 // Type definitions for subgraph responses
 export interface PlaylistSubgraphData {
   id: string;

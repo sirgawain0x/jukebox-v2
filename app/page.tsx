@@ -187,9 +187,10 @@ export default function App() {
 
               <main className="flex-1">
                 <ErrorBoundary>
-                  {activeTab === "home" && <Home setActiveTab={setActiveTab} />}
+                  {activeTab === "home" && <Home setActiveTab={setActiveTab} initialSection="music" />}
                   {activeTab === "features" && <Features setActiveTab={setActiveTab} />}
                   {activeTab === "fund" && <Fund setActiveTab={setActiveTab} />}
+                  {activeTab === "predictions" && <Home setActiveTab={setActiveTab} initialSection="predictions" />}
                 </ErrorBoundary>
               </main>
 

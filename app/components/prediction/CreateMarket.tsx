@@ -85,7 +85,7 @@ export function CreateMarket() {
   // Get max bet amount as bigint (0 = no limit)
   const getMaxBetAmount = (): bigint => {
     if (!maxBetAmount || maxBetAmount === "0") {
-      return 0n;
+      return BigInt(0);
     }
     // Convert USDC amount to wei (6 decimals)
     const amount = parseFloat(maxBetAmount);
@@ -150,7 +150,7 @@ export function CreateMarket() {
             <div className="mt-1 space-y-2">
               {isLoadingSongs ? (
                 <div className="flex items-center justify-center py-4">
-                  <p className="text-sm text-[var(--app-foreground-muted)]">Loading songs...</p>
+                  <p className="text-sm text-(--app-foreground-muted)">Loading songs...</p>
                 </div>
               ) : (
                 <>
@@ -184,7 +184,7 @@ export function CreateMarket() {
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{selectedSong.title}</p>
-                        <p className="text-xs text-[var(--app-foreground-muted)] truncate">{selectedSong.artist}</p>
+                        <p className="text-xs text-(--app-foreground-muted) truncate">{selectedSong.artist}</p>
                       </div>
                     </div>
                   )}
@@ -220,7 +220,7 @@ export function CreateMarket() {
               </button>
             </div>
           )}
-          <p className="text-xs text-[var(--app-foreground-muted)] mt-1">
+          <p className="text-xs text-(--app-foreground-muted) mt-1">
             {enableManualEntry 
               ? "The unique identifier for the song (from Spinamp)"
               : "Choose a song from the trending list or enter manually"}
@@ -249,7 +249,7 @@ export function CreateMarket() {
               />
             )}
           </div>
-          <p className="text-xs text-[var(--app-foreground-muted)] mt-1">
+          <p className="text-xs text-(--app-foreground-muted) mt-1">
             {useWeeklyEndTime
               ? `Market will end on: ${endTimeDate.toLocaleString("en-US", { timeZone: "UTC" })} UTC`
               : `Minimum duration: ${Math.floor(minDuration / 86400)} day(s)`}
@@ -268,7 +268,7 @@ export function CreateMarket() {
             step="0.01"
             className="mt-1"
           />
-          <p className="text-xs text-[var(--app-foreground-muted)] mt-1">
+          <p className="text-xs text-(--app-foreground-muted) mt-1">
             Maximum bet amount per user for this market. Set to 0 for no limit.
           </p>
         </div>
@@ -288,13 +288,13 @@ export function CreateMarket() {
               <p className="text-sm font-semibold text-[#0052ff]">
                 Will this song reach #1 in the weekly trending charts?
               </p>
-              <p className="text-xs text-[var(--app-foreground-muted)] mt-1">
+              <p className="text-xs text-(--app-foreground-muted) mt-1">
                 Users can bet YES (it will reach #1) or NO (it won&apos;t reach #1)
               </p>
             </div>
             <div className="border-t border-gray-200 pt-2 space-y-1">
               <p className="text-sm font-medium">Market Details</p>
-              <div className="text-xs space-y-1 text-[var(--app-foreground-muted)]">
+              <div className="text-xs space-y-1 text-(--app-foreground-muted)">
                 <p>Song: {selectedSong ? `${selectedSong.title} - ${selectedSong.artist}` : songId}</p>
                 <p className="break-all">
                   Song ID: <span className="font-mono text-[10px]">{songId}</span>
@@ -322,9 +322,10 @@ export function CreateMarket() {
 
         {isConnected && contractAddress && songId && (
           <Transaction calls={calls} onSuccess={handleSuccess}>
-            <TransactionButton className="w-full bg-[#0052ff] hover:bg-[#0040cc] text-white">
-              Create Market
-            </TransactionButton>
+            <TransactionButton 
+              text="Create Market"
+              className="w-full bg-[#0052ff] hover:bg-[#0040cc] text-white"
+            />
           </Transaction>
         )}
       </div>

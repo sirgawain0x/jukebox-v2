@@ -12,7 +12,7 @@ export function useCreateMarket() {
   const { writeContract, ...rest } = useWriteContract();
   const chainId = useChainId();
 
-  const createMarket = (songId: string, endTime: bigint, maxBetAmount: bigint = 0n) => {
+  const createMarket = (songId: string, endTime: bigint, maxBetAmount: bigint = BigInt(0)) => {
     const contractAddress = tryGetPredictionMarketAddress(chainId);
     if (!contractAddress) {
       throw new Error(`Prediction market contract not deployed on chain ${chainId}`);
@@ -274,7 +274,7 @@ export function useResolveMarket() {
     writeContract({
       abi: predictionMarketABI,
       address: contractAddress,
-      functionName: "resolveMarket",
+      functionName: "scheduleResolution",
       args: [marketId, winner],
     });
   };

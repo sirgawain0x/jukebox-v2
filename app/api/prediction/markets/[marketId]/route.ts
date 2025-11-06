@@ -4,7 +4,7 @@ import { serializePredictionMarket } from "@/lib/bigint-serialization";
 import type { PredictionMarket } from "@/types/prediction-market";
 
 // Mock function - in production, this would fetch from contract/subgraph
-async function fetchMarketFromContract(marketId: string): Promise<PredictionMarket | null> {
+async function fetchMarketFromContract(_marketId: string): Promise<PredictionMarket | null> {
   // This would query the smart contract or subgraph
   return null;
 }

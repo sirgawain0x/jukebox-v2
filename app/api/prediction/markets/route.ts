@@ -199,7 +199,7 @@ async function fetchMarketsFromContract(): Promise<PredictionMarket[]> {
     let contractAddress: string | null = null;
     try {
       contractAddress = getPredictionMarketAddress(base.id);
-    } catch (error) {
+    } catch (_error) {
       console.warn("Prediction market contract not deployed");
       return [];
     }

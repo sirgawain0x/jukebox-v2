@@ -5,11 +5,9 @@ import { formatUSDC } from "@/lib/usdc-utils";
 import { useUserBets } from "@/app/hooks/usePredictionMarket";
 import { Card } from "../ui/Card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useToast } from "../ui/ToastProvider";
 
 export function MyBets() {
   const { isConnected } = useAccount();
-  const { showToast } = useToast();
   const { data: betsData, isLoading } = useUserBets();
   
   const bets = betsData?.bets || [];
@@ -41,7 +39,7 @@ export function MyBets() {
     return (
       <Card title="🎲 My Bets">
         <div className="text-center py-8 text-[var(--app-foreground-muted)]">
-          <p>You haven't placed any bets yet</p>
+          <p>You haven&apos;t placed any bets yet</p>
           <p className="text-sm mt-2">Start predicting to win USDC!</p>
         </div>
       </Card>

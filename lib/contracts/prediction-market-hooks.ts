@@ -106,7 +106,7 @@ export function usePlaceBet() {
     marketId: bigint,
     amount: bigint,
     side: boolean,
-    userAddress: Address
+    _userAddress: Address
   ) => {
     const contractAddress = tryGetPredictionMarketAddress(chainId);
     if (!contractAddress) {

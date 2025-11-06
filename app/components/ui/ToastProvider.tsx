@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Icon } from "./Icon";
 
@@ -46,7 +46,12 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [interactiveToasts, setInteractiveToasts] = useState<InteractiveToast[]>([]);
 
-  const showToast = (toast: Omit<Toast, "id"> | string) => {
+  const hideToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(toast => toast.id !== id));
+    setInteractiveToasts(prev => prev.filter(toast => toast.id !== id));
+  }, []);
+
+  const showToast = useCallback((toast: Omit<Toast, "id"> | string) => {
     const id = Math.random().toString(36).substr(2, 9);
     const newToast = typeof toast === 'string' 
       ? { message: toast, id, type: "info" as const }
@@ -59,9 +64,9 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
     setTimeout(() => {
       hideToast(id);
     }, duration);
-  };
+  }, [hideToast]);
 
-  const showInteractiveToast = (toast: Omit<InteractiveToast, "id">) => {
+  const showInteractiveToast = useCallback((toast: Omit<InteractiveToast, "id">) => {
     const id = Math.random().toString(36).substr(2, 9);
     const newToast = { ...toast, id };
     
@@ -72,12 +77,13 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
     setTimeout(() => {
       hideToast(id);
     }, duration);
-  };
+  }, [hideToast]);
 
-  const hideToast = (id: string) => {
-    setToasts(prev => prev.filter(toast => toast.id !== id));
-    setInteractiveToasts(prev => prev.filter(toast => toast.id !== id));
-  };
+  const contextValue = useMemo(() => ({
+    showToast,
+    showInteractiveToast,
+    hideToast,
+  }), [showToast, showInteractiveToast, hideToast]);
 
   const getToastStyles = (type: Toast["type"] = "info") => {
     switch (type) {
@@ -93,7 +99,7 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
   };
 
   return (
-    <ToastContext.Provider value={{ showToast, showInteractiveToast, hideToast }}>
+    <ToastContext.Provider value={contextValue}>
       {children}
       
       {/* Toast Container - Positioned at top */}

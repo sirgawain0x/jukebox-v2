@@ -13,6 +13,7 @@ import { useToast } from "../ui/ToastProvider";
 import { useQueryClient } from "@tanstack/react-query";
 import { useReadContract } from "wagmi";
 import Image from "next/image";
+import { SongPicker } from "./SongPicker";
 
 export function CreateMarket() {
   const { isConnected } = useAccount();
@@ -31,6 +32,7 @@ export function CreateMarket() {
   
   const isContractDeployed = isPredictionMarketDeployed(chainId);
   const contractAddress = tryGetPredictionMarketAddress(chainId);
+  const isFormDisabled = !isConnected;
   
   // Fetch trending songs on mount
   useEffect(() => {
@@ -114,6 +116,47 @@ export function CreateMarket() {
     queryClient.invalidateQueries({ queryKey: ["prediction-markets"] });
   };
 
+  const persistSongMetadata = async (song: TrendingTrack) => {
+    try {
+      const response = await fetch("/api/prediction/song-metadata", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: song.id,
+          title: song.title,
+          artist: song.artist,
+          cover: song.cover,
+        }),
+      });
+      if (!response.ok) {
+        console.warn("Failed to persist song metadata", await response.text());
+      }
+    } catch (persistError) {
+      console.error("Error persisting song metadata", persistError);
+    }
+  };
+
+  const handleSelectSong = (song: TrendingTrack) => {
+    setSelectedSong(song);
+    setSongId(song.id);
+    setEnableManualEntry(false);
+    void persistSongMetadata(song);
+  };
+
+  const handleEnableManualEntry = () => {
+    if (isFormDisabled) return;
+    setEnableManualEntry(true);
+  };
+
+  const handleReturnToPicker = () => {
+    if (isFormDisabled) return;
+    setEnableManualEntry(false);
+    setSongId("");
+    setSelectedSong(null);
+  };
+
   if (!isContractDeployed) {
     return (
       <Card title="Create Market">
@@ -148,55 +191,41 @@ export function CreateMarket() {
           <Label htmlFor="songSelect">Select Song *</Label>
           {!enableManualEntry ? (
             <div className="mt-1 space-y-2">
-              {isLoadingSongs ? (
-                <div className="flex items-center justify-center py-4">
-                  <p className="text-sm text-(--app-foreground-muted)">Loading songs...</p>
-                </div>
-              ) : (
-                <>
-                  <select
-                    id="songSelect"
-                    value={selectedSong?.id || ""}
-                    onChange={(e) => {
-                      const song = songs.find(s => s.id === e.target.value);
-                      setSelectedSong(song || null);
-                    }}
-                    className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  >
-                    <option value="">-- Select a song --</option>
-                    {songs.map((song) => (
-                      <option key={song.id} value={song.id}>
-                        {song.title} - {song.artist}
-                      </option>
-                    ))}
-                  </select>
-                  {selectedSong && (
-                    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                      {selectedSong.cover && (
-                        <Image
-                          src={selectedSong.cover}
-                          alt={selectedSong.title}
-                          width={48}
-                          height={48}
-                          className="w-12 h-12 rounded object-cover"
-                          unoptimized
-                        />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{selectedSong.title}</p>
-                        <p className="text-xs text-(--app-foreground-muted) truncate">{selectedSong.artist}</p>
-                      </div>
-                    </div>
+              <SongPicker
+                songs={songs}
+                selectedSongId={selectedSong?.id}
+                onSelect={handleSelectSong}
+                disabled={isFormDisabled}
+                isLoading={isLoadingSongs}
+                placeholder="-- Select a song --"
+              />
+              {selectedSong && (
+                <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  {selectedSong.cover && (
+                    <Image
+                      src={selectedSong.cover}
+                      alt={selectedSong.title}
+                      width={48}
+                      height={48}
+                      className="h-12 w-12 rounded object-cover"
+                      unoptimized
+                    />
                   )}
-                  <button
-                    type="button"
-                    onClick={() => setEnableManualEntry(true)}
-                    className="text-xs text-[#0052ff] hover:underline"
-                  >
-                    Or enter song ID manually
-                  </button>
-                </>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{selectedSong.title}</p>
+                    <p className="truncate text-xs text-(--app-foreground-muted)">{selectedSong.artist}</p>
+                  </div>
+                </div>
               )}
+              <button
+                type="button"
+                onClick={handleEnableManualEntry}
+                className={`text-xs text-[#0052ff] hover:underline ${isFormDisabled ? "cursor-not-allowed opacity-60" : ""}`}
+                disabled={isFormDisabled}
+                aria-disabled={isFormDisabled}
+              >
+                Or enter song ID manually
+              </button>
             </div>
           ) : (
             <div className="mt-1 space-y-2">
@@ -206,15 +235,14 @@ export function CreateMarket() {
                 placeholder="e.g., song-123 or processedTrackId"
                 value={songId}
                 onChange={(e) => setSongId(e.target.value)}
+                disabled={isFormDisabled}
               />
               <button
                 type="button"
-                onClick={() => {
-                  setEnableManualEntry(false);
-                  setSongId("");
-                  setSelectedSong(null);
-                }}
-                className="text-xs text-[#0052ff] hover:underline"
+                onClick={handleReturnToPicker}
+                className={`text-xs text-[#0052ff] hover:underline ${isFormDisabled ? "cursor-not-allowed opacity-60" : ""}`}
+                disabled={isFormDisabled}
+                aria-disabled={isFormDisabled}
               >
                 Or select from list
               </button>
@@ -236,6 +264,7 @@ export function CreateMarket() {
                 checked={useWeeklyEndTime}
                 onChange={(e) => setUseWeeklyEndTime(e.target.checked)}
                 className="rounded"
+                disabled={isFormDisabled}
               />
               <span className="text-sm">Use weekly end time (next Monday 00:01 UTC)</span>
             </label>
@@ -246,6 +275,7 @@ export function CreateMarket() {
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
                 min={new Date(minEndTime * 1000).toISOString().slice(0, 16)}
+                disabled={isFormDisabled}
               />
             )}
           </div>
@@ -267,6 +297,7 @@ export function CreateMarket() {
             min="0"
             step="0.01"
             className="mt-1"
+            disabled={isFormDisabled}
           />
           <p className="text-xs text-(--app-foreground-muted) mt-1">
             Maximum bet amount per user for this market. Set to 0 for no limit.

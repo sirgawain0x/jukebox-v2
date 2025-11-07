@@ -29,6 +29,19 @@ export interface MarketBet {
   txHash?: string;
 }
 
+export interface MarketPreview {
+  id: string;
+  songTitle: string;
+  songArtist: string;
+  songCover?: string;
+  endTime: number;
+  status: MarketStatus;
+}
+
+export interface MarketBetWithPreview extends MarketBet {
+  market?: MarketPreview | null;
+}
+
 export interface MarketResolution {
   marketId: string;
   winner: MarketSide;

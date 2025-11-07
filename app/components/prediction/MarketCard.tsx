@@ -15,12 +15,11 @@ import { useToast } from "../ui/ToastProvider";
 import { tryGetPredictionMarketAddress, isPredictionMarketDeployed, predictionMarketABI } from "@/lib/contracts/prediction-market";
 import type { Contracts } from "@/types/transactions";
 
-type MarketCardProps = {
+interface MarketCardProps {
   market: PredictionMarket;
-  rank: number;
-};
+}
 
-export function MarketCard({ market, rank }: MarketCardProps) {
+export function MarketCard({ market }: MarketCardProps) {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { showToast } = useToast();
@@ -79,6 +78,20 @@ export function MarketCard({ market, rank }: MarketCardProps) {
   const daysRemaining = Math.floor(timeRemaining / 86400);
   const hoursRemaining = Math.floor((timeRemaining % 86400) / 3600);
 
+  const isFallbackMetadata =
+    !market.songCover ||
+    market.songTitle === market.songId ||
+    market.songArtist === "Unknown Artist";
+
+  const displayTitle =
+    market.songTitle === market.songId ? "Song No Longer Trending" : market.songTitle;
+
+  const displayArtist =
+    market.songArtist === "Unknown Artist" ? "Artist metadata unavailable" : market.songArtist;
+
+  const fallbackNotice =
+    "This song isn't doing so hot anymore and has fallen off the trending chart.";
+
   const calls = selectedSide && betAmount && parseFloat(betAmount) > 0 && isConnected && contractAddress && marketExistsOnContract
     ? [
         // Approve USDC
@@ -106,58 +119,41 @@ export function MarketCard({ market, rank }: MarketCardProps) {
     : [];
 
   // Get rank badge color based on position
-  const getRankBadgeColor = () => {
-    if (rank === 1) return "bg-gradient-to-br from-yellow-400 to-yellow-600";
-    if (rank === 2) return "bg-gradient-to-br from-gray-300 to-gray-500";
-    if (rank === 3) return "bg-gradient-to-br from-orange-400 to-orange-600";
-    return "bg-gradient-to-br from-[#0052ff] to-[#7c3aed]";
-  };
-
-  const getRankIcon = () => {
-    if (rank === 1) return "🏆";
-    if (rank === 2) return "🥈";
-    if (rank === 3) return "🥉";
-    return null;
-  };
-
   return (
-    <Card className="hover:shadow-xl transition-all border-l-4 border-l-[#0052ff]">
+    <Card className="hover:shadow-xl transition-all border border-(--app-card-border)">
       <div className="space-y-4">
         {/* Rank and Song Info */}
         <div className="flex items-start gap-4">
-          <div className={`shrink-0 w-14 h-14 rounded-lg ${getRankBadgeColor()} flex items-center justify-center text-white font-bold text-xl shadow-lg relative`}>
-            {getRankIcon() ? (
-              <span className="text-2xl">{getRankIcon()}</span>
-            ) : (
-              <span>{rank}</span>
-            )}
-            {rank <= 3 && (
-              <div className="absolute -top-1 -right-1 w-4 h-4 bg-white rounded-full flex items-center justify-center">
-                <div className="w-2 h-2 bg-[#0052ff] rounded-full"></div>
-              </div>
-            )}
-          </div>
+          {market.songCover && (
+            <Image
+              src={market.songCover}
+              alt={market.songTitle}
+              width={64}
+              height={64}
+              className="w-16 h-16 rounded-lg object-cover shrink-0"
+              unoptimized
+            />
+          )}
           <div className="flex-1 min-w-0">
-            <div className="flex items-start gap-3">
-              {market.songCover && (
-                <Image
-                  src={market.songCover}
-                  alt={market.songTitle}
-                  width={64}
-                  height={64}
-                  className="w-16 h-16 rounded-lg object-cover shrink-0"
-                  unoptimized
-                />
-              )}
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-lg text-[#111111] truncate">
-                  {market.songTitle}
-                </h3>
-                <p className="text-sm text-(--app-foreground-muted) truncate">
-                  {market.songArtist}
+            <h3 className="font-semibold text-lg text-[#111111] truncate">
+              {displayTitle}
+            </h3>
+            <p className="text-sm text-(--app-foreground-muted) truncate">
+              {displayArtist}
+            </p>
+            {isFallbackMetadata && (
+              <div className="mt-2 rounded-lg border border-red-200 bg-red-50 p-3">
+                <p className="text-xs font-semibold text-red-700">
+                  Getting Colder 🧊
+                </p>
+                <p className="text-xs text-red-600">
+                  {fallbackNotice}
+                </p>
+                <p className="mt-1 text-[10px] text-red-500 overflow-auto whitespace-nowrap">
+                  Song ID: {market.songId}
                 </p>
               </div>
-            </div>
+            )}
           </div>
         </div>
 

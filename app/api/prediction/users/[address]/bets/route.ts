@@ -1,13 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCachedUserBets, cacheUserBets } from "@/lib/prediction-cache";
-import { serializeMarketBets } from "@/lib/bigint-serialization";
-import type { MarketBet } from "@/types/prediction-market";
+import {
+  getCachedUserBets,
+  cacheUserBets,
+  getCachedDeploymentBlock,
+  cacheDeploymentBlock,
+} from "@/lib/prediction-cache";
+import { serializeMarketBet } from "@/lib/bigint-serialization";
+import type { MarketBet, PredictionMarket } from "@/types/prediction-market";
 import { Address } from "viem";
 import { createPublicClient, http } from "viem";
 import { base } from "viem/chains";
 import { getPredictionMarketAddress, predictionMarketABI } from "@/lib/contracts/prediction-market";
+import { fetchMarketsFromChain } from "@/lib/server/prediction-market-data";
 
-const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://base-mainnet.infura.io";
+const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://mainnet.base.org";
+const BIGINT_ZERO = BigInt(0);
+const BIGINT_ONE = BigInt(1);
+const DEFAULT_CHUNK_SIZE = BigInt(5000);
+const RETRY_DIVISOR = BigInt(2);
 
 /**
  * Fetch the actual number of bet transactions for a user from BetPlaced events
@@ -27,53 +37,81 @@ async function fetchUserBetCount(
       return 0;
     }
 
-    const MAX_BLOCKS_PER_QUERY = BigInt(1000);
-    const MAX_BLOCKS_TO_SEARCH = BigInt(10000);
-    
-    let totalCount = 0;
-    
-    try {
-      const latestBlock = await publicClient.getBlockNumber();
-      const startBlock = latestBlock > MAX_BLOCKS_TO_SEARCH 
-        ? latestBlock - MAX_BLOCKS_TO_SEARCH 
-        : BigInt(0);
-      
-      let currentFromBlock = startBlock;
-      
-      while (currentFromBlock <= latestBlock) {
-        const chunkToBlock = currentFromBlock + MAX_BLOCKS_PER_QUERY - BigInt(1);
-        const actualToBlock = chunkToBlock > latestBlock ? latestBlock : chunkToBlock;
-        
+    let searchFromBlock = await getCachedDeploymentBlock(contractAddress);
+
+    const latestBlock = await publicClient.getBlockNumber();
+
+    if (searchFromBlock === null) {
+      const marketCreatedEvent = predictionMarketABI.find(
+        (item) => item.type === "event" && item.name === "MarketCreated"
+      );
+
+      if (marketCreatedEvent) {
         try {
-          const chunkLogs = await publicClient.getLogs({
+          const creationLogs = await publicClient.getLogs({
             address: contractAddress as `0x${string}`,
-            event: betPlacedEvent,
-            args: {
-              user: userAddress,
-            },
-            fromBlock: currentFromBlock,
-            toBlock: actualToBlock,
+            event: marketCreatedEvent,
+            fromBlock: BIGINT_ZERO,
+            toBlock: latestBlock,
           });
-          
-          totalCount += chunkLogs.length;
-          
-          currentFromBlock = actualToBlock + BigInt(1);
-          
-          if (actualToBlock >= latestBlock) {
-            break;
+
+          if (creationLogs.length) {
+            searchFromBlock = creationLogs.reduce<bigint>((min, log) => {
+              const blockNumber = log.blockNumber ?? BIGINT_ZERO;
+              return blockNumber < min ? blockNumber : min;
+            }, creationLogs[0].blockNumber ?? BIGINT_ZERO);
+            await cacheDeploymentBlock(contractAddress, searchFromBlock);
           }
-        } catch (chunkError: unknown) {
-          const errorMessage = chunkError instanceof Error ? chunkError.message : String(chunkError);
-          console.warn(`Failed to fetch bet count chunk:`, errorMessage);
-          currentFromBlock = actualToBlock + BigInt(1);
+        } catch (creationError) {
+          console.warn("Failed to preload deployment block for bet count:", creationError);
         }
       }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error("Failed to fetch user bet count from events:", errorMessage);
-      return 0;
     }
-    
+
+    if (searchFromBlock === null) {
+      searchFromBlock = BIGINT_ZERO;
+    }
+
+    let totalCount = 0;
+    let chunkSize = DEFAULT_CHUNK_SIZE;
+    let currentFromBlock = searchFromBlock;
+
+    while (currentFromBlock <= latestBlock) {
+      const proposedToBlock = currentFromBlock + chunkSize - BIGINT_ONE;
+      const currentToBlock = proposedToBlock > latestBlock ? latestBlock : proposedToBlock;
+
+      try {
+        const chunkLogs = await publicClient.getLogs({
+          address: contractAddress as `0x${string}`,
+          event: betPlacedEvent,
+          args: {
+            user: userAddress,
+          },
+          fromBlock: currentFromBlock,
+          toBlock: currentToBlock,
+        });
+
+        totalCount += chunkLogs.length;
+
+        if (currentToBlock === latestBlock) break;
+
+        currentFromBlock = currentToBlock + BIGINT_ONE;
+        chunkSize = DEFAULT_CHUNK_SIZE;
+      } catch (chunkError: unknown) {
+        const errorMessage = chunkError instanceof Error ? chunkError.message : String(chunkError);
+        console.warn("Failed to fetch user bet count chunk:", errorMessage);
+
+        if (chunkSize === BIGINT_ONE) {
+          break;
+        }
+
+        chunkSize = chunkSize / RETRY_DIVISOR;
+        if (chunkSize < BIGINT_ONE) {
+          chunkSize = BIGINT_ONE;
+        }
+      }
+    }
+
     return totalCount;
   } catch (error) {
     console.error("Error fetching user bet count:", error);
@@ -197,42 +235,67 @@ export async function GET(
       return NextResponse.json({ bets: [], betCount: 0 });
     }
 
-    // Try to get from cache first
     const cached = await getCachedUserBets(address as Address);
     let bets: MarketBet[] = [];
     let betCount = 0;
 
+    const buildMarketsMap = async () => {
+      const markets = await fetchMarketsFromChain({ includeResolved: true, includeExpired: true });
+      return new Map<string, PredictionMarket>(
+        markets.map((market) => [`market-${market.marketIndex}`, market])
+      );
+    };
+
+    const serializeBets = (
+      betList: MarketBet[],
+      marketsById: Map<string, PredictionMarket>
+    ) =>
+      betList.map((bet) => {
+        const baseBet = serializeMarketBet(bet);
+        const market = marketsById.get(bet.marketId);
+        return {
+          ...baseBet,
+          market: market
+            ? {
+                id: market.id,
+                songTitle: market.songTitle,
+                songArtist: market.songArtist,
+                songCover: market.songCover,
+                endTime: market.endTime,
+                status: market.status,
+              }
+            : null,
+        };
+      });
+
     if (cached) {
       bets = cached;
-      // Serialize BigInt values to strings for JSON response
-      const serialized = serializeMarketBets(cached);
-      // Fetch actual bet count from events
+      const marketsById = await buildMarketsMap();
+      const serialized = serializeBets(bets, marketsById);
+
       try {
         betCount = await fetchUserBetCount(publicClient, contractAddress, address as Address);
       } catch {
         console.warn("Could not fetch bet count, using length as fallback");
-        betCount = cached.length;
+        betCount = bets.length;
       }
+
       return NextResponse.json({ bets: serialized, betCount });
     }
 
-    // Fetch from contract/subgraph
     bets = await fetchUserBetsFromContract(address as Address, publicClient);
-
-    // Cache the results
     await cacheUserBets(address as Address, bets);
 
-    // Serialize BigInt values to strings for JSON response
-    const serialized = serializeMarketBets(bets);
-    
-    // Fetch actual bet count from events
+    const marketsById = await buildMarketsMap();
+    const serialized = serializeBets(bets, marketsById);
+
     try {
       betCount = await fetchUserBetCount(publicClient, contractAddress, address as Address);
     } catch {
       console.warn("Could not fetch bet count, using length as fallback");
       betCount = bets.length;
     }
-    
+
     return NextResponse.json({ bets: serialized, betCount });
   } catch {
     console.error("Error fetching user bets");

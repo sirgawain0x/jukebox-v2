@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useAccount } from "wagmi";
 import { formatUSDC } from "@/lib/usdc-utils";
 import { useUserBets } from "@/app/hooks/usePredictionMarket";
@@ -12,6 +13,75 @@ export function MyBets() {
   
   const bets = betsData?.bets || [];
   const betCount = betsData?.betCount ?? bets.length;
+
+  const renderBetCard = (
+    bet: (typeof bets)[number],
+    variant: "active" | "resolved"
+  ) => {
+    const market = bet.market;
+    const title = market?.songTitle ?? `Market ${bet.marketId}`;
+    const artist = market?.songArtist ?? "Unknown Artist";
+    const cover = market?.songCover;
+    const endLabel = market
+      ? new Date(market.endTime * 1000).toLocaleString()
+      : new Date(bet.timestamp * 1000).toLocaleString();
+
+    return (
+      <div
+        key={bet.id}
+        className={
+          variant === "active"
+            ? "bg-[#f0f4ff] rounded-lg p-4 border border-[#0052ff]/20"
+            : "bg-gray-50 rounded-lg p-4 border border-gray-200"
+        }
+      >
+        <div className="flex items-start gap-3 mb-3">
+          {cover ? (
+            <Image
+              src={cover}
+              alt={title}
+              width={56}
+              height={56}
+              className="h-14 w-14 rounded-lg object-cover"
+              unoptimized
+            />
+          ) : (
+            <div className="h-14 w-14 rounded-lg bg-[#dbe4ff] flex items-center justify-center text-sm font-semibold text-[#0052ff]">
+              {title.slice(0, 2).toUpperCase()}
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-[#111111] truncate">{title}</p>
+            <p className="text-sm text-[var(--app-foreground-muted)] truncate">{artist}</p>
+            <p className="text-xs text-[var(--app-foreground-muted)] mt-1">Placed on {new Date(bet.timestamp * 1000).toLocaleDateString()}</p>
+            {market && (
+              <p className="text-xs text-[var(--app-foreground-muted)]">Ends {endLabel}</p>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center justify-between">
+          <div className="text-left">
+            <p className={variant === "active" ? "text-sm text-[#0052ff] font-semibold" : "text-sm text-gray-600 font-semibold"}>
+              {formatUSDC(bet.amount)} USDC
+            </p>
+          </div>
+          <span
+            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+              bet.side === "YES"
+                ? variant === "active"
+                  ? "bg-green-100 text-green-800"
+                  : "bg-green-200 text-green-900"
+                : variant === "active"
+                ? "bg-red-100 text-red-800"
+                : "bg-red-200 text-red-900"
+            }`}
+          >
+            {variant === "resolved" ? `${bet.side} - Claimed` : bet.side}
+          </span>
+        </div>
+      </div>
+    );
+  };
 
   if (!isConnected) {
     return (
@@ -65,37 +135,7 @@ export function MyBets() {
               Active Bets ({activeBets.length})
             </h3>
             <div className="space-y-3">
-              {activeBets.map((bet) => (
-                <div
-                  key={bet.id}
-                  className="bg-[#f0f4ff] rounded-lg p-4 border border-[#0052ff]/20"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <p className="font-medium text-[#111111]">
-                        Market #{bet.marketId}
-                      </p>
-                      <p className="text-sm text-[var(--app-foreground-muted)]">
-                        {new Date(bet.timestamp * 1000).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-[#0052ff]">
-                        {formatUSDC(bet.amount)} USDC
-                      </p>
-                      <span
-                        className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-                          bet.side === "YES"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {bet.side}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
+              {activeBets.map((bet) => renderBetCard(bet, "active"))}
             </div>
           </div>
         )}
@@ -107,31 +147,7 @@ export function MyBets() {
               Resolved Bets ({resolvedBets.length})
             </h3>
             <div className="space-y-3">
-              {resolvedBets.map((bet) => (
-                <div
-                  key={bet.id}
-                  className="bg-gray-50 rounded-lg p-4 border border-gray-200"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-[#111111]">
-                        Market #{bet.marketId}
-                      </p>
-                      <p className="text-sm text-[var(--app-foreground-muted)]">
-                        {new Date(bet.timestamp * 1000).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-gray-600">
-                        {formatUSDC(bet.amount)} USDC
-                      </p>
-                      <span className="inline-block px-2 py-1 rounded text-xs font-medium bg-gray-200 text-gray-700">
-                        {bet.side} - Claimed
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
+              {resolvedBets.map((bet) => renderBetCard(bet, "resolved"))}
             </div>
           </div>
         )}

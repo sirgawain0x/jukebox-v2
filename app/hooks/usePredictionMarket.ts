@@ -7,6 +7,8 @@ import type {
   PredictionMarket,
   MarketBet,
   MarketSide,
+  MarketBetWithPreview,
+  MarketPreview,
 } from "@/types/prediction-market";
 import {
   usePlaceBet as usePlaceBetContract,
@@ -17,6 +19,7 @@ import {
   deserializePredictionMarkets,
   deserializePredictionMarket,
   deserializeMarketBets,
+  deserializeMarketBet,
 } from "@/lib/bigint-serialization";
 import {
   cacheActiveMarkets,
@@ -90,7 +93,7 @@ async function fetchMarketBets(marketId: string): Promise<MarketBet[]> {
 /**
  * Fetch user's bets and bet count
  */
-async function fetchUserBets(address: Address): Promise<{ bets: MarketBet[]; betCount: number }> {
+async function fetchUserBets(address: Address): Promise<{ bets: MarketBetWithPreview[]; betCount: number }> {
   const cached = await getCachedUserBets(address);
   
   const response = await fetch(`/api/prediction/users/${address}/bets`);
@@ -100,7 +103,27 @@ async function fetchUserBets(address: Address): Promise<{ bets: MarketBet[]; bet
 
   // API returns BigInt values as strings, convert back to BigInt
   const data = await response.json();
-  const bets = deserializeMarketBets(data.bets || data);
+  const rawBets: Array<unknown> = data.bets || data;
+  const bets = (rawBets as Array<Record<string, unknown>>).reduce<MarketBetWithPreview[]>(
+    (accumulator, bet) => {
+      if (!isSerializedMarketBet(bet)) {
+        console.warn("Skipping invalid bet payload", bet);
+        return accumulator;
+      }
+
+      const { market, ...serializedBet } = bet;
+      const baseBet = deserializeMarketBet(serializedBet);
+      const preview = isSerializedMarketPreview(market);
+
+      accumulator.push({
+        ...baseBet,
+        market: preview ?? null,
+      });
+
+      return accumulator;
+    },
+    []
+  );
   const betCount = data.betCount ?? bets.length;
   
   // Cache the bets
@@ -109,6 +132,49 @@ async function fetchUserBets(address: Address): Promise<{ bets: MarketBet[]; bet
   }
   
   return { bets, betCount };
+}
+
+function isSerializedMarketBet(value: unknown): value is SerializedMarketBet {
+  if (!value || typeof value !== "object") return false;
+
+  const record = value as Record<string, unknown>;
+
+  if (typeof record.id !== "string") return false;
+  if (typeof record.marketId !== "string") return false;
+  if (typeof record.userAddress !== "string") return false;
+  if (record.side !== "YES" && record.side !== "NO") return false;
+  if (typeof record.timestamp !== "number") return false;
+  if (typeof record.claimed !== "boolean") return false;
+  if (typeof record.amount !== "string" && typeof record.amount !== "bigint") return false;
+  if ("txHash" in record && record.txHash !== undefined && typeof record.txHash !== "string") return false;
+  return true;
+}
+
+function isSerializedMarketPreview(value: unknown): MarketPreview | null {
+  if (!value || typeof value !== "object") return null;
+
+  const record = value as Record<string, unknown>;
+
+  if (typeof record.id !== "string") return null;
+  if (typeof record.songTitle !== "string") return null;
+  if (typeof record.songArtist !== "string") return null;
+  if (typeof record.endTime !== "number") return null;
+  if (record.status !== "ACTIVE" && record.status !== "RESOLVED" && record.status !== "CANCELLED") return null;
+  if ("songCover" in record && record.songCover !== undefined && typeof record.songCover !== "string") return null;
+
+  return {
+    id: record.id,
+    songTitle: record.songTitle,
+    songArtist: record.songArtist,
+    songCover: record.songCover as string | undefined,
+    endTime: record.endTime,
+    status: record.status as MarketPreview["status"],
+  };
+}
+
+interface SerializedMarketBet extends Omit<MarketBet, "amount"> {
+  amount: string | bigint;
+  market?: unknown;
 }
 
 /**

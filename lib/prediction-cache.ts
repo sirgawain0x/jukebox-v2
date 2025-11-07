@@ -13,6 +13,8 @@ const CACHE_TTL = {
   ACTIVE: 300, // 5 minutes for active market data
   HISTORICAL: 3600, // 1 hour for historical data
   LEADERBOARD: 300, // 5 minutes for leaderboard
+  BET_COUNTS: 60, // refresh bet counts every minute
+  DEPLOYMENT_BLOCK: 86400, // cache deployment block for a day
 };
 
 /**
@@ -26,6 +28,9 @@ const cacheKeys = {
   marketOdds: (marketId: string) => `prediction:odds:${marketId}`,
   leaderboard: (period: string) => `prediction:leaderboard:${period}`,
   resolvedMarkets: (week: string) => `prediction:resolved:${week}`,
+  songMetadata: (songId: string) => `prediction:song:${songId}`,
+  betCounts: (contractAddress: string) => `prediction:bet-counts:${contractAddress}`,
+  deploymentBlock: (contractAddress: string) => `prediction:deployment-block:${contractAddress}`,
 };
 
 /**
@@ -279,6 +284,191 @@ export async function invalidateMarketCache(marketId: string): Promise<void> {
     await redis.del(cacheKeys.activeMarkets());
   } catch (error) {
     console.error("Failed to invalidate market cache:", error);
+  }
+}
+
+export interface CachedSongMetadata {
+  title: string;
+  artist: string;
+  cover: string;
+  source: "trending" | "spinamp" | "fallback" | "creator";
+  isFallback: boolean;
+  updatedAt: number;
+}
+
+interface SaveSongMetadataInput {
+  title?: string;
+  artist?: string;
+  cover?: string;
+  source?: CachedSongMetadata["source"];
+  isFallback?: boolean;
+}
+
+interface SaveSongMetadataOptions {
+  force?: boolean;
+}
+
+function normalizeSongMetadata(
+  songId: string,
+  metadata: Partial<CachedSongMetadata>
+): CachedSongMetadata {
+  const normalisedCover =
+    typeof metadata.cover === "string" ? metadata.cover : "";
+
+  const isFallback =
+    metadata.isFallback ??
+    (metadata.source === "fallback" ||
+      !metadata.title ||
+      metadata.title === songId);
+
+  return {
+    title: metadata.title && metadata.title.trim().length ? metadata.title : songId,
+    artist:
+      metadata.artist && metadata.artist.trim().length
+        ? metadata.artist
+        : "Unknown Artist",
+    cover: normalisedCover,
+    source: metadata.source ?? (isFallback ? "fallback" : "spinamp"),
+    isFallback,
+    updatedAt: metadata.updatedAt ?? Date.now(),
+  };
+}
+
+export async function saveSongMetadata(
+  songId: string,
+  metadata: SaveSongMetadataInput,
+  options: SaveSongMetadataOptions = {}
+): Promise<CachedSongMetadata | null> {
+  if (!redis) return null;
+
+  try {
+    const existing = await getCachedSongMetadata(songId);
+
+    if (existing && !options.force) {
+      const incoming = normalizeSongMetadata(songId, {
+        ...metadata,
+        updatedAt: Date.now(),
+      });
+
+      if (!existing.isFallback && incoming.isFallback) {
+        return existing;
+      }
+
+      const merged: CachedSongMetadata = {
+        title: incoming.title || existing.title,
+        artist: incoming.artist || existing.artist,
+        cover: incoming.cover || existing.cover,
+        source: incoming.isFallback ? existing.source : incoming.source,
+        isFallback: existing.isFallback && !incoming.isFallback ? false : incoming.isFallback,
+        updatedAt: Date.now(),
+      };
+
+      await redis.set(
+        cacheKeys.songMetadata(songId),
+        JSON.stringify(merged)
+      );
+      return merged;
+    }
+
+    const record = normalizeSongMetadata(songId, {
+      ...metadata,
+      updatedAt: Date.now(),
+    });
+
+    await redis.set(
+      cacheKeys.songMetadata(songId),
+      JSON.stringify(record)
+    );
+
+    return record;
+  } catch (error) {
+    console.error("Failed to save song metadata:", error);
+    return null;
+  }
+}
+
+export async function getCachedSongMetadata(
+  songId: string
+): Promise<CachedSongMetadata | null> {
+  if (!redis) return null;
+
+  try {
+    const data = await redis.get(cacheKeys.songMetadata(songId));
+    if (!data || typeof data !== "string" || data.trim() === "") return null;
+    const parsed = JSON.parse(data) as Partial<CachedSongMetadata> | undefined;
+    if (!parsed || typeof parsed !== "object") return null;
+    return normalizeSongMetadata(songId, parsed);
+  } catch (error) {
+    console.error("Failed to get cached song metadata:", error);
+    return null;
+  }
+}
+
+export async function cacheBetCounts(
+  contractAddress: string,
+  counts: Map<number, number>
+): Promise<void> {
+  if (!redis) return;
+
+  try {
+    const serialized = Object.fromEntries(counts);
+    await redis.setex(
+      cacheKeys.betCounts(contractAddress),
+      CACHE_TTL.BET_COUNTS,
+      JSON.stringify(serialized)
+    );
+  } catch (error) {
+    console.error("Failed to cache bet counts:", error);
+  }
+}
+
+export async function getCachedBetCounts(
+  contractAddress: string
+): Promise<Map<number, number> | null> {
+  if (!redis) return null;
+
+  try {
+    const data = await redis.get(cacheKeys.betCounts(contractAddress));
+    if (!data || typeof data !== "string" || data.trim() === "") return null;
+    const parsed = JSON.parse(data) as Record<string, number>;
+    return new Map(
+      Object.entries(parsed).map(([key, value]) => [Number(key), value])
+    );
+  } catch (error) {
+    console.error("Failed to get cached bet counts:", error);
+    return null;
+  }
+}
+
+export async function cacheDeploymentBlock(
+  contractAddress: string,
+  blockNumber: bigint
+): Promise<void> {
+  if (!redis) return;
+
+  try {
+    await redis.setex(
+      cacheKeys.deploymentBlock(contractAddress),
+      CACHE_TTL.DEPLOYMENT_BLOCK,
+      blockNumber.toString()
+    );
+  } catch (error) {
+    console.error("Failed to cache deployment block:", error);
+  }
+}
+
+export async function getCachedDeploymentBlock(
+  contractAddress: string
+): Promise<bigint | null> {
+  if (!redis) return null;
+
+  try {
+    const data = await redis.get(cacheKeys.deploymentBlock(contractAddress));
+    if (!data || typeof data !== "string" || data.trim() === "") return null;
+    return BigInt(data);
+  } catch (error) {
+    console.error("Failed to get cached deployment block:", error);
+    return null;
   }
 }
 

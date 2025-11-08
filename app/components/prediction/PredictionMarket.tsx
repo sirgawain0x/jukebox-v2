@@ -4,6 +4,7 @@ import { useActiveMarkets } from "@/app/hooks/usePredictionMarket";
 import { MarketCard } from "./MarketCard";
 import { Card } from "../ui/Card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { isTrendingMetadataMissing } from "@/lib/prediction-market-utils";
 
 export function PredictionMarket() {
   const { data: markets, isLoading, error } = useActiveMarkets();
@@ -47,8 +48,21 @@ export function PredictionMarket() {
     );
   }
 
+  const filteredMarkets = markets.filter((market) => !isTrendingMetadataMissing(market));
+
+  if (filteredMarkets.length === 0) {
+    return (
+      <Card title="🎯 Prediction Markets">
+        <div className="text-center py-8 text-(--app-foreground-muted)">
+          <p className="mb-2">No active markets</p>
+          <p className="text-sm">Check back soon for new prediction markets!</p>
+        </div>
+      </Card>
+    );
+  }
+
   // Maintain deterministic ordering when marketIndex is available
-  const sortedMarkets = [...markets].sort((a, b) => {
+  const sortedMarkets = [...filteredMarkets].sort((a, b) => {
     // If both have marketIndex, sort by that
     if (a.marketIndex !== undefined && b.marketIndex !== undefined) {
       return a.marketIndex - b.marketIndex;
@@ -58,7 +72,7 @@ export function PredictionMarket() {
   });
 
   return (
-    <Card title="🎯 Weekly Prediction Markets">
+    <Card title="🎯 Trending Prediction Markets">
       <div className="mb-6">
         <p className="text-sm text-(--app-foreground-muted) mb-2">
           Bet USDC on which songs will become the hottest on-chain music this week.

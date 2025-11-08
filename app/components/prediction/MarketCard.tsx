@@ -13,6 +13,7 @@ import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
 import { useToast } from "../ui/ToastProvider";
 import { tryGetPredictionMarketAddress, isPredictionMarketDeployed, predictionMarketABI } from "@/lib/contracts/prediction-market";
+import { isTrendingMetadataMissing } from "@/lib/prediction-market-utils";
 import type { Contracts } from "@/types/transactions";
 
 interface MarketCardProps {
@@ -78,16 +79,13 @@ export function MarketCard({ market }: MarketCardProps) {
   const daysRemaining = Math.floor(timeRemaining / 86400);
   const hoursRemaining = Math.floor((timeRemaining % 86400) / 3600);
 
-  const isFallbackMetadata =
-    !market.songCover ||
-    market.songTitle === market.songId ||
-    market.songArtist === "Unknown Artist";
+  const hasTrendingMetadataFallback = isTrendingMetadataMissing(market);
 
-  const displayTitle =
-    market.songTitle === market.songId ? "Song No Longer Trending" : market.songTitle;
+  const displayTitle = hasTrendingMetadataFallback ? "Song No Longer Trending" : market.songTitle;
 
-  const displayArtist =
-    market.songArtist === "Unknown Artist" ? "Artist metadata unavailable" : market.songArtist;
+  const displayArtist = hasTrendingMetadataFallback
+    ? "Artist metadata unavailable"
+    : market.songArtist;
 
   const fallbackNotice =
     "This song isn't doing so hot anymore and has fallen off the trending chart.";
@@ -141,10 +139,10 @@ export function MarketCard({ market }: MarketCardProps) {
             <p className="text-sm text-(--app-foreground-muted) truncate">
               {displayArtist}
             </p>
-            {isFallbackMetadata && (
+            {hasTrendingMetadataFallback && (
               <div className="mt-2 rounded-lg border border-red-200 bg-red-50 p-3">
                 <p className="text-xs font-semibold text-red-700">
-                  Getting Colder 🧊
+                  Getting Cold 🧊
                 </p>
                 <p className="text-xs text-red-600">
                   {fallbackNotice}

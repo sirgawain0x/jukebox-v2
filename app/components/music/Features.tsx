@@ -24,27 +24,33 @@ export function Features({ setActiveTab }: FeaturesProps) {
       <Card title="Key Features">
         <ul className="space-y-3 mb-4">
           <li className="flex items-start">
-            <Icon name="check" className="text-[var(--app-accent)] mt-1 mr-2" />
-            <span className="text-[var(--app-foreground-muted)]">
+            <Icon name="check" className="text-(--app-accent) mt-1 mr-2" />
+            <span className="text-(--app-foreground-muted)">
               Discover and curate new music.
             </span>
           </li>
           <li className="flex items-start">
-            <Icon name="check" className="text-[var(--app-accent)] mt-1 mr-2" />
-            <span className="text-[var(--app-foreground-muted)]">
+            <Icon name="check" className="text-(--app-accent) mt-1 mr-2" />
+            <span className="text-(--app-foreground-muted)">
               Tip independent creators.
             </span>
           </li>
           <li className="flex items-start">
-            <Icon name="check" className="text-[var(--app-accent)] mt-1 mr-2" />
-            <span className="text-[var(--app-foreground-muted)]">
+            <Icon name="check" className="text-(--app-accent) mt-1 mr-2" />
+            <span className="text-(--app-foreground-muted)">
               AI text to image generation.
             </span>
           </li>
           <li className="flex items-start">
-            <Icon name="check" className="text-[var(--app-accent)] mt-1 mr-2" />
-            <span className="text-[var(--app-foreground-muted)]">
+            <Icon name="check" className="text-(--app-accent) mt-1 mr-2" />
+            <span className="text-(--app-foreground-muted)">
               Onchain music player.
+            </span>
+          </li>
+          <li className="flex items-start">
+            <Icon name="check" className="text-(--app-accent) mt-1 mr-2" />
+            <span className="text-(--app-foreground-muted)">
+              Predict the next #1 song.
             </span>
           </li>
         </ul>

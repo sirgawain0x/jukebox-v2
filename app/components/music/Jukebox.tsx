@@ -116,18 +116,20 @@ export function Jukebox({
   const handleShareSong = useCallback(() => {
     if (!selectedSong) return;
     
+    const shareUrl = `${window.location.origin}/share/song/${selectedSong.id}`;
     composeCast({
       text: `🎵 Currently vibing to "${selectedSong.title}" by ${selectedSong.artist}! Check out this amazing track on Jukebox 🎶`,
-      embeds: [window.location.href]
+      embeds: [shareUrl]
     });
   }, [selectedSong, composeCast]);
 
   const handleShareTip = useCallback(() => {
     if (!selectedSong) return;
     
+    const shareUrl = `${window.location.origin}/share/song/${selectedSong.id}`;
     composeCast({
       text: `💎 Just tipped ${selectedSong.artist} for their incredible track "${selectedSong.title}"! Supporting artists directly on the blockchain 🎵✨`,
-      embeds: [window.location.href]
+      embeds: [shareUrl]
     });
   }, [selectedSong, composeCast]);
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -959,9 +961,10 @@ export function Jukebox({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
+                          const shareUrl = `${window.location.origin}/share/song/${song.id}`;
                           composeCast({
                             text: `🎵 Check out "${song.title}" by ${song.artist}! Discovered this amazing track on Jukebox 🎶`,
-                            embeds: [window.location.href]
+                            embeds: [shareUrl]
                           });
                           showToast(`Shared "${song.title}" to Farcaster!`);
                         }}

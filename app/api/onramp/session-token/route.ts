@@ -25,7 +25,13 @@ const retryWithBackoff = async <T>(
   maxRetries: number = 3,
   baseDelay: number = 1000
 ): Promise<T> => {
-  let lastError: Error;
+  // Guard against invalid maxRetries
+  if (maxRetries < 0) {
+    maxRetries = 0;
+  }
+  
+  // Initialize with a default error to prevent uninitialized variable issues
+  let lastError: Error = new Error('Request failed after retries');
   
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
@@ -44,7 +50,8 @@ const retryWithBackoff = async <T>(
     }
   }
   
-  throw lastError!;
+  // This should never be reached due to the throw in the loop, but TypeScript needs it
+  throw lastError;
 };
 
 export async function POST(request: NextRequest) {

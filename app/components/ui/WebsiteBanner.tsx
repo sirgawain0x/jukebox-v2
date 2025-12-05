@@ -15,14 +15,14 @@ export function WebsiteBanner() {
   // For Farcaster: Link to the Farcaster mini-app directory page
   const farcasterUrl = "https://farcaster.xyz/miniapps/qmW3Ymy2yYM6/jukebox";
   // For Base app: Link to the Base app URL
-  const baseAppUrl = "https://jukebox.creativeplatform.xyz/";
+  const baseAppUrl = "https://www.base.app/";
 
   // Shared button base classes matching Button component styles
   const buttonBaseClasses =
     "inline-flex items-center justify-center font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0052FF]";
 
   return (
-    <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg">
+    <div className="mb-4 p-4 bg-linear-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
           <h3 className="text-sm font-semibold text-gray-900 mb-1">

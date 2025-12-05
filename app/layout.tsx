@@ -3,6 +3,7 @@ import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import { RootProvider } from "./rootProvider";
 import { ToastProvider } from "./components/ui/ToastProvider";
+import { PWAInitializer } from "./components/pwa/PWAInitializer";
 import "./globals.css";
 
 const ROOT_URL =
@@ -73,6 +74,7 @@ export default function RootLayout({
       <ToastProvider>
         <html lang="en" suppressHydrationWarning>
           <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
+            <PWAInitializer />
             {children}
           </body>
         </html>

@@ -37,8 +37,9 @@ export async function POST(request: NextRequest) {
       // Verify payment completed successfully
       if (paymentStatus.status !== 'completed') {
         console.error("[Gemini API] Payment not completed:", paymentStatus.status);
+        const errorMessage = paymentStatus.message || `Payment status: ${paymentStatus.status}`;
         return NextResponse.json(
-          { error: `Payment verification failed: ${paymentStatus.message}` },
+          { error: `Payment verification failed: ${errorMessage}` },
           { status: 402 }
         );
       }

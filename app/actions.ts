@@ -1,0 +1,275 @@
+'use server'
+
+import webpush from 'web-push'
+
+// Configure VAPID details
+webpush.setVapidDetails(
+  process.env.VAPID_SUBJECT || '<mailto:your-email@example.com>',
+  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+  process.env.VAPID_PRIVATE_KEY!
+)
+
+// In production, store subscriptions in a database
+// For now, using in-memory storage (will be lost on server restart)
+// Using a serialized format that web-push can work with
+interface SerializedPushSubscription {
+  endpoint: string
+  keys: {
+    p256dh: string
+    auth: string
+  }
+}
+
+const subscriptions: Map<string, SerializedPushSubscription> = new Map()
+
+export interface SubscribeUserResult {
+  success: boolean
+  error?: string
+}
+
+export interface UnsubscribeUserResult {
+  success: boolean
+  error?: string
+}
+
+export interface SendNotificationResult {
+  success: boolean
+  error?: string
+}
+
+/**
+ * Subscribe a user to push notifications
+ * @param subscription - Push subscription object from the client
+ * @param userId - Optional user identifier for multi-user support
+ */
+export async function subscribeUser(
+  subscription: PushSubscription | SerializedPushSubscription,
+  userId?: string
+): Promise<SubscribeUserResult> {
+  try {
+    // In production, store in database:
+    // await db.pushSubscriptions.create({
+    //   data: {
+    //     userId: userId || 'anonymous',
+    //     endpoint: subscription.endpoint,
+    //     p256dh: subscription.keys.p256dh,
+    //     auth: subscription.keys.auth,
+    //     createdAt: new Date(),
+    //   }
+    // })
+
+    // Ensure we have the serialized format
+    let serializedSub: SerializedPushSubscription
+    
+    // Check if it's already serialized or needs conversion
+    if ('keys' in subscription && typeof subscription.keys === 'object' && 'p256dh' in subscription.keys) {
+      // Already serialized
+      serializedSub = subscription as SerializedPushSubscription
+    } else {
+      // Need to serialize from PushSubscription
+      const pushSub = subscription as PushSubscription
+      const p256dhKey = pushSub.getKey('p256dh')
+      const authKey = pushSub.getKey('auth')
+      
+      if (!p256dhKey || !authKey) {
+        return {
+          success: false,
+          error: 'Invalid subscription: missing keys',
+        }
+      }
+      
+      serializedSub = {
+        endpoint: pushSub.endpoint,
+        keys: {
+          p256dh: btoa(String.fromCharCode(...new Uint8Array(p256dhKey))),
+          auth: btoa(String.fromCharCode(...new Uint8Array(authKey))),
+        },
+      }
+    }
+
+    const key = userId || subscription.endpoint || 'default'
+    subscriptions.set(key, serializedSub)
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error subscribing user:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to subscribe',
+    }
+  }
+}
+
+/**
+ * Unsubscribe a user from push notifications
+ * @param userId - Optional user identifier
+ * @param endpoint - Optional subscription endpoint to identify the subscription
+ */
+export async function unsubscribeUser(
+  userId?: string,
+  endpoint?: string
+): Promise<UnsubscribeUserResult> {
+  try {
+    // In production, remove from database:
+    // await db.pushSubscriptions.delete({
+    //   where: { userId: userId || 'anonymous' }
+    // })
+
+    if (userId) {
+      subscriptions.delete(userId)
+    } else if (endpoint) {
+      // Find and remove subscription by endpoint
+      for (const [key, sub] of subscriptions.entries()) {
+        if (sub.endpoint === endpoint) {
+          subscriptions.delete(key)
+          break
+        }
+      }
+    } else {
+      // If neither userId nor endpoint provided, we can't safely remove
+      // In production, you'd want to track this better
+      return {
+        success: false,
+        error: 'Cannot unsubscribe: userId or endpoint required',
+      }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error unsubscribing user:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to unsubscribe',
+    }
+  }
+}
+
+/**
+ * Send a push notification to a specific user
+ * @param message - Notification message
+ * @param userId - Optional user identifier (if not provided, sends to all)
+ * @param title - Optional notification title
+ */
+export async function sendNotification(
+  message: string,
+  userId?: string,
+  title: string = 'Jukebox'
+): Promise<SendNotificationResult> {
+  let subscription: SerializedPushSubscription | undefined
+  
+  try {
+    subscription = userId
+      ? subscriptions.get(userId)
+      : subscriptions.values().next().value
+
+    if (!subscription) {
+      return {
+        success: false,
+        error: 'No subscription available',
+      }
+    }
+
+    // web-push expects the subscription in this format
+    const pushSubscription = {
+      endpoint: subscription.endpoint,
+      keys: {
+        p256dh: subscription.keys.p256dh,
+        auth: subscription.keys.auth,
+      },
+    }
+
+    const payload = JSON.stringify({
+      title,
+      body: message,
+      icon: '/icon.png',
+      badge: '/icon.png',
+    })
+
+    await webpush.sendNotification(pushSubscription, payload)
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error sending push notification:', error)
+    
+    // Handle expired/invalid subscriptions
+    if (error && typeof error === 'object' && 'statusCode' in error) {
+      const statusCode = (error as { statusCode?: number }).statusCode
+      if (statusCode === 410 || statusCode === 404) {
+        // Subscription expired or not found, remove it
+        if (userId) {
+          subscriptions.delete(userId)
+        } else if (subscription) {
+          // Remove the subscription that failed
+          for (const [key, sub] of subscriptions.entries()) {
+            if (sub.endpoint === subscription.endpoint) {
+              subscriptions.delete(key)
+              break
+            }
+          }
+        }
+        return {
+          success: false,
+          error: 'Subscription expired. Please subscribe again.',
+        }
+      }
+    }
+    
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to send notification',
+    }
+  }
+}
+
+/**
+ * Send push notification to all subscribed users
+ * @param message - Notification message
+ * @param title - Optional notification title
+ */
+export async function sendNotificationToAll(
+  message: string,
+  title: string = 'Jukebox'
+): Promise<SendNotificationResult> {
+  try {
+    if (subscriptions.size === 0) {
+      return {
+        success: false,
+        error: 'No subscriptions available',
+      }
+    }
+
+    const payload = JSON.stringify({
+      title,
+      body: message,
+      icon: '/icon.png',
+      badge: '/icon.png',
+    })
+
+    const results = await Promise.allSettled(
+      Array.from(subscriptions.values()).map((subscription) => {
+        const pushSubscription = {
+          endpoint: subscription.endpoint,
+          keys: {
+            p256dh: subscription.keys.p256dh,
+            auth: subscription.keys.auth,
+          },
+        }
+        return webpush.sendNotification(pushSubscription, payload)
+      })
+    )
+
+    const failures = results.filter((r) => r.status === 'rejected')
+    if (failures.length > 0) {
+      console.error('Some notifications failed:', failures)
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error sending push notifications:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to send notifications',
+    }
+  }
+}
+

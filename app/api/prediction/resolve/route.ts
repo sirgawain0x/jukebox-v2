@@ -90,7 +90,10 @@ export async function POST(request: NextRequest) {
         });
 
         // Check if this market's song is the winner
-        const isWinner = marketData[0] === winnerSongId; // songId is first element
+        // Convert both to strings for comparison to handle type mismatches
+        // marketData[0] is songId (string from contract), winnerSongId is also string
+        const marketSongId = String(marketData[0]);
+        const isWinner = marketSongId === winnerSongId;
         const winner = isWinner; // true = YES won, false = NO won
 
         // If we have a private key, we can resolve the market

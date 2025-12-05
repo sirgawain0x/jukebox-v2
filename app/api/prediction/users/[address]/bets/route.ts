@@ -7,7 +7,7 @@ import {
 } from "@/lib/prediction-cache";
 import { serializeMarketBet } from "@/lib/bigint-serialization";
 import type { MarketBet, PredictionMarket } from "@/types/prediction-market";
-import { Address } from "viem";
+import { Address, decodeEventLog } from "viem";
 import { createPublicClient, http } from "viem";
 import { base } from "viem/chains";
 import { getPredictionMarketAddress, predictionMarketABI } from "@/lib/contracts/prediction-market";
@@ -119,6 +119,110 @@ async function fetchUserBetCount(
   }
 }
 
+/**
+ * Fetch the timestamp for a bet from BetPlaced events
+ * Decodes events to find the exact match for market, user, and side
+ */
+async function fetchBetTimestamp(
+  publicClient: ReturnType<typeof createPublicClient>,
+  contractAddress: string,
+  marketId: bigint,
+  userAddress: Address,
+  side: "YES" | "NO"
+): Promise<number> {
+  try {
+    const betPlacedEvent = predictionMarketABI.find(
+      (item) => item.type === "event" && item.name === "BetPlaced"
+    );
+
+    if (!betPlacedEvent) {
+      console.warn("BetPlaced event not found in ABI");
+      return Math.floor(Date.now() / 1000); // Fallback to current time
+    }
+
+    // Search for BetPlaced events for this user and market
+    const latestBlock = await publicClient.getBlockNumber();
+    const searchFromBlock = await getCachedDeploymentBlock(contractAddress) || BIGINT_ZERO;
+
+    // Fetch events with both marketId and user filters (both are indexed)
+    const logs = await publicClient.getLogs({
+      address: contractAddress as `0x${string}`,
+      event: betPlacedEvent,
+      args: {
+        marketId: marketId,
+        user: userAddress,
+      },
+      fromBlock: searchFromBlock,
+      toBlock: latestBlock,
+    });
+
+    // Find the event that matches this market, user, and side
+    // side is true for YES, false for NO
+    const sideBool = side === "YES";
+    
+    // Process logs in reverse order to get the most recent matching event
+    for (const log of logs.reverse()) {
+      // When using getLogs with an event, viem automatically decodes it
+      // The log should have decoded args
+      if ('args' in log && log.args) {
+        const args = log.args as { marketId?: bigint; user?: Address; side?: boolean; amount?: bigint };
+        
+        // Verify it matches our criteria
+        if (
+          args.marketId === marketId &&
+          args.user?.toLowerCase() === userAddress.toLowerCase() &&
+          args.side === sideBool
+        ) {
+          // Get the block timestamp
+          if (log.blockNumber) {
+            const block = await publicClient.getBlock({
+              blockNumber: log.blockNumber,
+            });
+            return Number(block.timestamp);
+          }
+        }
+      } else {
+        // Fallback: if args aren't decoded, try to decode manually
+        try {
+          const decoded = decodeEventLog({
+            abi: predictionMarketABI,
+            data: log.data,
+            topics: log.topics,
+          });
+
+          // Type guard: check if this is a BetPlaced event
+          if (decoded.eventName === "BetPlaced" && "side" in decoded.args) {
+            const args = decoded.args as { marketId?: bigint; user?: Address; side?: boolean; amount?: bigint };
+            
+            // Verify it matches our criteria
+            if (
+              args.marketId === marketId &&
+              args.user?.toLowerCase() === userAddress.toLowerCase() &&
+              args.side === sideBool
+            ) {
+              if (log.blockNumber) {
+                const block = await publicClient.getBlock({
+                  blockNumber: log.blockNumber,
+                });
+                return Number(block.timestamp);
+              }
+            }
+          }
+        } catch {
+          // If decoding fails, continue to next log
+          continue;
+        }
+      }
+    }
+
+    // Fallback: use current time if no matching event found
+    return Math.floor(Date.now() / 1000);
+  } catch (error) {
+    console.warn(`Failed to fetch bet timestamp for market ${marketId}, side ${side}:`, error);
+    return Math.floor(Date.now() / 1000); // Fallback to current time
+  }
+}
+
 async function fetchUserBetsFromContract(
   address: Address,
   publicClient: ReturnType<typeof createPublicClient>
@@ -171,25 +275,43 @@ async function fetchUserBetsFromContract(
 
         // Create bet entries for YES and NO if they exist
         if (amountYes > BigInt(0)) {
+          // Fetch the actual timestamp from BetPlaced events
+          const timestamp = await fetchBetTimestamp(
+            publicClient,
+            contractAddress,
+            BigInt(i),
+            address,
+            "YES"
+          );
+
           bets.push({
             id: `bet-${i}-${address}-yes`,
             marketId: `market-${i}`,
             userAddress: address,
             side: "YES",
             amount: amountYes,
-            timestamp: Math.floor(Date.now() / 1000), // We don't have timestamp from contract
+            timestamp,
             claimed,
           });
         }
 
         if (amountNo > BigInt(0)) {
+          // Fetch the actual timestamp from BetPlaced events
+          const timestamp = await fetchBetTimestamp(
+            publicClient,
+            contractAddress,
+            BigInt(i),
+            address,
+            "NO"
+          );
+
           bets.push({
             id: `bet-${i}-${address}-no`,
             marketId: `market-${i}`,
             userAddress: address,
             side: "NO",
             amount: amountNo,
-            timestamp: Math.floor(Date.now() / 1000),
+            timestamp,
             claimed,
           });
         }

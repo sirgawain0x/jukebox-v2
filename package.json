@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@base-org/account": "^2.4.0",
-    "@coinbase/cdp-sdk": "^1.38.4",
+    "@coinbase/cdp-sdk": "^1.39.0",
     "@coinbase/onchainkit": "latest",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",

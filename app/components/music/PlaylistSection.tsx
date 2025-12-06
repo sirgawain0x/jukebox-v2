@@ -198,7 +198,7 @@ export function PlaylistSection({
 
     try {
       getContractAddresses(chainId);
-    } catch (error) {
+    } catch {
       setImageGenerationError("Unsupported network. Please switch to Base mainnet or Base Sepolia.");
       return;
     }

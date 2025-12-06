@@ -5,6 +5,10 @@ import { useMiniKit } from '@coinbase/onchainkit/minikit'
 import { sdk } from '@farcaster/miniapp-sdk'
 import { Button } from '../ui/Button'
 import { subscribeUser, unsubscribeUser, sendNotification } from '@/app/actions'
+import { useWallet } from '@/app/contexts/WalletContext'
+
+// Allowed address that can send notifications
+const ALLOWED_NOTIFICATION_ADDRESS = '0xc3118549B9bCd7Ed6672Ea2A5a3B26FfbE735F67'
 
 /**
  * Helper function to convert VAPID public key from base64 URL to Uint8Array
@@ -34,6 +38,7 @@ export function PushNotificationManager({
   className = '' 
 }: PushNotificationManagerProps) {
   const { context } = useMiniKit()
+  const { address } = useWallet()
   const [isSupported, setIsSupported] = useState(false)
   const [isInMiniApp, setIsInMiniApp] = useState(false)
   const [subscription, setSubscription] = useState<PushSubscription | null>(null)
@@ -208,11 +213,16 @@ export function PushNotificationManager({
       return
     }
 
+    if (!address) {
+      setStatus('Please connect your wallet to send notifications')
+      return
+    }
+
     setIsLoading(true)
     setStatus('')
 
     try {
-      const result = await sendNotification(message.trim())
+      const result = await sendNotification(message.trim(), undefined, 'Jukebox', address)
       if (result.success) {
         setStatus('Test notification sent!')
         setMessage('')
@@ -272,32 +282,34 @@ export function PushNotificationManager({
             </Button>
           </div>
 
-          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <label className="block text-sm font-medium mb-2">
-              Send Test Notification
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="Enter notification message"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !isLoading) {
-                    handleSendTest()
-                  }
-                }}
-                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-sm"
-              />
-              <Button
-                size="sm"
-                onClick={handleSendTest}
-                disabled={isLoading || !message.trim()}
-              >
-                Send
-              </Button>
+          {address && address.toLowerCase() === ALLOWED_NOTIFICATION_ADDRESS.toLowerCase() && (
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <label className="block text-sm font-medium mb-2">
+                Send Test Notification
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Enter notification message"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !isLoading) {
+                      handleSendTest()
+                    }
+                  }}
+                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-sm"
+                />
+                <Button
+                  size="sm"
+                  onClick={handleSendTest}
+                  disabled={isLoading || !message.trim()}
+                >
+                  Send
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       ) : (
         <div className="space-y-3">

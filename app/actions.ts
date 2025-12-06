@@ -144,17 +144,31 @@ export async function unsubscribeUser(
   }
 }
 
+// Allowed address that can send notifications
+const ALLOWED_NOTIFICATION_ADDRESS = '0xc3118549B9bCd7Ed6672Ea2A5a3B26FfbE735F67'
+
 /**
  * Send a push notification to a specific user
  * @param message - Notification message
  * @param userId - Optional user identifier (if not provided, sends to all)
  * @param title - Optional notification title
+ * @param userAddress - Optional user wallet address for authorization check
  */
 export async function sendNotification(
   message: string,
   userId?: string,
-  title: string = 'Jukebox'
+  title: string = 'Jukebox',
+  userAddress?: string
 ): Promise<SendNotificationResult> {
+  // Check if user is authorized to send notifications
+  // Require address and verify it matches the allowed address
+  if (!userAddress || userAddress.toLowerCase() !== ALLOWED_NOTIFICATION_ADDRESS.toLowerCase()) {
+    return {
+      success: false,
+      error: 'Unauthorized: Only the specified address can send notifications',
+    }
+  }
+
   let subscription: SerializedPushSubscription | undefined
   
   try {
@@ -225,11 +239,22 @@ export async function sendNotification(
  * Send push notification to all subscribed users
  * @param message - Notification message
  * @param title - Optional notification title
+ * @param userAddress - Optional user wallet address for authorization check
  */
 export async function sendNotificationToAll(
   message: string,
-  title: string = 'Jukebox'
+  title: string = 'Jukebox',
+  userAddress?: string
 ): Promise<SendNotificationResult> {
+  // Check if user is authorized to send notifications
+  // Require address and verify it matches the allowed address
+  if (!userAddress || userAddress.toLowerCase() !== ALLOWED_NOTIFICATION_ADDRESS.toLowerCase()) {
+    return {
+      success: false,
+      error: 'Unauthorized: Only the specified address can send notifications',
+    }
+  }
+
   try {
     if (subscriptions.size === 0) {
       return {

@@ -160,6 +160,10 @@ export default function App() {
           >
             <div className="center-content flex flex-col">
               <AdaptiveHeader onAddFrame={handleAddFrame} frameAdded={frameAdded || context?.client?.added} />
+              {/* Push Notification Manager - Only shows when not in miniapp */}
+              <div className="mt-4">
+                <PushNotificationManager />
+              </div>
               <WebsiteBanner />
 
               {/* Platform-specific features */}
@@ -196,11 +200,6 @@ export default function App() {
                   {activeTab === "predictions" && <Home setActiveTab={setActiveTab} initialSection="predictions" />}
                 </ErrorBoundary>
               </main>
-
-              {/* Push Notification Manager - Only shows when not in miniapp */}
-              <div className="mt-4">
-                <PushNotificationManager />
-              </div>
 
               <footer className="mt-2 pt-4 flex justify-center">
                 <Button

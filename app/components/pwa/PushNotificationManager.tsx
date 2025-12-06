@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react'
 import { useMiniKit } from '@coinbase/onchainkit/minikit'
 import { sdk } from '@farcaster/miniapp-sdk'
+import { useAccount } from 'wagmi'
 import { Button } from '../ui/Button'
 import { subscribeUser, unsubscribeUser, sendNotification } from '@/app/actions'
-import { useWallet } from '@/app/contexts/WalletContext'
+import { getFarcasterWalletAddress } from '@/app/utils/farcaster-context'
 
 // Allowed address that can send notifications
 const ALLOWED_NOTIFICATION_ADDRESS = '0xc3118549B9bCd7Ed6672Ea2A5a3B26FfbE735F67'
@@ -38,7 +39,12 @@ export function PushNotificationManager({
   className = '' 
 }: PushNotificationManagerProps) {
   const { context } = useMiniKit()
-  const { address } = useWallet()
+  // Get address from wagmi (works with OnchainKitProvider)
+  const { address: wagmiAddress } = useAccount()
+  // Get address from Farcaster context as fallback
+  const farcasterAddress = getFarcasterWalletAddress()
+  // Use wagmi address first, fallback to Farcaster address
+  const address = wagmiAddress || (farcasterAddress as `0x${string}` | undefined)
   const [isSupported, setIsSupported] = useState(false)
   const [isInMiniApp, setIsInMiniApp] = useState(false)
   const [subscription, setSubscription] = useState<PushSubscription | null>(null)

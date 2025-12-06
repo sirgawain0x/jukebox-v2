@@ -161,7 +161,7 @@ export default function App() {
             <div className="center-content flex flex-col">
               <AdaptiveHeader onAddFrame={handleAddFrame} frameAdded={frameAdded || context?.client?.added} />
               {/* Push Notification Manager - Only shows when not in miniapp */}
-              <div className="mt-4">
+              <div className="my-4">
                 <PushNotificationManager />
               </div>
               <WebsiteBanner />

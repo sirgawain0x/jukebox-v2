@@ -116,20 +116,18 @@ export function Jukebox({
   const handleShareSong = useCallback(() => {
     if (!selectedSong) return;
     
-    const shareUrl = `${window.location.origin}/share/song/${selectedSong.id}`;
     composeCast({
       text: `🎵 Currently vibing to "${selectedSong.title}" by ${selectedSong.artist}! Check out this amazing track on Jukebox 🎶`,
-      embeds: [shareUrl]
+      embeds: [window.location.href]
     });
   }, [selectedSong, composeCast]);
 
   const handleShareTip = useCallback(() => {
     if (!selectedSong) return;
     
-    const shareUrl = `${window.location.origin}/share/song/${selectedSong.id}`;
     composeCast({
       text: `💎 Just tipped ${selectedSong.artist} for their incredible track "${selectedSong.title}"! Supporting artists directly on the blockchain 🎵✨`,
-      embeds: [shareUrl]
+      embeds: [window.location.href]
     });
   }, [selectedSong, composeCast]);
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -961,10 +959,9 @@ export function Jukebox({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          const shareUrl = `${window.location.origin}/share/song/${song.id}`;
                           composeCast({
                             text: `🎵 Check out "${song.title}" by ${song.artist}! Discovered this amazing track on Jukebox 🎶`,
-                            embeds: [shareUrl]
+                            embeds: [window.location.href]
                           });
                           showToast(`Shared "${song.title}" to Farcaster!`);
                         }}
@@ -1219,7 +1216,7 @@ export function Jukebox({
                       Tip {selectedSong?.artist} in ETH
                     </p>
                   </div>
-                  <TransactionButton className="w-full bg-white text-[#0052ff] hover:bg-gray-100" />
+                  <TransactionButton className="w-full bg-white text-[#0052ff] hover:bg-gray-100" text="Tip" />
                   <div className="text-center mb-2">
                     {!playlist && (
                       <p className="text-xs text-white/70 mt-1">

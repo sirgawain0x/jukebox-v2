@@ -1,4 +1,7 @@
-import { Address } from "viem";
+import { Address, type Abi } from "viem";
+
+// Playlist deployment fee: $0.10 USDC (100000 units with 6 decimals)
+export const PLAYLIST_DEPLOYMENT_FEE_USDC = BigInt(100000);
 
 // USDC contract addresses by chain
 export const USDC_ADDRESSES = {
@@ -8,71 +11,71 @@ export const USDC_ADDRESSES = {
   84532: "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as const,
 } as const;
 
-// Standard ERC20 ABI for USDC
+// Standard ERC20 ABI for USDC (viem v2 format)
 export const erc20ABI = [
   {
-    constant: true,
-    inputs: [{ name: "_owner", type: "address" }],
-    name: "balanceOf",
-    outputs: [{ name: "balance", type: "uint256" }],
+    stateMutability: "view",
     type: "function",
+    name: "balanceOf",
+    inputs: [{ name: "_owner", type: "address" }],
+    outputs: [{ name: "balance", type: "uint256" }],
   },
   {
-    constant: false,
+    stateMutability: "nonpayable",
+    type: "function",
+    name: "approve",
     inputs: [
       { name: "_spender", type: "address" },
       { name: "_value", type: "uint256" },
     ],
-    name: "approve",
     outputs: [{ name: "", type: "bool" }],
-    type: "function",
   },
   {
-    constant: true,
+    stateMutability: "view",
+    type: "function",
+    name: "allowance",
     inputs: [
       { name: "_owner", type: "address" },
       { name: "_spender", type: "address" },
     ],
-    name: "allowance",
     outputs: [{ name: "", type: "uint256" }],
-    type: "function",
   },
   {
-    constant: false,
+    stateMutability: "nonpayable",
+    type: "function",
+    name: "transfer",
     inputs: [
       { name: "_to", type: "address" },
       { name: "_value", type: "uint256" },
     ],
-    name: "transfer",
     outputs: [{ name: "", type: "bool" }],
-    type: "function",
   },
   {
-    constant: false,
+    stateMutability: "nonpayable",
+    type: "function",
+    name: "transferFrom",
     inputs: [
       { name: "_from", type: "address" },
       { name: "_to", type: "address" },
       { name: "_value", type: "uint256" },
     ],
-    name: "transferFrom",
     outputs: [{ name: "", type: "bool" }],
-    type: "function",
   },
   {
-    constant: true,
-    inputs: [],
+    stateMutability: "view",
+    type: "function",
     name: "decimals",
+    inputs: [],
     outputs: [{ name: "", type: "uint8" }],
-    type: "function",
   },
   {
-    constant: true,
-    inputs: [],
-    name: "symbol",
-    outputs: [{ name: "", type: "string" }],
+    stateMutability: "view",
     type: "function",
+    name: "symbol",
+    inputs: [],
+    outputs: [{ name: "", type: "string" }],
   },
-] as const;
+] as Abi;
 
 /**
  * Get USDC contract address for a given chain ID

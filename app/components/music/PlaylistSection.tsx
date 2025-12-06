@@ -22,10 +22,21 @@ import {
   useBalance,
 } from "wagmi";
 import {
-  useGetRequiredETH,
   create2FactoryABI,
   getContractAddresses,
+  PLAYLIST_NFT_BYTECODE,
+  STORAGE_CONTRACT_BYTECODE,
+  useInitializePlaylist,
+  useCreatePlaylistNFT,
+  type PlaylistMetadata,
 } from "@/lib/contracts";
+import { 
+  PLAYLIST_DEPLOYMENT_FEE_USDC, 
+  getUSDCAddress,
+  erc20ABI,
+  formatUSDC 
+} from "@/lib/usdc-utils";
+import { useReadContract } from "wagmi";
 import { extractTransactionErrorMessage } from "@/lib/utils";
 import {
   Music,
@@ -39,7 +50,7 @@ import {
   Tag,
   FileText,
 } from "lucide-react";
-import { decodeEventLog } from "viem";
+import { decodeEventLog, type Address } from "viem";
 import { type ContractFunctionParameters } from "viem";
 import { pay, getPaymentStatus } from "@base-org/account";
 
@@ -84,46 +95,56 @@ export function PlaylistSection({
   const [aiAccessUnlocked, setAiAccessUnlocked] = useState(false);
   const [imageGenerationCount, setImageGenerationCount] = useState(0);
   const [useAIGeneration, setUseAIGeneration] = useState(true);
+  const [deployedPlaylistAddress, setDeployedPlaylistAddress] = useState<Address | null>(null);
+  const [deployedStorageAddress, setDeployedStorageAddress] = useState<Address | null>(null);
+  const [storageDeploymentHash, setStorageDeploymentHash] = useState<`0x${string}` | undefined>();
+  const [storageSalt, setStorageSalt] = useState<`0x${string}` | null>(null);
+  const [saveStorageCalls, setSaveStorageCalls] = useState<PayableContractFunctionParameters[]>([]);
 
-  // Get ETH amount for $0.10 (10 cents) for saving playlist
-  const priceQueryResult = useGetRequiredETH(BigInt(10));
-  const { data: savePlaylistCost, isLoading: isLoadingSaveCost, isError: priceError } = priceQueryResult;
-  const _debug = (priceQueryResult as Record<string, unknown>)._debug as {
-    fallbackUsed?: boolean;
-    priceSource?: string;
-  } | undefined;
-
-  // Validate price and provide safe fallback
-  const validateAndGetCost = (cost: bigint | undefined) => {
-    if (!cost) return BigInt("26400000000000"); // ~$0.10 at ETH $3,787
-    
-    // Sanity check: ensure cost is reasonable (between $0.01 and $1.00)
-    const minCost = BigInt("2600000000000"); // ~$0.01
-    const maxCost = BigInt("260000000000000"); // ~$1.00
-    
-    if (cost < minCost || cost > maxCost) {
-      console.warn(`Price feed returned unusual value: ${cost} wei. Using fallback.`);
-      return BigInt("26400000000000"); // Safe fallback at current ETH price
-    }
-    
-    return cost;
-  };
-
-  const SAVE_PLAYLIST_COST = validateAndGetCost(savePlaylistCost);
-
+  // Get account and chain info first - required for balance and allowance checks
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
+
+  // USDC balance check
+  const { data: usdcBalance } = useBalance({
+    address: address,
+    token: chainId ? getUSDCAddress(chainId) : undefined,
+    chainId: chainId,
+  });
+
+  // USDC allowance check
+  const { data: usdcAllowance } = useReadContract({
+    address: chainId ? getUSDCAddress(chainId) : undefined,
+    abi: erc20ABI,
+    functionName: "allowance",
+    args: address && chainId 
+      ? [address, getContractAddresses(chainId).CREATE2_FACTORY] 
+      : undefined,
+    query: {
+      enabled: !!address && !!chainId,
+    },
+  });
   const { composeCast } = useComposeCast();
+
+  // Helper function to check if network is supported
+  const isNetworkSupported = useCallback(() => {
+    if (!chainId) return false;
+    try {
+      getContractAddresses(chainId);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [chainId]);
 
   const { data: receipt } = useWaitForTransactionReceipt({
     hash: deploymentHash,
   });
 
-  // Check ETH balance for transaction
-  const { data: ethBalance } = useBalance({
-    address: address,
-    chainId: chainId,
+  const { data: storageReceipt } = useWaitForTransactionReceipt({
+    hash: storageDeploymentHash,
   });
+
 
   const launchConfetti = useCallback(() => {
     // Ensure confetti is called safely without DOM conflicts
@@ -169,16 +190,32 @@ export function PlaylistSection({
       return;
     }
 
+    // Validate network before proceeding
+    if (!chainId) {
+      setImageGenerationError("Please connect to a supported network");
+      return;
+    }
+
+    try {
+      getContractAddresses(chainId);
+    } catch (error) {
+      setImageGenerationError("Unsupported network. Please switch to Base mainnet or Base Sepolia.");
+      return;
+    }
+
     setLoadingImage(true);
     setImageGenerationError(null);
     setPaymentStatus("Initiating payment...");
+
+    // Determine if we're on testnet based on chainId
+    const isTestnet = chainId === 84532; // Base Sepolia
 
     try {
       // Use Base Pay to handle the payment
       const payment = await pay({
         amount: '0.25', // $0.25 USDC
         to: PAYMENT_RECIPIENT,
-        testnet: false, // Use mainnet
+        testnet: isTestnet,
       });
 
       console.log("Payment initiated:", payment.id);
@@ -194,7 +231,7 @@ export function PlaylistSection({
         
         const status = await getPaymentStatus({
           id: payment.id,
-          testnet: false
+          testnet: isTestnet
         });
         console.log("Payment status:", status);
 
@@ -250,7 +287,7 @@ export function PlaylistSection({
       setLoadingImage(false);
       setPaymentStatus("");
     }
-  }, [imagePrompt, isConnected, address, showToast]);
+  }, [imagePrompt, isConnected, address, chainId, showToast]);
 
   const handlePayForAIAccess = useCallback(async () => {
     // Set a default prompt and unlock access, then call the generation function
@@ -282,7 +319,9 @@ export function PlaylistSection({
           statusData: status.statusData,
           timestamp: new Date().toISOString(),
           userAddress: address,
-          chainId: chainId
+          chainId: chainId,
+          storageDeployed: !!deployedStorageAddress,
+          playlistDeployed: !!deployedPlaylistAddress
         };
         
         // Only log if there's meaningful error data
@@ -295,20 +334,104 @@ export function PlaylistSection({
         // Extract user-friendly error message using utility function
         const errorMessage = extractTransactionErrorMessage(
           status.statusData,
-          "Transaction failed. Please try again."
+          "Playlist deployment failed. Please try again."
         );
         
         showToast(errorMessage);
+        
+        // If playlist deployment failed but storage succeeded, reset playlist state to allow retry
+        // Note: Storage contract remains deployed but unused - this is acceptable
+        if (deployedStorageAddress && !deployedPlaylistAddress) {
+          setDeploymentHash(undefined);
+          setSavePlaylistCalls([]);
+        }
       }
     },
-    [showToast, address, chainId]
+    [showToast, address, chainId, deployedStorageAddress, deployedPlaylistAddress]
   );
 
+  // Setup storage deployment when modal opens
   useEffect(() => {
-    if (showSaveModal && address) {
-      const saltBytes = new Uint8Array(32);
-      crypto.getRandomValues(saltBytes);
-      const salt = BigInt(`0x${Buffer.from(saltBytes).toString("hex")}`);
+    if (showSaveModal && address && chainId && !storageSalt && !deployedStorageAddress) {
+      // Validate network first
+      if (!isNetworkSupported()) {
+        console.error("Unsupported network:", chainId);
+        showToast(`Unsupported network. Please switch to Base mainnet or Base Sepolia.`);
+        setShowSaveModal(false);
+        return;
+      }
+
+      // Validate sufficient USDC balance
+      if (usdcBalance && usdcBalance.value < PLAYLIST_DEPLOYMENT_FEE_USDC) {
+        console.error("Insufficient USDC balance:", {
+          required: PLAYLIST_DEPLOYMENT_FEE_USDC.toString(),
+          available: usdcBalance.value.toString()
+        });
+        showToast(`Insufficient USDC balance. You need at least ${formatUSDC(PLAYLIST_DEPLOYMENT_FEE_USDC)} USDC.`);
+        setShowSaveModal(false);
+        return;
+      }
+
+      let addresses;
+      try {
+        addresses = getContractAddresses(chainId);
+      } catch (error) {
+        console.error("Failed to get contract addresses:", error);
+        showToast(`Unsupported network. Please switch to Base mainnet or Base Sepolia.`);
+        setShowSaveModal(false);
+        return;
+      }
+
+      // Generate bytes32 salt for storage contract (32 bytes)
+      const storageSaltBytes = new Uint8Array(32);
+      crypto.getRandomValues(storageSaltBytes);
+      const newStorageSalt = `0x${Buffer.from(storageSaltBytes).toString("hex")}` as `0x${string}`;
+      setStorageSalt(newStorageSalt);
+      
+      console.log("Setting up storage deployment with salt:", newStorageSalt);
+      
+      // Check if USDC approval is needed
+      const allowanceValue = typeof usdcAllowance === "bigint" ? usdcAllowance : BigInt(0);
+      const needsApproval = !usdcAllowance || allowanceValue < PLAYLIST_DEPLOYMENT_FEE_USDC;
+      
+      const calls: PayableContractFunctionParameters[] = [];
+      
+      // Add USDC approval if needed
+      if (needsApproval) {
+        calls.push({
+          abi: erc20ABI,
+          address: getUSDCAddress(chainId),
+          functionName: "approve",
+          args: [addresses.CREATE2_FACTORY, PLAYLIST_DEPLOYMENT_FEE_USDC],
+        });
+      }
+      
+      // Add storage deployment call
+      calls.push({
+        abi: create2FactoryABI,
+        address: addresses.CREATE2_FACTORY,
+        functionName: "deploy",
+        args: [newStorageSalt, STORAGE_CONTRACT_BYTECODE as `0x${string}`],
+      });
+      
+      console.log("Storage deployment calls:", calls);
+      setSaveStorageCalls(calls);
+    }
+  }, [
+    showSaveModal,
+    address,
+    chainId,
+    usdcBalance,
+    usdcAllowance,
+    storageSalt,
+    deployedStorageAddress,
+    showToast,
+    isNetworkSupported,
+  ]);
+
+  // Wait for storage deployment to complete, then deploy playlist
+  useEffect(() => {
+    if (showSaveModal && storageReceipt && deployedStorageAddress && !deploymentHash && address && chainId) {
       let addresses;
       try {
         addresses = getContractAddresses(chainId);
@@ -318,63 +441,118 @@ export function PlaylistSection({
         return;
       }
       
-      const transactionCall = {
+      // Generate bytes32 salt for playlist contract (different from storage)
+      const playlistSaltBytes = new Uint8Array(32);
+      crypto.getRandomValues(playlistSaltBytes);
+      const playlistSalt = `0x${Buffer.from(playlistSaltBytes).toString("hex")}` as `0x${string}`;
+      
+      // Check if USDC approval is needed
+      const allowanceValue = typeof usdcAllowance === "bigint" ? usdcAllowance : BigInt(0);
+      const needsApproval = !usdcAllowance || allowanceValue < PLAYLIST_DEPLOYMENT_FEE_USDC;
+      
+      const calls: PayableContractFunctionParameters[] = [];
+      
+      // Add USDC approval if needed
+      if (needsApproval) {
+        calls.push({
+          abi: erc20ABI,
+          address: getUSDCAddress(chainId),
+          functionName: "approve",
+          args: [addresses.CREATE2_FACTORY, PLAYLIST_DEPLOYMENT_FEE_USDC],
+        });
+      }
+      
+      // Add playlist deployment call
+      calls.push({
         abi: create2FactoryABI,
         address: addresses.CREATE2_FACTORY,
-        functionName: "deployPlaylist",
-        args: [
-          playlistName,
-          coverImage,
-          description,
-          tags,
-          address as `0x${string}`,
-          addresses.PRICE_FEED,
-          salt,
-        ],
-        value: SAVE_PLAYLIST_COST,
-      };
+        functionName: "deploy",
+        args: [playlistSalt, PLAYLIST_NFT_BYTECODE as `0x${string}`],
+      });
       
-      console.log("Setting up transaction call:", {
+      console.log("Setting up playlist deployment after storage:", {
         chainId,
         addresses,
         playlistName,
-        coverImage,
-        description,
-        tags,
-        address,
-        salt: salt.toString(),
-        value: SAVE_PLAYLIST_COST.toString(),
-        ethBalance: ethBalance?.value.toString(),
-        transactionCall
+        storageAddress: deployedStorageAddress,
+        playlistSalt,
+        needsApproval,
+        calls
       });
       
-      // Validate sufficient ETH balance
-      if (ethBalance && ethBalance.value < SAVE_PLAYLIST_COST) {
-        console.error("Insufficient ETH balance:", {
-          required: SAVE_PLAYLIST_COST.toString(),
-          available: ethBalance.value.toString()
-        });
-        showToast(`Insufficient ETH balance. You need at least ${(Number(SAVE_PLAYLIST_COST) / 1e18).toFixed(6)} ETH.`);
-        return;
-      }
-      
-      setSavePlaylistCalls([transactionCall]);
+      setSavePlaylistCalls(calls);
     }
   }, [
     showSaveModal,
+    storageReceipt,
+    deployedStorageAddress,
+    deploymentHash,
     address,
     chainId,
     playlistName,
-    coverImage,
-    description,
-    tags,
-    SAVE_PLAYLIST_COST,
-    ethBalance,
+    usdcBalance,
+    usdcAllowance,
     showToast,
   ]);
 
+  // Handle storage contract deployment event
   useEffect(() => {
-    if (receipt) {
+    if (storageReceipt && !deployedStorageAddress) {
+      let addresses;
+      try {
+        addresses = getContractAddresses(chainId);
+      } catch (error) {
+        console.error("Failed to get contract addresses for storage receipt processing:", error);
+        return;
+      }
+      
+      const eventAbi = create2FactoryABI.find(
+        (item) => item.type === "event" && item.name === "ContractDeployed"
+      );
+
+      if (!eventAbi) return;
+
+      for (const log of storageReceipt.logs) {
+        if (
+          log.address.toLowerCase() === addresses.CREATE2_FACTORY.toLowerCase()
+        ) {
+          try {
+            const decodedLog = decodeEventLog({
+              abi: [eventAbi],
+              data: log.data,
+              topics: log.topics,
+            });
+
+            const eventArgs = decodedLog.args as {
+              contractAddress: `0x${string}`;
+              salt: `0x${string}`;
+              deployer: `0x${string}`;
+            };
+
+            if (eventArgs?.contractAddress) {
+              console.log("Storage ContractDeployed event detected:", eventArgs);
+              setDeployedStorageAddress(eventArgs.contractAddress);
+              break;
+            }
+          } catch (e) {
+            console.warn("Could not decode storage log:", e);
+          }
+        }
+      }
+    }
+  }, [storageReceipt, deployedStorageAddress, chainId]);
+
+  // Hooks for contract interactions
+  const { initializePlaylist, hash: initHash } = useInitializePlaylist();
+  const { createPlaylist, hash: createHash } = useCreatePlaylistNFT(deployedPlaylistAddress || undefined);
+  
+  // Wait for initialization transaction receipt
+  const { data: initReceipt } = useWaitForTransactionReceipt({
+    hash: initHash,
+  });
+
+  useEffect(() => {
+    if (receipt && !deployedPlaylistAddress) {
       let addresses;
       try {
         addresses = getContractAddresses(chainId);
@@ -382,8 +560,9 @@ export function PlaylistSection({
         console.error("Failed to get contract addresses for receipt processing:", error);
         return;
       }
+      
       const eventAbi = create2FactoryABI.find(
-        (item) => item.type === "event" && item.name === "PlaylistDeployed"
+        (item) => item.type === "event" && item.name === "ContractDeployed"
       );
 
       if (!eventAbi) return;
@@ -399,27 +578,18 @@ export function PlaylistSection({
               topics: log.topics,
             });
 
-            const deployedAddress = decodedLog.args as {
-              playlistAddress: `0x${string}`;
+            const eventArgs = decodedLog.args as {
+              contractAddress: `0x${string}`;
+              salt: `0x${string}`;
+              deployer: `0x${string}`;
             };
 
-            if (deployedAddress) {
-              setSaveState("success");
-              // Use setTimeout to ensure modal is closed before confetti
-              setTimeout(() => {
-                setShowSaveModal(false);
-                launchConfetti();
-                showToast("Playlist created!");
-                onCreate({
-                  name: playlistName,
-                  coverImage,
-                  description,
-                  tags,
-                  address: deployedAddress.playlistAddress,
-                });
-                // Automatically share the playlist creation achievement
-                handleSharePlaylist();
-              }, 100);
+            if (eventArgs?.contractAddress) {
+              console.log("ContractDeployed event detected:", eventArgs);
+              setDeployedPlaylistAddress(eventArgs.contractAddress);
+              
+              // Initialize the deployed contract
+              initializePlaylist(eventArgs.contractAddress);
               break; // Exit loop once we've found and processed the log
             }
           } catch (e) {
@@ -433,15 +603,60 @@ export function PlaylistSection({
     receipt,
     deploymentHash,
     chainId,
-    onCreate,
-    playlistName,
-    coverImage,
-    description,
-    tags,
-    showToast,
-    launchConfetti,
-    handleSharePlaylist,
+    deployedPlaylistAddress,
+    initializePlaylist,
   ]);
+
+  // Handle initialization completion and create playlist
+  useEffect(() => {
+    if (address && deployedPlaylistAddress && initReceipt && !createHash) {
+      // Wait for initialization transaction to complete before creating playlist
+      const metadata: PlaylistMetadata = {
+        name: playlistName,
+        description: description,
+        coverImageUrl: coverImage,
+        tags: tags,
+        creator: address as Address,
+        createdAt: BigInt(Math.floor(Date.now() / 1000)),
+        songs: [],
+        artists: [],
+        isPrivate: false,
+        maxSupply: BigInt(0), // 0 = unlimited
+        price: BigInt(0), // Free by default
+        collaborators: [],
+      };
+      
+      // Use the deployed storage contract address
+      if (deployedStorageAddress) {
+        createPlaylist(metadata, deployedStorageAddress);
+      } else {
+        console.error("Storage contract address not available");
+        showToast("Storage contract deployment incomplete. Please try again.");
+      }
+    }
+  }, [deployedPlaylistAddress, initReceipt, createHash, deployedStorageAddress, address, playlistName, description, coverImage, tags, createPlaylist, showToast]);
+
+  // Handle playlist creation completion
+  useEffect(() => {
+    if (deployedPlaylistAddress && createHash && saveState !== "success") {
+      setSaveState("success");
+      // Use setTimeout to ensure modal is closed before confetti
+      setTimeout(() => {
+        setShowSaveModal(false);
+        launchConfetti();
+        showToast("Playlist created!");
+        onCreate({
+          name: playlistName,
+          coverImage,
+          description,
+          tags,
+          address: deployedPlaylistAddress,
+        });
+        // Automatically share the playlist creation achievement
+        handleSharePlaylist();
+      }, 100);
+    }
+  }, [deployedPlaylistAddress, createHash, saveState, showToast, launchConfetti, handleSharePlaylist, onCreate, playlistName, coverImage, description, tags]);
 
   const addTag = () => {
     if (tagInput.trim() && !tags.includes(tagInput.trim())) {
@@ -513,6 +728,21 @@ export function PlaylistSection({
               onSubmit={(e) => {
                 e.preventDefault();
                 if (!playlistName || initialCreated) return;
+                
+                // Validate network before opening modal
+                if (!isNetworkSupported()) {
+                  showToast("Unsupported network. Please switch to Base mainnet or Base Sepolia.");
+                  return;
+                }
+                
+                // Warn if no cover image (but allow proceeding)
+                if (!coverImage) {
+                  const proceed = window.confirm(
+                    "You haven't added a cover image. Would you like to continue without one?"
+                  );
+                  if (!proceed) return;
+                }
+                
                 setShowSaveModal(true);
               }}
             >
@@ -907,9 +1137,23 @@ export function PlaylistSection({
                 transition={{ delay: 1.1 }}
                 className="pt-6"
               >
+                {!isNetworkSupported() && isConnected && (
+                  <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl">
+                    <p className="text-sm text-yellow-800 dark:text-yellow-300 text-center">
+                      ⚠️ Unsupported network. Please switch to Base mainnet or Base Sepolia to create a playlist.
+                    </p>
+                  </div>
+                )}
+                {!coverImage && playlistName.trim() && (
+                  <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
+                    <p className="text-sm text-blue-800 dark:text-blue-300 text-center">
+                      💡 Tip: Add a cover image to make your playlist stand out!
+                    </p>
+                  </div>
+                )}
                 <Button
                   type="submit"
-                  disabled={initialCreated || !playlistName.trim()}
+                  disabled={initialCreated || !playlistName.trim() || !isNetworkSupported()}
                   className="w-full h-16 text-xl font-bold bg-blue-500 hover:bg-blue-500/90 text-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <span className="relative z-10 flex items-center gap-3">
@@ -967,39 +1211,13 @@ export function PlaylistSection({
                   <Music className="w-8 h-8 text-white" />
                 </div>
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                  Save Forever for $0.10
+                  Save Forever for $0.10 USDC
                 </h2>
                 <div className="text-gray-600 dark:text-gray-400 mb-2">
-                  ≈{" "}
-                  {isLoadingSaveCost
-                    ? "Loading..."
-                    : `${(Number(SAVE_PLAYLIST_COST) / 1e18).toFixed(6)} ETH`}
-                  {priceError && (
-                    <div className="text-yellow-600 text-xs block mt-1">
-                      <div className="flex items-center gap-2">
-                        <span>⚠️ Price feed unavailable - using fallback calculation</span>
-                        {'refetch' in priceQueryResult && (
-                          <button
-                            onClick={() => priceQueryResult.refetch?.()}
-                            className="text-blue-600 hover:text-blue-800 underline text-xs"
-                            disabled={isLoadingSaveCost}
-                          >
-                            {isLoadingSaveCost ? "Retrying..." : "Retry"}
-                          </button>
-                        )}
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {_debug?.fallbackUsed ? 
-                          `Using Chainlink fallback (${_debug.priceSource})` : 
-                          "Using hardcoded fallback price"
-                        }
-                      </div>
-                    </div>
-                  )}
+                  {formatUSDC(PLAYLIST_DEPLOYMENT_FEE_USDC)} USDC
                 </div>
                 <p className="text-xs bg-pink-50 dark:bg-pink-900/20 text-pink-800 dark:text-pink-300 px-3 py-2 rounded-md">
-                  This does not include network gas fees, which can be higher
-                  for playlist deployment.
+                  Plus network gas fees for transaction execution.
                 </p>
               </div>
 
@@ -1007,28 +1225,90 @@ export function PlaylistSection({
                 <Button
                   variant="outline"
                   className="w-full h-12 border border-(--app-card-border) hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl transition-all duration-200"
-                  onClick={() => setShowSaveModal(false)}
+                  onClick={() => {
+                    // Reset all deployment state
+                    setShowSaveModal(false);
+                    setSaveState("idle");
+                    setStorageSalt(null);
+                    setDeployedStorageAddress(null);
+                    setStorageDeploymentHash(undefined);
+                    setDeployedPlaylistAddress(null);
+                    setDeploymentHash(undefined);
+                    setSaveStorageCalls([]);
+                    setSavePlaylistCalls([]);
+                  }}
                   disabled={saveState === "pending"}
                 >
-                  Cancel
+                  {saveState === "error" ? "Close & Reset" : "Cancel"}
                 </Button>
 
-                <Transaction
-                  calls={savePlaylistCalls}
-                  onStatus={handleOnStatus}
-                >
-                  <TransactionButton
-                    disabled={
-                      saveState === "pending" ||
-                      initialCreated ||
-                      !playlistName.trim() ||
-                      (ethBalance && ethBalance.value < SAVE_PLAYLIST_COST) ||
-                      !address ||
-                      !chainId
-                    }
-                    className="w-full h-12 bg-blue-500 hover:bg-blue-500/90 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                  />
-                </Transaction>
+                {/* Storage Deployment Transaction */}
+                {!deployedStorageAddress && saveStorageCalls.length > 0 && (
+                  <Transaction
+                    calls={saveStorageCalls}
+                    onStatus={(status) => {
+                      if (status.statusName === "transactionPending") {
+                        setSaveState("pending");
+                      } else if (status.statusName === "success") {
+                        const txHash = status.statusData.transactionReceipts?.[0]?.transactionHash;
+                        if (txHash) {
+                          setStorageDeploymentHash(txHash as `0x${string}`);
+                        }
+                      } else if (status.statusName === "error") {
+                        setSaveState("error");
+                        const errorMessage = extractTransactionErrorMessage(
+                          status.statusData,
+                          "Storage deployment failed. Please try again."
+                        );
+                        showToast(errorMessage);
+                        // Reset storage state on error to allow retry
+                        setStorageSalt(null);
+                        setStorageDeploymentHash(undefined);
+                        setSaveStorageCalls([]);
+                      }
+                    }}
+                  >
+                    <TransactionButton
+                      text={saveState === "pending" ? "Deploying Storage..." : "Deploy Storage Contract"}
+                      disabled={
+                        saveState === "pending" ||
+                        initialCreated ||
+                        !playlistName.trim() ||
+                        (usdcBalance && usdcBalance.value < PLAYLIST_DEPLOYMENT_FEE_USDC) ||
+                        !address ||
+                        !chainId
+                      }
+                      className="w-full h-12 bg-blue-500 hover:bg-blue-500/90 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+                  </Transaction>
+                )}
+
+                {/* Playlist Deployment Transaction - shown after storage is deployed */}
+                {deployedStorageAddress && savePlaylistCalls.length > 0 && (
+                  <Transaction
+                    calls={savePlaylistCalls}
+                    onStatus={handleOnStatus}
+                  >
+                    <TransactionButton
+                      text={saveState === "pending" ? "Deploying Playlist..." : "Deploy Playlist"}
+                      disabled={
+                        saveState === "pending" ||
+                        initialCreated ||
+                        !playlistName.trim() ||
+                        !address ||
+                        !chainId
+                      }
+                      className="w-full h-12 bg-blue-500 hover:bg-blue-500/90 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+                  </Transaction>
+                )}
+
+                {/* Status messages */}
+                {deployedStorageAddress && !deployedPlaylistAddress && (
+                  <div className="text-sm text-center mt-2 text-green-600 dark:text-green-400">
+                    ✓ Storage contract deployed. Ready to deploy playlist.
+                  </div>
+                )}
               </div>
 
               {saveState === "error" && (
@@ -1037,12 +1317,12 @@ export function PlaylistSection({
                 </div>
               )}
 
-              {ethBalance && ethBalance.value < SAVE_PLAYLIST_COST && (
+              {usdcBalance && usdcBalance.value < PLAYLIST_DEPLOYMENT_FEE_USDC && (
                 <div className="text-yellow-600 text-sm text-center mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                  ⚠️ Insufficient ETH balance. You need at least{" "}
-                  {(Number(SAVE_PLAYLIST_COST) / 1e18).toFixed(6)} ETH to deploy this playlist.
+                  ⚠️ Insufficient USDC balance. You need at least{" "}
+                  {formatUSDC(PLAYLIST_DEPLOYMENT_FEE_USDC)} USDC to deploy this playlist.
                   <br />
-                  Current balance: {(Number(ethBalance.value) / 1e18).toFixed(6)} ETH
+                  Current balance: {usdcBalance ? formatUSDC(usdcBalance.value) : "0"} USDC
                 </div>
               )}
             </motion.div>

@@ -212,6 +212,8 @@ export function PlaylistSection({
 
     try {
       // Use Base Pay to handle the payment
+      // Base Pay automatically detects connected wallet and uses account abstraction
+      // Make sure you're using a wallet that supports account abstraction (e.g., Coinbase Smart Wallet)
       const payment = await pay({
         amount: '0.25', // $0.25 USDC
         to: PAYMENT_RECIPIENT,
@@ -268,7 +270,16 @@ export function PlaylistSection({
             throw new Error(errorData.error || "Failed to generate image");
           }
         } else if (status.status === 'failed') {
-          throw new Error(status.reason || "Payment failed");
+          // Enhanced error handling for UserOperation failures
+          const errorReason = status.reason || "Payment failed";
+          console.error("Payment failed:", {
+            paymentId: payment.id,
+            reason: errorReason,
+            status: status,
+            walletAddress: address,
+            chainId: chainId,
+          });
+          throw new Error(`Payment failed: ${errorReason}. Please ensure you're using a wallet that supports account abstraction (like Coinbase Smart Wallet).`);
         }
 
         attempts++;
@@ -280,9 +291,32 @@ export function PlaylistSection({
 
     } catch (error) {
       console.error("Payment or image generation error:", error);
-      setImageGenerationError(
-        error instanceof Error ? error.message : "Failed to process payment or generate image"
-      );
+      
+      // Enhanced error handling for UserOperation-specific errors
+      let errorMessage = "Failed to process payment or generate image";
+      
+      if (error instanceof Error) {
+        const errorMsg = error.message.toLowerCase();
+        
+        // UserOperation-specific error patterns
+        if (errorMsg.includes('useroperation') || errorMsg.includes('user operation')) {
+          errorMessage = "Account abstraction error. Please ensure you're using a smart wallet (like Coinbase Smart Wallet) that supports account abstraction.";
+        } else if (errorMsg.includes('gas') || errorMsg.includes('insufficient')) {
+          errorMessage = "Insufficient funds or gas error. Please ensure you have enough balance.";
+        } else if (errorMsg.includes('signature') || errorMsg.includes('sign')) {
+          errorMessage = "Signature error. Please try connecting your wallet again.";
+        } else if (errorMsg.includes('network') || errorMsg.includes('chain')) {
+          errorMessage = "Network error. Please check your network connection and try again.";
+        } else if (errorMsg.includes('timeout')) {
+          errorMessage = "Payment timeout. The transaction is taking longer than expected. Please check your wallet and try again.";
+        } else if (errorMsg.includes('rejected') || errorMsg.includes('cancelled')) {
+          errorMessage = "Payment was cancelled. Please try again.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      setImageGenerationError(errorMessage);
     } finally {
       setLoadingImage(false);
       setPaymentStatus("");

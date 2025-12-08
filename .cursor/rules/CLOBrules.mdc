@@ -143,7 +143,9 @@ async function trade() {
   console.log(`Order placed! ID: ${response.orderID}`);
 }
 
-trade();
+(async () => {
+  await trade();
+})();
 ​
 Troubleshooting
 Error: L2_AUTH_NOT_AVAILABLE
@@ -380,9 +382,9 @@ const client = new ClobClient(
 );
 
 // All public and L1 methods available
-const newCreds = createApiKey();
-const derivedCreds = deriveApiKey();
-const creds = createOrDeriveApiKey();
+const newCreds = await client.createApiKey();
+const derivedCreds = await client.deriveApiKey();
+const creds = await client.createOrDeriveApiKey();
 
 // Create client with signer and creds
 const client = new ClobClient(
@@ -604,11 +606,11 @@ async function main() {
     nonce: 0,
     price: 0.5,
   });
-  console.log("Created Order", order);
+  console.log("Created Order", marketOrder);
 
   // Send it to the server
   // FOK Order
-  const resp = await clobClient.postOrder(order, OrderType.FOK);
+  const resp = await clobClient.postOrder(marketOrder, OrderType.FOK);
   console.log(resp);
 }
 
@@ -630,11 +632,11 @@ async function main() {
     nonce: 0,
     price: 0.5,
   });
-  console.log("Created Order", order);
+  console.log("Created Order", marketOrder);
 
   // Send it to the server
   // FOK Order
-  const resp = await clobClient.postOrder(order, OrderType.FOK);
+  const resp = await clobClient.postOrder(marketOrder, OrderType.FOK);
   console.log(resp);
 }
 

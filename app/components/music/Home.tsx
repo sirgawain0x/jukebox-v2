@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useAccount } from "wagmi";
 import { Song } from "@/types/music";
 // import { Playlist } from "@/types/music"; // Commented out - playlist functionality disabled
@@ -9,7 +9,7 @@ import { Card } from "../ui/Card";
 import { Jukebox } from "./Jukebox";
 // import { PlaylistSection } from "./PlaylistSection"; // Commented out - playlist functionality disabled
 // import { PlaylistView } from "./PlaylistView"; // Commented out - playlist functionality disabled
-import { RecentTips } from "./RecentTips";
+// import { RecentTips } from "./RecentTips"; // Commented out - playlist functionality disabled
 import { UserBalances } from "./UserBalances";
 import { ErrorBoundary } from "../ui/ErrorBoundary";
 import { PredictionMarket } from "../prediction/PredictionMarket";
@@ -25,7 +25,7 @@ type HomeProps = {
 export function Home({ setActiveTab, initialSection = "music" }: HomeProps) {
   const { isConnected } = useAccount();
   // const [playlist, setPlaylist] = useState<Playlist | null>(null); // Commented out - playlist functionality disabled
-  const [selectedSong, setSelectedSong] = useState<Song | null>(null);
+  const [_selectedSong, setSelectedSong] = useState<Song | null>(null);
   const [activeSection, setActiveSection] = useState<"music" | "predictions">(initialSection);
 
   const handleSongTipped = () => {
@@ -34,8 +34,8 @@ export function Home({ setActiveTab, initialSection = "music" }: HomeProps) {
   // const handlePlaylistCreate = useCallback((pl: Playlist) => {
   //   setPlaylist(pl);
   // }, []); // Commented out - playlist functionality disabled
-  const artistId =
-    selectedSong?.artist || "sound-0x7e4c2e6e6e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e";
+  // const artistId =
+  //   selectedSong?.artist || "sound-0x7e4c2e6e6e2e2e2e2e2e2e2e2e2e2e2e2e2e2e"; // Commented out - unused
 
   // Sync activeSection when initialSection prop changes
   useEffect(() => {

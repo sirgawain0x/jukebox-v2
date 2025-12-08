@@ -80,7 +80,7 @@ export function Jukebox({
   // const sendNotification = useNotification();
   const minTipEth = BigInt(Math.floor(0.00001429 * 1e18));
   const { composeCast } = useComposeCast();
-  const { showToast, showInteractiveToast } = useToast();
+  const { showToast } = useToast();
   
   // Use OnchainKit's built-in wallet hooks
   const { address, isConnected, connector } = useAccount();

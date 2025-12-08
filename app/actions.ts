@@ -2,12 +2,28 @@
 
 import webpush from 'web-push'
 
-// Configure VAPID details
-webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT || '<mailto:your-email@example.com>',
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-)
+// Configure VAPID details with proper error handling
+const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || '<mailto:your-email@example.com>'
+
+if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+  console.warn(
+    '⚠️ VAPID keys not configured. Web push notifications will not work.\n' +
+    'Please set NEXT_PUBLIC_VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY environment variables.\n' +
+    'You can generate them using: npm install -g web-push && web-push generate-vapid-keys'
+  )
+} else {
+  try {
+    webpush.setVapidDetails(
+      VAPID_SUBJECT,
+      VAPID_PUBLIC_KEY,
+      VAPID_PRIVATE_KEY
+    )
+  } catch (error) {
+    console.error('Failed to configure VAPID details:', error)
+  }
+}
 
 // In production, store subscriptions in a database
 // For now, using in-memory storage (will be lost on server restart)
@@ -160,6 +176,14 @@ export async function sendNotification(
   title: string = 'Jukebox',
   userAddress?: string
 ): Promise<SendNotificationResult> {
+  // Check if VAPID keys are configured
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+    return {
+      success: false,
+      error: 'Web push notifications not configured. VAPID keys are missing.',
+    }
+  }
+
   // Check if user is authorized to send notifications
   // Require address and verify it matches the allowed address
   if (!userAddress || userAddress.toLowerCase() !== ALLOWED_NOTIFICATION_ADDRESS.toLowerCase()) {
@@ -246,6 +270,14 @@ export async function sendNotificationToAll(
   title: string = 'Jukebox',
   userAddress?: string
 ): Promise<SendNotificationResult> {
+  // Check if VAPID keys are configured
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+    return {
+      success: false,
+      error: 'Web push notifications not configured. VAPID keys are missing.',
+    }
+  }
+
   // Check if user is authorized to send notifications
   // Require address and verify it matches the allowed address
   if (!userAddress || userAddress.toLowerCase() !== ALLOWED_NOTIFICATION_ADDRESS.toLowerCase()) {

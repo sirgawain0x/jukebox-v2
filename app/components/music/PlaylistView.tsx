@@ -1,3 +1,9 @@
+/* 
+ * PLAYLIST FUNCTIONALITY COMMENTED OUT
+ * This component is temporarily disabled but preserved for future use.
+ */
+
+/*
 "use client";
 import { Playlist, Song } from "@/types/music";
 import { Card } from "../ui/Card";
@@ -185,3 +191,4 @@ export function PlaylistView({ playlist }: { playlist: Playlist }) {
     </Card>
   );
 }
+*/

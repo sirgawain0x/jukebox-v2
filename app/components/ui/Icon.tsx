@@ -2,7 +2,7 @@
 import { FC } from "react";
 
 type IconProps = {
-  name: "heart" | "star" | "check" | "plus" | "arrow-right" | "chevron-down" | "share" | "music" | "chevron-left" | "chevron-right" | "x" | "play" | "pause" | "volume" | "volume-x" | "volume-1" | "volume-2" | "trending-up";
+  name: "heart" | "star" | "check" | "plus" | "arrow-right" | "chevron-down" | "share" | "music" | "chevron-left" | "chevron-right" | "x" | "play" | "pause" | "volume" | "volume-x" | "volume-1" | "volume-2" | "trending-up" | "search";
   size?: "sm" | "md" | "lg";
   className?: string;
 };
@@ -299,6 +299,22 @@ export const Icon: FC<IconProps> = ({ name, size = "md", className = "" }) => {
         <title>Trending Up</title>
         <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
         <polyline points="17 6 23 6 23 12" />
+      </svg>
+    ),
+    search: (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <title>Search</title>
+        <circle cx="11" cy="11" r="8" />
+        <path d="m21 21-4.35-4.35" />
       </svg>
     ),
   };

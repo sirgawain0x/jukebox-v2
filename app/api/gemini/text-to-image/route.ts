@@ -9,7 +9,7 @@ import { getPaymentStatus } from "@base-org/account";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { prompt, paymentId } = body;
+    const { prompt, paymentId, testnet } = body;
 
     if (!prompt) {
       return NextResponse.json(
@@ -26,12 +26,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log("[Gemini API] Verifying Base Pay payment:", paymentId);
+    // Determine testnet flag - use provided value or default to false (mainnet)
+    // Frontend passes this based on chainId (true for Base Sepolia 84532, false for Base mainnet 8453)
+    const isTestnet = testnet === true;
+
+    console.log("[Gemini API] Verifying Base Pay payment:", { paymentId, testnet: isTestnet });
 
     try {
       const paymentStatus = await getPaymentStatus({
         id: paymentId,
-        testnet: false
+        testnet: isTestnet
       });
 
       // Verify payment completed successfully

@@ -33,13 +33,13 @@ const retryWithBackoff = async <T>(
   // Initialize with a default error to prevent uninitialized variable issues
   let lastError: Error = new Error('Request failed after retries');
   
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       return await fn();
     } catch (error) {
       lastError = error as Error;
       
-      if (attempt === maxRetries) {
+      if (attempt === maxRetries - 1) {
         throw lastError;
       }
       

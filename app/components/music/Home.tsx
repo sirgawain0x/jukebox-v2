@@ -1,13 +1,14 @@
 "use client";
 import { useState, useCallback, useEffect } from "react";
 import { useAccount } from "wagmi";
-import { Playlist, Song } from "@/types/music";
+import { Song } from "@/types/music";
+// import { Playlist } from "@/types/music"; // Commented out - playlist functionality disabled
 import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
 import { Card } from "../ui/Card";
 import { Jukebox } from "./Jukebox";
-import { PlaylistSection } from "./PlaylistSection";
-import { PlaylistView } from "./PlaylistView";
+// import { PlaylistSection } from "./PlaylistSection"; // Commented out - playlist functionality disabled
+// import { PlaylistView } from "./PlaylistView"; // Commented out - playlist functionality disabled
 import { RecentTips } from "./RecentTips";
 import { UserBalances } from "./UserBalances";
 import { ErrorBoundary } from "../ui/ErrorBoundary";
@@ -23,16 +24,16 @@ type HomeProps = {
 
 export function Home({ setActiveTab, initialSection = "music" }: HomeProps) {
   const { isConnected } = useAccount();
-  const [playlist, setPlaylist] = useState<Playlist | null>(null);
+  // const [playlist, setPlaylist] = useState<Playlist | null>(null); // Commented out - playlist functionality disabled
   const [selectedSong, setSelectedSong] = useState<Song | null>(null);
   const [activeSection, setActiveSection] = useState<"music" | "predictions">(initialSection);
 
   const handleSongTipped = () => {
     // Songs are now managed by the PlaylistView component via contract
   };
-  const handlePlaylistCreate = useCallback((pl: Playlist) => {
-    setPlaylist(pl);
-  }, []);
+  // const handlePlaylistCreate = useCallback((pl: Playlist) => {
+  //   setPlaylist(pl);
+  // }, []); // Commented out - playlist functionality disabled
   const artistId =
     selectedSong?.artist || "sound-0x7e4c2e6e6e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e";
 
@@ -97,20 +98,20 @@ export function Home({ setActiveTab, initialSection = "music" }: HomeProps) {
             <Jukebox
               onSongTipped={handleSongTipped}
               setSelectedSong={setSelectedSong}
-              playlist={playlist}
+              // playlist={playlist} // Commented out - playlist functionality disabled
             />
           </ErrorBoundary>
-          <ErrorBoundary>
+          {/* <ErrorBoundary>
             <PlaylistSection onCreate={handlePlaylistCreate} created={!!playlist} />
-          </ErrorBoundary>
-          {playlist && (
+          </ErrorBoundary> */}
+          {/* {playlist && (
             <ErrorBoundary>
               <div>
                 <PlaylistView playlist={playlist} />
                 <RecentTips artistId={artistId} />
               </div>
             </ErrorBoundary>
-          )}
+          )} */}
         </>
       )}
 

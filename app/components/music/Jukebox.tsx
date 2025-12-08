@@ -10,12 +10,13 @@ import {
 import type { TransactionResponseType } from "@coinbase/onchainkit/transaction";
 import { useComposeCast } from "@coinbase/onchainkit/minikit";
 // import { useNotification } from "@coinbase/onchainkit/minikit";
-import { Song, Playlist } from "@/types/music";
+import { Song } from "@/types/music";
+// import { Playlist } from "@/types/music"; // Commented out - playlist functionality disabled
 import { Card } from "../ui/Card";
 import { Icon } from "../ui/Icon";
 import { AnimatedAudioIndicator } from "../ui/AnimatedAudioIndicator";
 import { Pills } from "../ui/Pills";
-import { playlistABI } from "@/lib/contracts";
+// import { playlistABI } from "@/lib/contracts"; // Commented out - playlist functionality disabled
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "../ui/ToastProvider";
 import { useFarcasterTransactions } from "@/app/utils/farcaster-transactions";
@@ -38,17 +39,18 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useFarcasterContext } from '@/app/utils/farcaster-context';
 import { SongShareMetaTags } from '../ui/SongShareMetaTags';
+import { Input } from '@/components/ui/input';
 
 type JukeboxProps = {
   onSongTipped: (song: Song) => void;
   setSelectedSong: (song: Song) => void;
-  playlist: Playlist | null;
+  // playlist: Playlist | null; // Commented out - playlist functionality disabled
 };
 
 export function Jukebox({
   onSongTipped,
   setSelectedSong,
-  playlist,
+  // playlist, // Commented out - playlist functionality disabled
 }: JukeboxProps) {
   // Use global music context for persistent player
   const globalMusic = useMusic();
@@ -57,6 +59,8 @@ export function Jukebox({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState("TRENDING");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchPage, setSearchPage] = useState(1); // Pagination for filtered search results
   const [after, setAfter] = useState<string | null>(null);
   const [before, setBefore] = useState<string | null>(null);
   const [direction, setDirection] = useState<"forward" | "backward">("forward");
@@ -90,7 +94,7 @@ export function Jukebox({
     {}
   );
   const [tipCount, setTipCount] = useState(0);
-  const [hasSeenPlaylistPrompt, setHasSeenPlaylistPrompt] = useState(false);
+  // const [hasSeenPlaylistPrompt, setHasSeenPlaylistPrompt] = useState(false); // Commented out - playlist functionality disabled
   const errorHandledRef = useRef(false);
   const successHandledRef = useRef(false);
 
@@ -106,9 +110,9 @@ export function Jukebox({
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedTipCount = localStorage.getItem('jukebox_tip_count');
-      const savedHasSeenPrompt = localStorage.getItem('jukebox_seen_playlist_prompt');
+      // const savedHasSeenPrompt = localStorage.getItem('jukebox_seen_playlist_prompt'); // Commented out - playlist functionality disabled
       if (savedTipCount) setTipCount(parseInt(savedTipCount, 10));
-      if (savedHasSeenPrompt) setHasSeenPlaylistPrompt(savedHasSeenPrompt === 'true');
+      // if (savedHasSeenPrompt) setHasSeenPlaylistPrompt(savedHasSeenPrompt === 'true'); // Commented out - playlist functionality disabled
     }
   }, []);
 
@@ -135,6 +139,7 @@ export function Jukebox({
   const sortOptions = [
     { label: "🔥 Trending", value: "TRENDING" },
     { label: "🆕 Newest", value: "CREATED_AT_TIME_DESC" },
+    { label: "🔍 Search", value: "SEARCH" },
   ];
 
   const handleSortChange = (newSort: string) => {
@@ -142,7 +147,65 @@ export function Jukebox({
     setAfter(null);
     setBefore(null);
     setDirection("forward");
+    // Clear search when switching away from Search tab
+    if (newSort !== "SEARCH") {
+      setSearchQuery("");
+    }
   };
+
+  // Reset pagination when switching to Search tab or when search query changes
+  useEffect(() => {
+    if (sortBy === "SEARCH") {
+      setAfter(null);
+      setBefore(null);
+      setDirection("forward");
+      setSearchPage(1); // Reset to first page when search query changes
+    }
+  }, [searchQuery, sortBy]);
+
+  // Filter songs based on search query (only for Search tab)
+  const filteredSongs = useMemo(() => {
+    if (sortBy !== "SEARCH" || !searchQuery.trim()) {
+      return songs;
+    }
+    
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) {
+      return songs;
+    }
+    
+    return songs.filter((song) => {
+      const title = (song.title || "").toLowerCase();
+      const artist = (song.artist || "").toLowerCase();
+      const platform = (song.platformName || "").toLowerCase();
+      
+      const titleMatch = title.includes(query);
+      const artistMatch = artist.includes(query);
+      const platformMatch = platform.includes(query);
+      
+      return titleMatch || artistMatch || platformMatch;
+    });
+  }, [songs, searchQuery, sortBy]);
+
+  // Paginate filtered search results (10 songs per page)
+  const ITEMS_PER_PAGE = 10;
+  const paginatedFilteredSongs = useMemo(() => {
+    // Always paginate when on Search tab
+    if (sortBy !== "SEARCH") {
+      return filteredSongs;
+    }
+    
+    const startIndex = (searchPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    return filteredSongs.slice(startIndex, endIndex);
+  }, [filteredSongs, searchPage, sortBy]);
+
+  const totalSearchPages = useMemo(() => {
+    if (sortBy !== "SEARCH") {
+      return 1;
+    }
+    return Math.ceil(filteredSongs.length / ITEMS_PER_PAGE);
+  }, [filteredSongs.length, sortBy]);
 
   useEffect(() => {
     // Clear any pending fetch timeout
@@ -160,13 +223,19 @@ export function Jukebox({
         let query = "";
         let dataPath = "";
         const variables: Record<string, unknown> = {};
+        
+        // When on Search tab, always fetch more results to enable searching through entire database
+        const isSearchTab = sortBy === "SEARCH";
+        const isSearching = isSearchTab && searchQuery.trim();
+        const fetchLimit = isSearchTab ? 500 : 10; // Fetch 500 results on Search tab to cover more of the database
+        
         if (sortBy === "TRENDING") {
         if (direction === "forward") {
-          variables.first = 10;
-          if (after) variables.after = after;
+          variables.first = fetchLimit;
+          if (after && !isSearching) variables.after = after;
         } else {
-          variables.last = 10;
-          if (before) variables.before = before;
+          variables.last = fetchLimit;
+          if (before && !isSearching) variables.before = before;
         }
         query = `query TrendingTracks($first: Int, $last: Int, $after: Cursor, $before: Cursor) {
           allTrendingTracks(first: $first, last: $last, after: $after, before: $before) {
@@ -249,13 +318,105 @@ export function Jukebox({
           }
         }`;
         dataPath = "allTrendingTracks";
-      } else {
+      } else if (sortBy === "SEARCH") {
+        // For search, use CREATED_AT_TIME_DESC ordering to get all songs
         if (direction === "forward") {
-          variables.first = 10;
-          if (after) variables.after = after;
+          variables.first = fetchLimit;
+          // Reset pagination when searching
+          if (after && !isSearching) variables.after = after;
         } else {
-          variables.last = 10;
-          if (before) variables.before = before;
+          variables.last = fetchLimit;
+          // Reset pagination when searching
+          if (before && !isSearching) variables.before = before;
+        }
+        variables.orderBy = ["CREATED_AT_TIME_DESC", "ID_DESC"];
+        query = `query ProcessedTracks($first: Int, $last: Int, $after: Cursor, $before: Cursor, $orderBy: [ProcessedTracksOrderBy!]) {
+          allProcessedTracks(first: $first, last: $last, after: $after, before: $before, orderBy: $orderBy) {
+            edges {
+              cursor
+              node {
+                id
+                createdAtTime
+                createdAtBlockNumber
+                title
+                slug
+                platformInternalId
+                lossyAudioIpfsHash
+                lossyAudioUrl
+                description
+                lossyArtworkIpfsHash
+                lossyArtworkUrl
+                websiteUrl
+                platformId
+                artistId
+                supportingArtist
+                insertionId
+                phasesUpdatedAtBlock
+                chorusStart
+                duration
+                lossyAudioMimeType
+                lossyArtworkMimeType
+                mintStart
+                artistByArtistId {
+                  id
+                  createdAtTime
+                  createdAtBlockNumber
+                  slug
+                  userId
+                  avatarUrl
+                  name
+                  avatarIpfsHash
+                  description
+                  customTheme
+                  predefinedThemeName
+                }
+                platformByPlatformId {
+                  id
+                  type
+                  name
+                }
+                artistBySupportingArtist {
+                  id
+                  createdAtTime
+                  createdAtBlockNumber
+                  slug
+                  userId
+                  description
+                  customTheme
+                  predefinedThemeName
+                  name
+                  avatarIpfsHash
+                  avatarUrl
+                  userByUserId {
+                    id
+                    avatarUrl
+                    name
+                    avatarIpfsHash
+                    description
+                    customTheme
+                    predefinedThemeName
+                    metadata
+                  }
+                }
+              }
+            }
+            pageInfo {
+              endCursor
+              hasNextPage
+              hasPreviousPage
+              startCursor
+            }
+          }
+        }`;
+        dataPath = "allProcessedTracks";
+      } else {
+        // CREATED_AT_TIME_DESC - Newest songs
+        if (direction === "forward") {
+          variables.first = fetchLimit;
+          if (after && !isSearching) variables.after = after;
+        } else {
+          variables.last = fetchLimit;
+          if (before && !isSearching) variables.before = before;
         }
         variables.orderBy = [sortBy, "ID_DESC"];
         query = `query ProcessedTracks($first: Int, $last: Int, $after: Cursor, $before: Cursor, $orderBy: [ProcessedTracksOrderBy!]) {
@@ -430,7 +591,7 @@ export function Jukebox({
         clearTimeout(fetchTimeoutRef.current);
       }
     };
-  }, [sortBy, after, before, direction]);
+  }, [sortBy, after, before, direction, searchQuery]);
 
   const calls = useMemo(() => {
     if (!selectedSong || !address) {
@@ -441,23 +602,24 @@ export function Jukebox({
       data: "0x" as `0x${string}`,
       value: minTipEth,
     };
-    if (playlist?.address) {
-      const addSongCall = {
-        abi: playlistABI,
-        address: playlist.address,
-        functionName: "addSong",
-        args: [
-          selectedSong.id,
-          selectedSong.title,
-          selectedSong.artist,
-          selectedSong.cover,
-          selectedSong.audioUrl,
-        ],
-      };
-      return [tipCall, addSongCall];
-    }
+    // Playlist functionality commented out - playlist auto-add disabled
+    // if (playlist?.address) {
+    //   const addSongCall = {
+    //     abi: playlistABI,
+    //     address: playlist.address,
+    //     functionName: "addSong",
+    //     args: [
+    //       selectedSong.id,
+    //       selectedSong.title,
+    //       selectedSong.artist,
+    //       selectedSong.cover,
+    //       selectedSong.audioUrl,
+    //     ],
+    //   };
+    //   return [tipCall, addSongCall];
+    // }
     return [tipCall];
-  }, [selectedSong, address, minTipEth, playlist]);
+  }, [selectedSong, address, minTipEth]); // Removed playlist from dependencies
 
   const handleSuccess = useCallback(
     async (_response: TransactionResponseType) => {
@@ -481,51 +643,55 @@ export function Jukebox({
         localStorage.setItem('jukebox_tip_count', newTipCount.toString());
       }
       
-      if (playlist) {
-        // User has playlist - show success with confirmation
-        showToast(`🎵 Tip sent to ${selectedSong.artist}! Song automatically added to "${playlist.name}"`);
-      } else {
-        // No playlist - progressive disclosure
-        if (newTipCount === 1) {
-          // First tip - subtle educational message
-          showToast(`🎵 Tip sent to ${selectedSong.artist}! 💡 Create a playlist to auto-save songs you tip!`);
-        } else if (newTipCount >= 2 && !hasSeenPlaylistPrompt) {
-          // 2+ tips - show interactive prompt
-          setHasSeenPlaylistPrompt(true);
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('jukebox_seen_playlist_prompt', 'true');
-          }
-          
-          showInteractiveToast({
-            message: `🎵 You've tipped ${newTipCount} artists! Create a playlist to auto-save all your favorite songs!`,
-            action: {
-              label: "Create My Playlist",
-              onClick: () => {
-                // Scroll to and highlight playlist section
-                setTimeout(() => {
-                  const playlistSection = document.getElementById('playlist-section');
-                  if (playlistSection) {
-                    playlistSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    // Add highlight animation
-                    playlistSection.classList.add('playlist-highlight');
-                    setTimeout(() => {
-                      playlistSection.classList.remove('playlist-highlight');
-                    }, 2000);
-                  }
-                }, 100);
-              }
-            }
-          });
-        } else {
-          // Subsequent tips after seeing prompt
-          showToast(`🎵 Tip sent to ${selectedSong.artist}! Thank you for supporting the artist.`);
-        }
-      }
+      // Playlist functionality commented out - simplified toast message
+      showToast(`🎵 Tip sent to ${selectedSong.artist}! Thank you for supporting the artist.`);
+      
+      // Original playlist-related logic commented out:
+      // if (playlist) {
+      //   // User has playlist - show success with confirmation
+      //   showToast(`🎵 Tip sent to ${selectedSong.artist}! Song automatically added to "${playlist.name}"`);
+      // } else {
+      //   // No playlist - progressive disclosure
+      //   if (newTipCount === 1) {
+      //     // First tip - subtle educational message
+      //     showToast(`🎵 Tip sent to ${selectedSong.artist}! 💡 Create a playlist to auto-save songs you tip!`);
+      //   } else if (newTipCount >= 2 && !hasSeenPlaylistPrompt) {
+      //     // 2+ tips - show interactive prompt
+      //     setHasSeenPlaylistPrompt(true);
+      //     if (typeof window !== 'undefined') {
+      //       localStorage.setItem('jukebox_seen_playlist_prompt', 'true');
+      //     }
+      //     
+      //     showInteractiveToast({
+      //       message: `🎵 You've tipped ${newTipCount} artists! Create a playlist to auto-save all your favorite songs!`,
+      //       action: {
+      //         label: "Create My Playlist",
+      //         onClick: () => {
+      //           // Scroll to and highlight playlist section
+      //           setTimeout(() => {
+      //             const playlistSection = document.getElementById('playlist-section');
+      //             if (playlistSection) {
+      //               playlistSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      //               // Add highlight animation
+      //               playlistSection.classList.add('playlist-highlight');
+      //               setTimeout(() => {
+      //                 playlistSection.classList.remove('playlist-highlight');
+      //               }, 2000);
+      //             }
+      //           }, 100);
+      //         }
+      //       }
+      //     });
+      //   } else {
+      //     // Subsequent tips after seeing prompt
+      //     showToast(`🎵 Tip sent to ${selectedSong.artist}! Thank you for supporting the artist.`);
+      //   }
+      // }
       
       onSongTipped(selectedSong);
       handleShareTip();
     },
-    [selectedSong, onSongTipped, playlist, showToast, showInteractiveToast, handleShareTip, tipCount, hasSeenPlaylistPrompt]
+    [selectedSong, onSongTipped, showToast, handleShareTip, tipCount] // Removed playlist, showInteractiveToast, hasSeenPlaylistPrompt from dependencies
   );
 
   // Custom transaction handler for Farcaster and regular wallets
@@ -558,17 +724,17 @@ export function Jukebox({
         );
         transactions.push(tipTransaction);
 
-        // Add playlist transaction if applicable
-        if (playlist?.address) {
-          // For contract interactions, we need to encode the function call
-          // This is a simplified version - in production you'd use proper ABI encoding
-          const contractTransaction = farcasterTransactions.createContractTransaction(
-            playlist.address,
-            "0x", // This would be the encoded addSong function call
-            "0"
-          );
-          transactions.push(contractTransaction);
-        }
+        // Playlist functionality commented out - playlist auto-add disabled
+        // if (playlist?.address) {
+        //   // For contract interactions, we need to encode the function call
+        //   // This is a simplified version - in production you'd use proper ABI encoding
+        //   const contractTransaction = farcasterTransactions.createContractTransaction(
+        //     playlist.address,
+        //     "0x", // This would be the encoded addSong function call
+        //     "0"
+        //   );
+        //   transactions.push(contractTransaction);
+        // }
 
         const results = await farcasterTransactions.sendBatchTransactions(transactions);
         
@@ -590,7 +756,7 @@ export function Jukebox({
       console.error("Custom transaction error:", error);
       showToast(`❌ Transaction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-  }, [selectedSong, address, shouldUseFarcasterWallet, connector?.name, isConnected, isInFarcaster, isMiniapp, farcasterTransactions, minTipEth, playlist, handleSuccess, showToast]);
+  }, [selectedSong, address, shouldUseFarcasterWallet, connector?.name, isConnected, isInFarcaster, isMiniapp, farcasterTransactions, minTipEth, handleSuccess, showToast]); // Removed playlist from dependencies
   const handleSelectSong = useCallback((song: Song) => {
     // Use global music context to set the selected song
     globalMusic.setSelectedSong(song);
@@ -866,15 +1032,34 @@ export function Jukebox({
             </div>
           </div>
         )}
-        <div className="flex items-center gap-4">
-          <div className="text-sm font-medium text-(--app-foreground-muted)">
-            Sort by:
+        <div className="space-y-3">
+          <div className="flex items-center gap-4">
+            {/* <div className="text-sm font-medium text-(--app-foreground-muted)">
+              Sort by:
+            </div> */}
+            <Pills
+              options={sortOptions}
+              value={sortBy}
+              onChange={handleSortChange}
+            />
           </div>
-          <Pills
-            options={sortOptions}
-            value={sortBy}
-            onChange={handleSortChange}
-          />
+          {sortBy === "SEARCH" && (
+            <div className="relative">
+              <Input
+                type="text"
+                placeholder="Search songs by title, artist, or platform..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4"
+                aria-label="Search songs"
+              />
+              <Icon
+                name="search"
+                size="sm"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-(--app-foreground-muted)"
+              />
+            </div>
+          )}
         </div>
         {loading ? (
           <div className="grid grid-cols-1 gap-4" aria-label="Loading songs">
@@ -895,8 +1080,23 @@ export function Jukebox({
           <div className="text-red-500">{error}</div>
         ) : (
           <>
+            {sortBy === "SEARCH" && (
+              <>
+                {!searchQuery.trim() ? (
+                  <div className="text-sm text-(--app-foreground-muted) text-center py-4">
+                    Type in the search bar above to find songs available on Jukebox.
+                  </div>
+                ) : (
+                  <div className="text-sm text-(--app-foreground-muted)">
+                    {filteredSongs.length === 0
+                      ? "No songs found matching your search."
+                      : `Found ${filteredSongs.length} song${filteredSongs.length !== 1 ? "s" : ""} matching "${searchQuery}"`}
+                  </div>
+                )}
+              </>
+            )}
             <div className="grid grid-cols-1 gap-4">
-              {songs.map((song) => (
+              {(sortBy === "SEARCH" ? paginatedFilteredSongs : filteredSongs).map((song) => (
                 <div
                   key={song.id}
                   className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all ${
@@ -1002,30 +1202,61 @@ export function Jukebox({
                 </div>
               ))}
             </div>
-            <div className="flex justify-between mt-4">
-              <button
-                className="px-4 py-2 rounded bg-gray-200 text-(--app-foreground-muted) cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                onClick={() => {
-                  setBefore(pageInfo.startCursor);
-                  setAfter(null);
-                  setDirection("backward");
-                }}
-                disabled={!pageInfo.hasPreviousPage || loading}
-              >
-                Previous
-              </button>
-              <button
-                className="px-4 py-2 rounded bg-gray-200 text-(--app-foreground-muted) cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                onClick={() => {
-                  setAfter(pageInfo.endCursor);
-                  setBefore(null);
-                  setDirection("forward");
-                }}
-                disabled={!pageInfo.hasNextPage || loading}
-              >
-                Next
-              </button>
-            </div>
+            {/* Pagination for Search tab filtered results */}
+            {sortBy === "SEARCH" && filteredSongs.length > ITEMS_PER_PAGE && (
+              <div className="flex justify-between items-center mt-4">
+                <button
+                  className="px-4 py-2 rounded bg-gray-200 text-(--app-foreground-muted) cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => {
+                    setSearchPage((prev) => Math.max(1, prev - 1));
+                  }}
+                  disabled={searchPage === 1 || loading}
+                  aria-label="Previous page"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-(--app-foreground-muted)">
+                  Page {searchPage} of {totalSearchPages}
+                </span>
+                <button
+                  className="px-4 py-2 rounded bg-gray-200 text-(--app-foreground-muted) cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => {
+                    setSearchPage((prev) => Math.min(totalSearchPages, prev + 1));
+                  }}
+                  disabled={searchPage >= totalSearchPages || loading}
+                  aria-label="Next page"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+            {/* Pagination for other tabs (Trending, Newest) */}
+            {sortBy !== "SEARCH" && (
+              <div className="flex justify-between mt-4">
+                <button
+                  className="px-4 py-2 rounded bg-gray-200 text-(--app-foreground-muted) cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => {
+                    setBefore(pageInfo.startCursor);
+                    setAfter(null);
+                    setDirection("backward");
+                  }}
+                  disabled={!pageInfo.hasPreviousPage || loading}
+                >
+                  Previous
+                </button>
+                <button
+                  className="px-4 py-2 rounded bg-gray-200 text-(--app-foreground-muted) cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => {
+                    setAfter(pageInfo.endCursor);
+                    setBefore(null);
+                    setDirection("forward");
+                  }}
+                  disabled={!pageInfo.hasNextPage || loading}
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </>
         )}
         {selectedSong && (
@@ -1217,13 +1448,14 @@ export function Jukebox({
                     </p>
                   </div>
                   <TransactionButton className="w-full bg-white text-[#0052ff] hover:bg-gray-100" text="Tip" />
-                  <div className="text-center mb-2">
+                  {/* Playlist functionality commented out */}
+                  {/* <div className="text-center mb-2">
                     {!playlist && (
                       <p className="text-xs text-white/70 mt-1">
                         💡 Create a playlist to auto-save songs you tip!
                       </p>
                     )}
-                  </div>
+                  </div> */}
                 </div>
               </Transaction>
 

@@ -1,3 +1,9 @@
+/* 
+ * PLAYLIST FUNCTIONALITY COMMENTED OUT
+ * This component is temporarily disabled but preserved for future use.
+ */
+
+/*
 "use client";
 import { useState, useCallback, useEffect } from "react";
 import confetti from "canvas-confetti";
@@ -247,7 +253,8 @@ export function PlaylistSection({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ 
               prompt: imagePrompt,
-              paymentId: payment.id
+              paymentId: payment.id,
+              testnet: isTestnet
             }),
           });
 
@@ -271,7 +278,7 @@ export function PlaylistSection({
           }
         } else if (status.status === 'failed') {
           // Enhanced error handling for UserOperation failures
-          const errorReason = status.reason || "Payment failed";
+          const errorReason = status.error || "Payment failed";
           console.error("Payment failed:", {
             paymentId: payment.id,
             reason: errorReason,
@@ -1384,3 +1391,4 @@ export function PlaylistSection({
     </div>
   );
 }
+*/

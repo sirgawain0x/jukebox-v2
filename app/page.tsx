@@ -10,6 +10,7 @@ import {
   useOpenUrl,
 } from "@coinbase/onchainkit/minikit";
 import { sdk } from "@farcaster/miniapp-sdk";
+import { initializeFarcasterFrame } from "./utils/farcaster";
 import { Button } from "./components/ui/Button";
 import { Home } from "./components/music/Home";
 import { Features } from "./components/music/Features";
@@ -123,6 +124,22 @@ export default function App() {
 
     loadFarcasterContext();
   }, []);
+
+  // Initialize Farcaster frame and dismiss splash screen when ready
+  useEffect(() => {
+    const initFarcasterFrame = async () => {
+      try {
+        const isInMiniApp = await sdk.isInMiniApp();
+        if (isInMiniApp && isMiniAppReady) {
+          await initializeFarcasterFrame();
+        }
+      } catch (error) {
+        console.error('Error initializing Farcaster frame:', error);
+      }
+    };
+
+    initFarcasterFrame();
+  }, [isMiniAppReady]);
 
   const handleAddFrame = async () => {
     const frameAdded = await addFrame();

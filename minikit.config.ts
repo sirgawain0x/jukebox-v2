@@ -18,7 +18,7 @@ export const minikitConfig = {
     name: "Jukebox", 
     subtitle: "Not your parents jukebox.", 
     description: "On-chain music. Tip artists directly. AI-powered playlists.",
-    screenshotUrls: [`${ROOT_URL}/screenshot.png`, `${ROOT_URL}/screenshot-2.png`, `${ROOT_URL}/screenshot-3.png`],
+    screenshotUrls: [`${ROOT_URL}/screenshot.png`, `${ROOT_URL}/screenshot-3.png`],
     iconUrl: `${ROOT_URL}/icon.png`,
     splashImageUrl: `${ROOT_URL}/splash.png`,
     splashBackgroundColor: "#000000",

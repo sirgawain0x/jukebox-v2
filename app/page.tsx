@@ -126,11 +126,13 @@ export default function App() {
   }, []);
 
   // Initialize Farcaster frame and dismiss splash screen when ready
+  // Call ready() as soon as possible to hide the loading splash screen
   useEffect(() => {
     const initFarcasterFrame = async () => {
       try {
         const isInMiniApp = await sdk.isInMiniApp();
-        if (isInMiniApp && isMiniAppReady) {
+        if (isInMiniApp) {
+          // Call ready() immediately when in miniapp, don't wait for other conditions
           await initializeFarcasterFrame();
         }
       } catch (error) {
@@ -139,7 +141,7 @@ export default function App() {
     };
 
     initFarcasterFrame();
-  }, [isMiniAppReady]);
+  }, []); // Empty deps - run once on mount
 
   const handleAddFrame = async () => {
     const frameAdded = await addFrame();

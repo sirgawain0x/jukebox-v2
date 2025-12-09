@@ -60,6 +60,20 @@ export async function generateMetadata(): Promise<Metadata> {
           },
         },
       }),
+      "fc:miniapp": JSON.stringify({
+        version: "next",
+        imageUrl: `${ROOT_URL}/hero.png`,
+        button: {
+          title: "Launch Jukebox",
+          action: {
+            type: "launch_miniapp",
+            name: process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME || "Jukebox",
+            url: ROOT_URL,
+            splashImageUrl: `${ROOT_URL}/splash.png`,
+            splashBackgroundColor: "#000000",
+          },
+        },
+      }),
     },
   };
 }

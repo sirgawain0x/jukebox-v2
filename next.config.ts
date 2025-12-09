@@ -124,10 +124,8 @@ const nextConfig: NextConfig = {
             key: 'X-Content-Type-Options',
             value: 'nosniff',
           },
-          {
-            key: 'X-Frame-Options',
-            value: 'DENY',
-          },
+          // Removed X-Frame-Options to allow embedding in Farcaster miniapp iframes
+          // The app is designed to be embedded, so this header is not needed
           {
             key: 'Referrer-Policy',
             value: 'strict-origin-when-cross-origin',

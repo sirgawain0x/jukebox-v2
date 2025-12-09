@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Connector } from 'wagmi';
 
 interface ConnectorStatus {
@@ -194,15 +194,36 @@ export function useConnectorReadiness(
     return () => clearInterval(interval);
   }, [connectors, connectorStatuses, checkInterval, updateConnectorStatus, isInitialized]);
 
+  // Store stable references for event handlers
+  const connectorsRef = useRef(connectors);
+  const updateConnectorStatusRef = useRef(updateConnectorStatus);
+  
+  // Update refs when values change
+  useEffect(() => {
+    connectorsRef.current = connectors;
+    updateConnectorStatusRef.current = updateConnectorStatus;
+  }, [connectors, updateConnectorStatus]);
+
+  // Debounce handler to prevent rapid-fire updates
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
   // Listen for wallet events
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const handleWalletChange = () => {
-      // Re-check all injected connectors when wallet changes
-      connectors
-        .filter(connector => connector.type === 'injected')
-        .forEach(connector => updateConnectorStatus(connector));
+      // Clear any pending debounce
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+      
+      // Debounce the update to prevent rapid-fire chainChanged events
+      debounceTimeoutRef.current = setTimeout(() => {
+        // Re-check all injected connectors when wallet changes
+        connectorsRef.current
+          .filter(connector => connector.type === 'injected')
+          .forEach(connector => updateConnectorStatusRef.current(connector));
+      }, 100); // 100ms debounce
     };
 
     // Listen for wallet provider changes
@@ -216,13 +237,18 @@ export function useConnectorReadiness(
     }
 
     return () => {
+      // Clear debounce timeout on cleanup
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+      
       window.removeEventListener('ethereum#initialized', handleWalletChange);
       if (ethereum) {
         ethereum.removeListener('accountsChanged', handleWalletChange);
         ethereum.removeListener('chainChanged', handleWalletChange);
       }
     };
-  }, [connectors, updateConnectorStatus]);
+  }, []); // Empty deps - handler uses refs for stable access
 
   const getConnectorStatus = useCallback((connector: Connector) => {
     return connectorStatuses.get(connector.uid) || {

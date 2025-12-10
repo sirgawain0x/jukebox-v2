@@ -10,7 +10,6 @@ import { Jukebox } from "./Jukebox";
 // import { PlaylistSection } from "./PlaylistSection"; // Commented out - playlist functionality disabled
 // import { PlaylistView } from "./PlaylistView"; // Commented out - playlist functionality disabled
 // import { RecentTips } from "./RecentTips"; // Commented out - playlist functionality disabled
-import { UserBalances } from "./UserBalances";
 import { ErrorBoundary } from "../ui/ErrorBoundary";
 import { PredictionMarket } from "../prediction/PredictionMarket";
 import { MyBets } from "../prediction/MyBets";
@@ -44,6 +43,29 @@ export function Home({ setActiveTab, initialSection = "music" }: HomeProps) {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <Card title="🎵 Jukebox">
+        <p className="text-(--app-foreground-muted) mb-4">
+          Discover and support independent
+          artists through on-chain music streaming and direct creator tips.
+        </p>
+        <div className="flex gap-3 flex-wrap">
+          <Button
+            onClick={() => setActiveTab("features")}
+            icon={<Icon name="arrow-right" size="sm" />}
+          >
+            Explore Features
+          </Button>
+          <Button
+            onClick={() => setActiveTab("fund")}
+            variant="outline"
+            icon={<Icon name="plus" size="sm" />}
+            disabled={!isConnected}
+          >
+            {isConnected ? "Add Funds" : "Add Funds"}
+          </Button>
+        </div>
+      </Card>
+
       {/* Section Tabs */}
       <Card>
         <div className="flex gap-2">
@@ -68,31 +90,6 @@ export function Home({ setActiveTab, initialSection = "music" }: HomeProps) {
 
       {activeSection === "music" && (
         <>
-          <Card title="🎵 Jukebox">
-            <p className="text-(--app-foreground-muted) mb-4">
-              Discover and support independent
-              artists through on-chain music streaming and direct creator tips.
-            </p>
-            <div className="flex gap-3 flex-wrap">
-              <Button
-                onClick={() => setActiveTab("features")}
-                icon={<Icon name="arrow-right" size="sm" />}
-              >
-                Explore Features
-              </Button>
-              <Button
-                onClick={() => setActiveTab("fund")}
-                variant="outline"
-                icon={<Icon name="plus" size="sm" />}
-                disabled={!isConnected}
-              >
-                {isConnected ? "Add Funds" : "Add Funds"}
-              </Button>
-            </div>
-          </Card>
-          <ErrorBoundary>
-            <UserBalances />
-          </ErrorBoundary>
           
           <ErrorBoundary>
             <Jukebox

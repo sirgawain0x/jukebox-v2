@@ -5,8 +5,9 @@ import { sdk } from '@farcaster/miniapp-sdk';
 import { useWallet } from '@/app/contexts/WalletContext';
 import { useFarcasterContext } from '@/app/utils/farcaster-context';
 import { getName, getAvatar, getAttestations } from '@coinbase/onchainkit/identity';
-import { EthBalance } from '@coinbase/onchainkit/identity';
 import { base } from 'wagmi/chains';
+import { useBalance } from 'wagmi';
+import { formatUnits } from 'viem';
 import { CheckCircle2, Copy, ChevronDown, LogOut } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -42,6 +43,25 @@ export function UserProfile() {
     avatar: null,
     isLoading: true,
     isVerified: false,
+  });
+
+  // ETH (native) balance on Base
+  const {
+    data: ethBalance,
+    isLoading: ethLoading,
+  } = useBalance({
+    address: wallet.address as `0x${string}` | undefined,
+    chainId: 8453, // Base mainnet
+  });
+
+  // USDC balance on Base
+  const {
+    data: usdcBalance,
+    isLoading: usdcLoading,
+  } = useBalance({
+    address: wallet.address as `0x${string}` | undefined,
+    token: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // USDC on Base
+    chainId: 8453,
   });
 
   // Close dropdown when clicking outside
@@ -403,19 +423,60 @@ export function UserProfile() {
                     Network: {wallet.chainName}
                   </div>
                 )}
-                {wallet.connectorName && (
+                {/* {wallet.connectorName && (
                   <div className="text-xs text-gray-500">
                     Wallet: {wallet.connectorName}
                   </div>
-                )}
+                )} */}
               </div>
             )}
           </div>
 
           {wallet.address && (
             <div className="p-2 border-b border-gray-200 dark:border-gray-700">
-              <div className="px-2 py-1">
-                <EthBalance address={wallet.address} />
+              <div className="flex flex-col gap-3 px-2 py-1">
+                {(ethLoading || usdcLoading) ? (
+                  <div className="text-xs text-gray-500 animate-pulse">
+                    Loading balances...
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
+                        <Image 
+                          src="/tokens/eth-logo.svg" 
+                          alt="ETH" 
+                          width={32} 
+                          height={32}
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                      <span className="font-bold text-sm text-(--app-foreground)">ETH:</span>
+                      <span className="text-sm font-medium text-(--app-foreground)">
+                        {ethBalance
+                          ? Number(formatUnits(ethBalance.value, ethBalance.decimals)).toFixed(4)
+                          : "0.0000"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
+                        <Image 
+                          src="/tokens/usdc-logo.svg" 
+                          alt="USDC" 
+                          width={32} 
+                          height={32}
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                      <span className="font-bold text-sm text-(--app-foreground)">USDC:</span>
+                      <span className="text-sm font-medium text-(--app-foreground)">
+                        {usdcBalance
+                          ? Number(formatUnits(usdcBalance.value, usdcBalance.decimals)).toFixed(4)
+                          : "0.0000"}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}

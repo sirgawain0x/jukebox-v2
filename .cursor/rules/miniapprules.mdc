@@ -53,7 +53,7 @@ export function Providers(props: { children: React.ReactNode }) {
 - [Manifest](https://docs.base.org/mini-apps/features/manifest.md) â€” Manifest
 - [Authentication](https://docs.base.org/mini-apps/features/Authentication.md) â€” Auth
 - [Embeds & Previews](https://docs.base.org/mini-apps/features/embeds-and-previews.md) â€” Embeds
-- [Search & Discovery](https://docs.base.org/mini-apps/features/search-and-discovery.md) â€” Discovery
+- [Search & Discovery](https://docs.base.org/mini-apps/technical-guides/search-discovery.md) â€” Discovery
 - [Sharing & Social Graph](https://docs.base.org/mini-apps/features/sharing-and-social-graph.md) â€” Sharing
 - [Notifications](https://docs.base.org/mini-apps/features/notifications.md) â€” Notifications
 - [Links](https://docs.base.org/mini-apps/features/links.md) â€” Links
@@ -63,9 +63,9 @@ export function Providers(props: { children: React.ReactNode }) {
 - [Base App Compatibility](https://docs.base.org/mini-apps/troubleshooting/base-app-compatibility.md) â€” Client behavior
 
 ### Technical Reference
-- [MiniKit Overview](https://docs.base.org/mini-apps/technical-reference/minikit/overview.md) â€” Overview
-- [Provider & Initialization](https://docs.base.org/mini-apps/technical-reference/minikit/provider-and-initialization.md) â€” Provider
-- [Hooks](https://docs.base.org/mini-apps/technical-reference/minikit/hooks/useMiniKit.md) â€” Hooks
+- [MiniKit Overview](https://docs.base.org/onchainkit/latest/components/minikit/overview.md) â€” Overview
+- [Provider & Initialization](https://docs.base.org/onchainkit/latest/components/minikit/provider-and-initialization.md) â€” Provider
+- [Hooks](https://docs.base.org/onchainkit/latest/components/minikit/hooks/useMiniKit.md) â€” Hooks
 
 
 ## Quickstart (excerpts)
@@ -98,7 +98,7 @@ Source: `https://docs.base.org/mini-apps/overview.md`
 - Onboarding: Reduce steps; defer heavy auth until value is shown; prefill from client context.
   - Source: `https://docs.base.org/mini-apps/growth/optimize-onboarding.md`
 - Discovery: Optimize for search and featuring by following guidelines.
-  - Source: `https://docs.base.org/mini-apps/features/search-and-discovery.md`
+  - Source: `https://docs.base.org/mini-apps/technical-guides/search-discovery.md`
 
 
 ## Authentication Best Practices (excerpts)
@@ -132,7 +132,7 @@ Modes summary (from Authentication):
 Hook reference:
 
 - useAuthenticate â€” Returns verified user from SIWF or wallet auth. Use alongside `useMiniKit` context.
-  - Source: `https://docs.base.org/mini-apps/technical-reference/minikit/hooks/useAuthenticate.md`
+  - Source: `https://docs.base.org/onchainkit/latest/components/minikit/hooks/useAuthenticate.md`
 
 Example (hook usage):
 
@@ -175,9 +175,9 @@ Prompt timing guidelines:
 ## API and Schemas (pruned)
 
 - MiniKit Provider and initialization props
-  - Source: `https://docs.base.org/mini-apps/technical-reference/minikit/provider-and-initialization.md`
+  - Source: `https://docs.base.org/onchainkit/latest/components/minikit/provider-and-initialization.md`
 - `useMiniKit` hook: access frame context, user, and client capabilities
-  - Source: `https://docs.base.org/mini-apps/technical-reference/minikit/hooks/useMiniKit.md`
+  - Source: `https://docs.base.org/onchainkit/latest/components/minikit/hooks/useMiniKit.md`
 
 Example manifest fields (conceptual):
 
@@ -187,9 +187,6 @@ Example manifest fields (conceptual):
     "header": "eyJmaWQiOjkxNTIsInR5cGUiOiJjdXN0b2R5Iiwia2V5IjoiMHgwMmVmNzkwRGQ3OTkzQTM1ZkQ4NDdDMDUzRURkQUU5NDBEMDU1NTk2In0",
     "payload": "eyJkb21haW4iOiJhcHAuZXhhbXBsZS5jb20ifQ",
     "signature": "MHgxMGQwZGU4ZGYwZDUwZTdmMGIxN2YxMTU2NDI1MjRmZTY0MTUyZGU4ZGU1MWU0MThiYjU4ZjVmZmQxYjRjNDBiNGVlZTRhNDcwNmVmNjhlMzQ0ZGQ5MDBkYmQyMmNlMmVlZGY5ZGQ0N2JlNWRmNzMwYzUxNjE4OWVjZDJjY2Y0MDFj"
-  },
-  "baseBuilder": {
-    "allowedAddresses": ["0x..."]
   },
   "frame": {
     "version": "1",
@@ -225,7 +222,7 @@ Example: Wire providers for OnchainKit + MiniKit
 
 Sources:
 - `https://docs.base.org/mini-apps/design-ux/onchainkit.md`
-- `https://docs.base.org/mini-apps/technical-reference/minikit/provider-and-initialization.md`
+- `https://docs.base.org/onchainkit/latest/components/minikit/provider-and-initialization.md`
 
 ```tsx
 import { OnchainKitProvider } from '@coinbase/onchainkit'
@@ -242,7 +239,7 @@ export function Providers(props: { children: React.ReactNode }) {
 
 Example: Use `useMiniKit` to access client context
 
-Source: `https://docs.base.org/mini-apps/technical-reference/minikit/hooks/useMiniKit.md`
+Source: `https://docs.base.org/onchainkit/latest/components/minikit/hooks/useMiniKit.md`
 
 ```tsx
 import { useMiniKit } from '@coinbase/minikit'

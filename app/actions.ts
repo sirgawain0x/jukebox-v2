@@ -3,14 +3,16 @@
 import webpush from 'web-push'
 
 // Configure VAPID details with proper error handling
-const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+// Note: Server actions only need the private key for sending notifications
+// The public key is served via API endpoint to clients
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY // Server-side variable (no NEXT_PUBLIC_ prefix)
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || '<mailto:your-email@example.com>'
 
 if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
   console.warn(
     '⚠️ VAPID keys not configured. Web push notifications will not work.\n' +
-    'Please set NEXT_PUBLIC_VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY environment variables.\n' +
+    'Please set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY environment variables.\n' +
     'You can generate them using: npm install -g web-push && web-push generate-vapid-keys'
   )
 } else {
@@ -78,10 +80,8 @@ export async function subscribeUser(
     let serializedSub: SerializedPushSubscription
     
     // Check if it's already serialized or needs conversion
-    if ('keys' in subscription && typeof subscription.keys === 'object' && 'p256dh' in subscription.keys) {
-      // Already serialized
-      serializedSub = subscription as SerializedPushSubscription
-    } else {
+    // PushSubscription has a getKey() method, SerializedPushSubscription has keys object with string values
+    if ('getKey' in subscription && typeof subscription.getKey === 'function') {
       // Need to serialize from PushSubscription
       const pushSub = subscription as PushSubscription
       const p256dhKey = pushSub.getKey('p256dh')
@@ -101,9 +101,32 @@ export async function subscribeUser(
           auth: btoa(String.fromCharCode(...new Uint8Array(authKey))),
         },
       }
+    } else if ('keys' in subscription && typeof subscription.keys === 'object' && 
+               subscription.keys !== null && 
+               'p256dh' in subscription.keys && 
+               typeof subscription.keys.p256dh === 'string') {
+      // Already serialized
+      serializedSub = subscription as SerializedPushSubscription
+    } else {
+      return {
+        success: false,
+        error: 'Invalid subscription format',
+      }
     }
 
-    const key = userId || subscription.endpoint || 'default'
+    // Use userId if provided, otherwise use endpoint as unique identifier
+    // Endpoint should always be available for valid subscriptions
+    // If endpoint is missing, generate a unique key to prevent overwrites
+    let key: string
+    if (userId) {
+      key = userId
+    } else if (serializedSub.endpoint) {
+      key = serializedSub.endpoint
+    } else {
+      // Fallback: generate unique key if endpoint is missing (shouldn't happen)
+      key = `anonymous_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+    }
+    
     subscriptions.set(key, serializedSub)
 
     return { success: true }
@@ -161,20 +184,21 @@ export async function unsubscribeUser(
 }
 
 // Allowed address that can send notifications
-const ALLOWED_NOTIFICATION_ADDRESS = '0xc3118549B9bCd7Ed6672Ea2A5a3B26FfbE735F67'
+// Load from environment variable for security
+const ALLOWED_NOTIFICATION_ADDRESS = process.env.ALLOWED_NOTIFICATION_ADDRESS || '0xc3118549B9bCd7Ed6672Ea2A5a3B26FfbE735F67'
 
 /**
  * Send a push notification to a specific user
  * @param message - Notification message
  * @param userId - Optional user identifier (if not provided, sends to all)
  * @param title - Optional notification title
- * @param userAddress - Optional user wallet address for authorization check
+ * @param userAddress - Required user wallet address for authorization check
  */
 export async function sendNotification(
   message: string,
-  userId?: string,
+  userId: string | undefined,
   title: string = 'Jukebox',
-  userAddress?: string
+  userAddress: string
 ): Promise<SendNotificationResult> {
   // Check if VAPID keys are configured
   if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
@@ -193,37 +217,77 @@ export async function sendNotification(
     }
   }
 
-  let subscription: SerializedPushSubscription | undefined
-  
   try {
-    subscription = userId
-      ? subscriptions.get(userId)
-      : subscriptions.values().next().value
+    // If userId is provided, send to that specific user
+    // Otherwise, send to all anonymous subscriptions
+    if (userId) {
+      const subscription = subscriptions.get(userId)
+      if (!subscription) {
+        return {
+          success: false,
+          error: 'No subscription found for user',
+        }
+      }
 
-    if (!subscription) {
-      return {
-        success: false,
-        error: 'No subscription available',
+      const pushSubscription = {
+        endpoint: subscription.endpoint,
+        keys: {
+          p256dh: subscription.keys.p256dh,
+          auth: subscription.keys.auth,
+        },
+      }
+
+      const payload = JSON.stringify({
+        title,
+        body: message,
+        icon: '/icon.png',
+        badge: '/icon.png',
+      })
+
+      await webpush.sendNotification(pushSubscription, payload)
+    } else {
+      // Send to all anonymous subscriptions (those without userId)
+      // Filter to only subscriptions that don't have a userId key
+      const anonymousSubscriptions = Array.from(subscriptions.entries())
+        .filter(([key, sub]) => {
+          // Check if key is an endpoint (anonymous) or a generated anonymous key
+          return key === sub.endpoint || key.startsWith('anonymous_')
+        })
+        .map(([_, sub]) => sub)
+
+      if (anonymousSubscriptions.length === 0) {
+        return {
+          success: false,
+          error: 'No anonymous subscriptions available',
+        }
+      }
+
+      const payload = JSON.stringify({
+        title,
+        body: message,
+        icon: '/icon.png',
+        badge: '/icon.png',
+      })
+
+      // Send to all anonymous subscriptions
+      const results = await Promise.allSettled(
+        anonymousSubscriptions.map((subscription) => {
+          const pushSubscription = {
+            endpoint: subscription.endpoint,
+            keys: {
+              p256dh: subscription.keys.p256dh,
+              auth: subscription.keys.auth,
+            },
+          }
+          return webpush.sendNotification(pushSubscription, payload)
+        })
+      )
+
+      const failures = results.filter((r) => r.status === 'rejected')
+      if (failures.length > 0) {
+        console.error('Some notifications failed:', failures)
       }
     }
-
-    // web-push expects the subscription in this format
-    const pushSubscription = {
-      endpoint: subscription.endpoint,
-      keys: {
-        p256dh: subscription.keys.p256dh,
-        auth: subscription.keys.auth,
-      },
-    }
-
-    const payload = JSON.stringify({
-      title,
-      body: message,
-      icon: '/icon.png',
-      badge: '/icon.png',
-    })
-
-    await webpush.sendNotification(pushSubscription, payload)
 
     return { success: true }
   } catch (error) {
@@ -236,14 +300,10 @@ export async function sendNotification(
         // Subscription expired or not found, remove it
         if (userId) {
           subscriptions.delete(userId)
-        } else if (subscription) {
-          // Remove the subscription that failed
-          for (const [key, sub] of subscriptions.entries()) {
-            if (sub.endpoint === subscription.endpoint) {
-              subscriptions.delete(key)
-              break
-            }
-          }
+        } else {
+          // For anonymous subscriptions, we can't easily identify which one failed
+          // This is a limitation of the current implementation
+          // In production, you'd want to track which subscription failed
         }
         return {
           success: false,
@@ -263,12 +323,12 @@ export async function sendNotification(
  * Send push notification to all subscribed users
  * @param message - Notification message
  * @param title - Optional notification title
- * @param userAddress - Optional user wallet address for authorization check
+ * @param userAddress - Required user wallet address for authorization check
  */
 export async function sendNotificationToAll(
   message: string,
   title: string = 'Jukebox',
-  userAddress?: string
+  userAddress: string
 ): Promise<SendNotificationResult> {
   // Check if VAPID keys are configured
   if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {

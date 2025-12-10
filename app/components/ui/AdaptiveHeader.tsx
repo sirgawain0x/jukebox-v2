@@ -15,6 +15,8 @@ import {
 import { Button } from './Button';
 import { Icon } from './Icon';
 import { useFarcasterContext } from '@/app/utils/farcaster-context';
+import { useWallet } from '@/app/contexts/WalletContext';
+import { UserProfile } from './UserProfile';
 
 interface AdaptiveHeaderProps {
   onAddFrame?: () => void;
@@ -23,27 +25,33 @@ interface AdaptiveHeaderProps {
 
 export default function AdaptiveHeader({ onAddFrame, frameAdded }: AdaptiveHeaderProps) {
   const { isMiniapp } = useFarcasterContext();
+  const wallet = useWallet();
 
   return (
     <header className="flex justify-between items-center mb-3 h-11">
       <div className="flex items-center space-x-3">
-        <Wallet className="z-10">
+        {/* Show custom user profile if connected, otherwise show wallet connect */}
+        {wallet.isConnected || wallet.farcasterUserFid !== undefined ? (
+          <UserProfile />
+        ) : (
+          <Wallet className="z-10">
             <ConnectWallet
-            className="bg-blue-600 text-white hover:bg-blue-700 rounded-md"
+              className="bg-blue-600 text-white hover:bg-blue-700 rounded-md"
             >
               <Avatar className="h-6 w-6" />
               <Name />
             </ConnectWallet>
-          <WalletDropdown>
-            <Identity className="px-4 pt-3 pb-2" hasCopyAddressOnClick>
-              <Avatar />
-              <Name />
-              <Address />
-              <EthBalance />
-            </Identity>
-            <WalletDropdownDisconnect />
-          </WalletDropdown>
-        </Wallet>
+            <WalletDropdown>
+              <Identity className="px-4 pt-3 pb-2" hasCopyAddressOnClick>
+                <Avatar />
+                <Name />
+                <Address />
+                <EthBalance />
+              </Identity>
+              <WalletDropdownDisconnect />
+            </WalletDropdown>
+          </Wallet>
+        )}
       </div>
 
       {isMiniapp && (

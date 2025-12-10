@@ -25,9 +25,9 @@ const retryWithBackoff = async <T>(
   maxRetries: number = 3,
   baseDelay: number = 1000
 ): Promise<T> => {
-  // Guard against invalid maxRetries
-  if (maxRetries < 0) {
-    maxRetries = 0;
+  // Guard against invalid maxRetries - ensure at least 1 attempt
+  if (maxRetries < 1) {
+    maxRetries = 1;
   }
   
   // Initialize with a default error to prevent uninitialized variable issues
@@ -39,6 +39,7 @@ const retryWithBackoff = async <T>(
     } catch (error) {
       lastError = error as Error;
       
+      // If this is the last attempt, throw the error
       if (attempt === maxRetries - 1) {
         throw lastError;
       }
@@ -121,7 +122,7 @@ export async function POST(request: NextRequest) {
         },
         30000 // 30 second timeout
       );
-    }, 3, 2000); // 3 retries with 2 second base delay
+    }, 4, 2000); // 4 total attempts (1 initial + 3 retries) with 2 second base delay
 
     if (!response.ok) {
       const errorText = await response.text();

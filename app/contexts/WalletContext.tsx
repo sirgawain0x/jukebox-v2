@@ -41,6 +41,9 @@ interface WalletContextType {
   isFrame: boolean;
   farcasterUserFid?: number;
   farcasterUserAddress?: string;
+  farcasterUsername?: string;
+  farcasterDisplayName?: string;
+  farcasterPfpUrl?: string;
   shouldUseFarcasterWallet: boolean;
 }
 
@@ -221,6 +224,9 @@ export function WalletProvider({ children }: WalletProviderProps) {
     isFrame: farcasterContext.isFrame,
     farcasterUserFid: farcasterContext.userFid,
     farcasterUserAddress: farcasterContext.userAddress,
+    farcasterUsername: farcasterContext.username,
+    farcasterDisplayName: farcasterContext.displayName,
+    farcasterPfpUrl: farcasterContext.pfpUrl,
     shouldUseFarcasterWallet,
   };
 

@@ -139,7 +139,6 @@ export function Jukebox({
   const sortOptions = [
     { label: "🔥 Trending", value: "TRENDING" },
     { label: "🆕 Newest", value: "CREATED_AT_TIME_DESC" },
-    { label: "🔍 Search", value: "SEARCH" },
   ];
 
   const handleSortChange = (newSort: string) => {
@@ -147,15 +146,15 @@ export function Jukebox({
     setAfter(null);
     setBefore(null);
     setDirection("forward");
-    // Clear search when switching away from Search tab
-    if (newSort !== "SEARCH") {
+    // Clear search when switching away from Newest tab
+    if (newSort !== "CREATED_AT_TIME_DESC") {
       setSearchQuery("");
     }
   };
 
-  // Reset pagination when switching to Search tab or when search query changes
+  // Reset pagination when switching to Newest tab with search or when search query changes
   useEffect(() => {
-    if (sortBy === "SEARCH") {
+    if (sortBy === "CREATED_AT_TIME_DESC") {
       setAfter(null);
       setBefore(null);
       setDirection("forward");
@@ -163,9 +162,9 @@ export function Jukebox({
     }
   }, [searchQuery, sortBy]);
 
-  // Filter songs based on search query (only for Search tab)
+  // Filter songs based on search query (for Newest tab)
   const filteredSongs = useMemo(() => {
-    if (sortBy !== "SEARCH" || !searchQuery.trim()) {
+    if (sortBy !== "CREATED_AT_TIME_DESC" || !searchQuery.trim()) {
       return songs;
     }
     
@@ -190,22 +189,22 @@ export function Jukebox({
   // Paginate filtered search results (10 songs per page)
   const ITEMS_PER_PAGE = 10;
   const paginatedFilteredSongs = useMemo(() => {
-    // Always paginate when on Search tab
-    if (sortBy !== "SEARCH") {
+    // Always paginate when searching on Newest tab
+    if (sortBy !== "CREATED_AT_TIME_DESC" || !searchQuery.trim()) {
       return filteredSongs;
     }
     
     const startIndex = (searchPage - 1) * ITEMS_PER_PAGE;
     const endIndex = startIndex + ITEMS_PER_PAGE;
     return filteredSongs.slice(startIndex, endIndex);
-  }, [filteredSongs, searchPage, sortBy]);
+  }, [filteredSongs, searchPage, sortBy, searchQuery]);
 
   const totalSearchPages = useMemo(() => {
-    if (sortBy !== "SEARCH") {
+    if (sortBy !== "CREATED_AT_TIME_DESC" || !searchQuery.trim()) {
       return 1;
     }
     return Math.ceil(filteredSongs.length / ITEMS_PER_PAGE);
-  }, [filteredSongs.length, sortBy]);
+  }, [filteredSongs.length, sortBy, searchQuery]);
 
   useEffect(() => {
     // Clear any pending fetch timeout
@@ -224,10 +223,9 @@ export function Jukebox({
         let dataPath = "";
         const variables: Record<string, unknown> = {};
         
-        // When on Search tab, always fetch more results to enable searching through entire database
-        const isSearchTab = sortBy === "SEARCH";
-        const isSearching = isSearchTab && searchQuery.trim();
-        const fetchLimit = isSearchTab ? 500 : 10; // Fetch 500 results on Search tab to cover more of the database
+        // When searching on Newest tab, fetch more results to enable searching through entire database
+        const isSearching = sortBy === "CREATED_AT_TIME_DESC" && searchQuery.trim();
+        const fetchLimit = isSearching ? 500 : 10; // Fetch 500 results when searching to cover more of the database
         
         if (sortBy === "TRENDING") {
         if (direction === "forward") {
@@ -318,97 +316,6 @@ export function Jukebox({
           }
         }`;
         dataPath = "allTrendingTracks";
-      } else if (sortBy === "SEARCH") {
-        // For search, use CREATED_AT_TIME_DESC ordering to get all songs
-        if (direction === "forward") {
-          variables.first = fetchLimit;
-          // Reset pagination when searching
-          if (after && !isSearching) variables.after = after;
-        } else {
-          variables.last = fetchLimit;
-          // Reset pagination when searching
-          if (before && !isSearching) variables.before = before;
-        }
-        variables.orderBy = ["CREATED_AT_TIME_DESC", "ID_DESC"];
-        query = `query ProcessedTracks($first: Int, $last: Int, $after: Cursor, $before: Cursor, $orderBy: [ProcessedTracksOrderBy!]) {
-          allProcessedTracks(first: $first, last: $last, after: $after, before: $before, orderBy: $orderBy) {
-            edges {
-              cursor
-              node {
-                id
-                createdAtTime
-                createdAtBlockNumber
-                title
-                slug
-                platformInternalId
-                lossyAudioIpfsHash
-                lossyAudioUrl
-                description
-                lossyArtworkIpfsHash
-                lossyArtworkUrl
-                websiteUrl
-                platformId
-                artistId
-                supportingArtist
-                insertionId
-                phasesUpdatedAtBlock
-                chorusStart
-                duration
-                lossyAudioMimeType
-                lossyArtworkMimeType
-                mintStart
-                artistByArtistId {
-                  id
-                  createdAtTime
-                  createdAtBlockNumber
-                  slug
-                  userId
-                  avatarUrl
-                  name
-                  avatarIpfsHash
-                  description
-                  customTheme
-                  predefinedThemeName
-                }
-                platformByPlatformId {
-                  id
-                  type
-                  name
-                }
-                artistBySupportingArtist {
-                  id
-                  createdAtTime
-                  createdAtBlockNumber
-                  slug
-                  userId
-                  description
-                  customTheme
-                  predefinedThemeName
-                  name
-                  avatarIpfsHash
-                  avatarUrl
-                  userByUserId {
-                    id
-                    avatarUrl
-                    name
-                    avatarIpfsHash
-                    description
-                    customTheme
-                    predefinedThemeName
-                    metadata
-                  }
-                }
-              }
-            }
-            pageInfo {
-              endCursor
-              hasNextPage
-              hasPreviousPage
-              startCursor
-            }
-          }
-        }`;
-        dataPath = "allProcessedTracks";
       } else {
         // CREATED_AT_TIME_DESC - Newest songs
         if (direction === "forward") {
@@ -1043,7 +950,7 @@ export function Jukebox({
               onChange={handleSortChange}
             />
           </div>
-          {sortBy === "SEARCH" && (
+          {sortBy === "CREATED_AT_TIME_DESC" && (
             <div className="relative">
               <Input
                 type="text"
@@ -1080,23 +987,15 @@ export function Jukebox({
           <div className="text-red-500">{error}</div>
         ) : (
           <>
-            {sortBy === "SEARCH" && (
-              <>
-                {!searchQuery.trim() ? (
-                  <div className="text-sm text-(--app-foreground-muted) text-center py-4">
-                    Type in the search bar above to find songs available on Jukebox.
-                  </div>
-                ) : (
-                  <div className="text-sm text-(--app-foreground-muted)">
-                    {filteredSongs.length === 0
-                      ? "No songs found matching your search."
-                      : `Found ${filteredSongs.length} song${filteredSongs.length !== 1 ? "s" : ""} matching "${searchQuery}"`}
-                  </div>
-                )}
-              </>
+            {sortBy === "CREATED_AT_TIME_DESC" && searchQuery.trim() && (
+              <div className="text-sm text-(--app-foreground-muted)">
+                {filteredSongs.length === 0
+                  ? "No songs found matching your search."
+                  : `Found ${filteredSongs.length} song${filteredSongs.length !== 1 ? "s" : ""} matching "${searchQuery}"`}
+              </div>
             )}
             <div className="grid grid-cols-1 gap-4">
-              {(sortBy === "SEARCH" ? paginatedFilteredSongs : filteredSongs).map((song) => (
+              {(sortBy === "CREATED_AT_TIME_DESC" && searchQuery.trim() ? paginatedFilteredSongs : filteredSongs).map((song) => (
                 <div
                   key={song.id}
                   className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all ${
@@ -1202,8 +1101,8 @@ export function Jukebox({
                 </div>
               ))}
             </div>
-            {/* Pagination for Search tab filtered results */}
-            {sortBy === "SEARCH" && filteredSongs.length > ITEMS_PER_PAGE && (
+            {/* Pagination for search results on Newest tab */}
+            {sortBy === "CREATED_AT_TIME_DESC" && searchQuery.trim() && filteredSongs.length > ITEMS_PER_PAGE && (
               <div className="flex justify-between items-center mt-4">
                 <button
                   className="px-4 py-2 rounded bg-gray-200 text-(--app-foreground-muted) cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1230,8 +1129,8 @@ export function Jukebox({
                 </button>
               </div>
             )}
-            {/* Pagination for other tabs (Trending, Newest) */}
-            {sortBy !== "SEARCH" && (
+            {/* Pagination for other tabs (Trending, Newest without search) */}
+            {!(sortBy === "CREATED_AT_TIME_DESC" && searchQuery.trim()) && (
               <div className="flex justify-between mt-4">
                 <button
                   className="px-4 py-2 rounded bg-gray-200 text-(--app-foreground-muted) cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"

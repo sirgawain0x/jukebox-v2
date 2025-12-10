@@ -28,7 +28,12 @@ export async function POST(request: NextRequest) {
 
     // Determine testnet flag - use provided value or default to false (mainnet)
     // Frontend passes this based on chainId (true for Base Sepolia 84532, false for Base mainnet 8453)
+    // If not provided, log a warning but proceed with mainnet (false)
     const isTestnet = testnet === true;
+    
+    if (testnet === undefined) {
+      console.warn("[Gemini API] Warning: 'testnet' parameter not provided in request. Defaulting to mainnet (false).");
+    }
 
     console.log("[Gemini API] Verifying Base Pay payment:", { paymentId, testnet: isTestnet });
 
@@ -63,8 +68,23 @@ export async function POST(request: NextRequest) {
 
     } catch (error) {
       console.error("[Gemini API] Payment verification error:", error);
+      
+      // Provide more specific error messages based on error type
+      let errorMessage = "Payment verification failed.";
+      if (error instanceof Error) {
+        if (error.message.includes('not found') || error.message.includes('invalid')) {
+          errorMessage = "Payment verification failed. Invalid payment ID.";
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorMessage = "Payment verification failed. Network error connecting to Base Pay API.";
+        } else if (error.message.includes('timeout')) {
+          errorMessage = "Payment verification failed. Request timeout.";
+        } else {
+          errorMessage = `Payment verification failed. ${error.message}`;
+        }
+      }
+      
       return NextResponse.json(
-        { error: "Payment verification failed. Invalid payment ID." },
+        { error: errorMessage },
         { status: 402 }
       );
     }

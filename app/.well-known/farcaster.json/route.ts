@@ -1,48 +1,60 @@
+import { minikitConfig } from "../../../minikit.config";
+
 function withValidProperties(properties: Record<string, undefined | string | string[]>) {
   return Object.fromEntries(
-    Object.entries(properties).filter(([_, value]) => (Array.isArray(value) ? value.length > 0 : !!value))
+    Object.entries(properties).filter(([_, value]) => {
+      if (value === undefined || value === null) {
+        return false;
+      }
+      if (Array.isArray(value)) {
+        return value.length > 0;
+      }
+      // Filter out empty strings - they should be omitted from the manifest
+      return value !== '';
+    })
   );
 }
 
 export async function GET() {
   const URL = process.env.NEXT_PUBLIC_URL || 'https://jukebox.creativeplatform.xyz';
   
+  // Use account association from minikit.config, with environment variable overrides
+  // Handle empty strings properly - if env var is empty string, fall back to config
+  const getAccountAssociationValue = (envVar: string | undefined, configValue: string): string => {
+    return (envVar && envVar.trim() !== '') ? envVar : configValue;
+  };
+  
+  const accountAssociation = {
+    header: getAccountAssociationValue(process.env.FARCASTER_ACCOUNT_ASSOCIATION_HEADER, minikitConfig.accountAssociation.header),
+    payload: getAccountAssociationValue(process.env.FARCASTER_ACCOUNT_ASSOCIATION_PAYLOAD, minikitConfig.accountAssociation.payload),
+    signature: getAccountAssociationValue(process.env.FARCASTER_ACCOUNT_ASSOCIATION_SIGNATURE, minikitConfig.accountAssociation.signature),
+  };
+  
   const manifest = {
-    accountAssociation: {
-      // TODO: Generate these using Base Build Account association tool
-      // https://build.base.org/tools/account-association
-      header: process.env.FARCASTER_ACCOUNT_ASSOCIATION_HEADER || "",
-      payload: process.env.FARCASTER_ACCOUNT_ASSOCIATION_PAYLOAD || "",
-      signature: process.env.FARCASTER_ACCOUNT_ASSOCIATION_SIGNATURE || "",
-    },
-    baseBuilder: {
-      ownerAddress: process.env.BASE_BUILDER_OWNER_ADDRESS || "0x",
-    },
+    accountAssociation,
+    
     miniapp: {
       ...withValidProperties({
-        version: "1",
-        name: process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME || "Jukebox",
+        version: minikitConfig.miniapp.version,
+        name: process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME || minikitConfig.miniapp.name,
         homeUrl: URL,
         iconUrl: `${URL}/icon.png`,
         splashImageUrl: `${URL}/splash.png`,
-        splashBackgroundColor: "#000000",
+        splashBackgroundColor: minikitConfig.miniapp.splashBackgroundColor,
         webhookUrl: `${URL}/api/webhook`,
-        subtitle: "On-chain music platform",
-        description: "On-chain music. Tip artists directly. AI-powered playlists.",
-        screenshotUrls: [
-          `${URL}/screenshot.png`,
-          `${URL}/screenshot-2.png`,
-          `${URL}/Screenshot-3.png`,
-        ],
-        primaryCategory: "music",
-        tags: ["music", "onchain", "miniapp", "baseapp", "jukebox"],
+        subtitle: minikitConfig.miniapp.subtitle,
+        description: minikitConfig.miniapp.description,
+        screenshotUrls: [...minikitConfig.miniapp.screenshotUrls],
+        primaryCategory: minikitConfig.miniapp.primaryCategory,
+        tags: [...minikitConfig.miniapp.tags],
         heroImageUrl: `${URL}/hero.png`,
-        tagline: "Play instantly",
-        ogTitle: process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME || "Jukebox",
-        ogDescription: "On-chain music. Tip artists directly. AI-powered playlists.",
+        tagline: minikitConfig.miniapp.tagline,
+        ogTitle: process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME || minikitConfig.miniapp.ogTitle,
+        ogDescription: minikitConfig.miniapp.ogDescription,
         ogImageUrl: `${URL}/hero.png`,
+        requiredCapabilities: [...minikitConfig.miniapp.requiredCapabilities],
       }),
-      noindex: false,
+      noindex: minikitConfig.miniapp.noindex,
     },
   };
 

@@ -8,6 +8,9 @@ export interface FarcasterContext {
   isFrame: boolean;
   userFid?: number;
   userAddress?: string;
+  username?: string;
+  displayName?: string;
+  pfpUrl?: string;
   castHash?: string;
   castAuthorFid?: number;
 }
@@ -113,6 +116,9 @@ export function useFarcasterContext(): FarcasterContext {
               isFrame: isCastLocation,
               userFid: currentContext.user?.fid,
               userAddress: undefined, // Address not available in UserContext
+              username: currentContext.user?.username,
+              displayName: currentContext.user?.displayName,
+              pfpUrl: currentContext.user?.pfpUrl,
               castHash: castLocation?.cast?.hash,
               castAuthorFid: castLocation?.cast?.author?.fid,
             }));

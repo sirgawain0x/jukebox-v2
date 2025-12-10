@@ -52,9 +52,23 @@ export function PushNotificationManager({
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [status, setStatus] = useState<string>('')
+  const [vapidPublicKey, setVapidPublicKey] = useState<string | null>(null)
 
   useEffect(() => {
     const checkSupport = async () => {
+      // Fetch VAPID public key from API endpoint
+      try {
+        const response = await fetch('/api/vapid/public-key')
+        if (response.ok) {
+          const data = await response.json()
+          setVapidPublicKey(data.publicKey)
+        } else {
+          console.error('Failed to fetch VAPID public key:', response.statusText)
+        }
+      } catch (error) {
+        console.error('Error fetching VAPID public key:', error)
+      }
+
       // Check if we're in a miniapp
       let inMiniApp = false
       try {
@@ -123,16 +137,15 @@ export function PushNotificationManager({
         return
       }
 
-      // Get service worker registration
-      const registration = await navigator.serviceWorker.ready
-
-      // Get VAPID public key from environment
-      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+      // Check if VAPID public key is available
       if (!vapidPublicKey) {
-        setStatus('VAPID public key not configured')
+        setStatus('VAPID public key not configured. Please refresh the page.')
         setIsLoading(false)
         return
       }
+
+      // Get service worker registration
+      const registration = await navigator.serviceWorker.ready
 
       // Subscribe to push notifications
       const subscription = await registration.pushManager.subscribe({

@@ -36,8 +36,5 @@ export const minikitConfig = {
     ogDescription: "On-chain music. Tip artists directly. AI-powered playlists.",
     ogImageUrl: `${ROOT_URL}/hero.png`,
     noindex: true,
-  },
-  baseBuilder: {
-    allowedAddresses: ["0xc3118549B9bCd7Ed6672Ea2A5a3B26FfbE735F67"]
   }
 } as const;

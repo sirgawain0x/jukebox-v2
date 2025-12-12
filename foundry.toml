@@ -25,3 +25,8 @@ multiline_func_header = "all"
 verbatim = []
 wrap_comments = false
 
+remappings = [
+    "@chainlink/contracts/=lib/chainlink-evm/contracts/src/",
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/"
+]
+

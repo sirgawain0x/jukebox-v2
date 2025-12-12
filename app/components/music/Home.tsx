@@ -15,6 +15,8 @@ import { PredictionMarket } from "../prediction/PredictionMarket";
 import { MyBets } from "../prediction/MyBets";
 import { MarketLeaderboard } from "../prediction/MarketLeaderboard";
 import { CreateMarket } from "../prediction/CreateMarket";
+import { CreateAutomatedMarket } from "../prediction/CreateAutomatedMarket";
+import { AutomatedMarkets } from "../prediction/AutomatedMarkets";
 
 type HomeProps = {
   setActiveTab: (tab: string) => void;
@@ -114,6 +116,12 @@ export function Home({ setActiveTab, initialSection = "music" }: HomeProps) {
 
       {activeSection === "predictions" && (
         <>
+          <ErrorBoundary>
+            <CreateAutomatedMarket />
+          </ErrorBoundary>
+          <ErrorBoundary>
+            <AutomatedMarkets />
+          </ErrorBoundary>
           <ErrorBoundary>
             <CreateMarket />
           </ErrorBoundary>

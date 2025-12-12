@@ -9,7 +9,7 @@ import { Button } from "../ui/Button";
 import { useEffect } from "react";
 
 export function CreateAutomatedMarket() {
-  const { isConnected, address } = useAccount();
+  const { isConnected } = useAccount();
   const chainId = useChainId();
   const { showToast } = useToast();
   
@@ -27,7 +27,7 @@ export function CreateAutomatedMarket() {
 
   useEffect(() => {
     if (isError && error) {
-      showToast(`Error: ${error.message}`, "error");
+      showToast({ message: `Error: ${error.message}`, type: "error" });
     }
   }, [isError, error, showToast]);
 
@@ -102,10 +102,10 @@ export function CreateAutomatedMarket() {
                 try {
                   createWeeklyMarket();
                 } catch (err) {
-                  showToast(
-                    err instanceof Error ? err.message : "Failed to create market",
-                    "error"
-                  );
+                  showToast({
+                    message: err instanceof Error ? err.message : "Failed to create market",
+                    type: "error"
+                  });
                 }
               }}
               disabled={isPending}

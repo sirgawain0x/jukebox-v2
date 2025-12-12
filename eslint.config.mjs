@@ -11,7 +11,11 @@ const compat = new FlatCompat({
 
 const eslintConfig = [
   {
-    ignores: ["lib/openzeppelin-contracts/**"],
+    ignores: [
+      "lib/openzeppelin-contracts/**",
+      "lib/chainlink-evm/**",
+      "lib/chainlink/**",
+    ],
   },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {

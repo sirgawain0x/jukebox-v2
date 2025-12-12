@@ -70,7 +70,7 @@ function MarketItem({
 
   const getTimeRemaining = (endTime: bigint) => {
     const now = BigInt(Math.floor(Date.now() / 1000));
-    const remaining = endTime > now ? endTime - now : 0n;
+    const remaining = endTime > now ? endTime - now : BigInt(0);
     const days = Number(remaining) / 86400;
     const hours = (Number(remaining) % 86400) / 3600;
     if (days >= 1) {
@@ -92,7 +92,7 @@ function MarketItem({
   }
 
   const market = marketData as MarketData | undefined;
-  if (!market || market.id === 0n) {
+  if (!market || market.id === BigInt(0)) {
     return null;
   }
 
@@ -103,51 +103,51 @@ function MarketItem({
 
   const handlePlaceBet = async () => {
     if (!isConnected || !address) {
-      showToast("Please connect your wallet", "error");
+      showToast({ message: "Please connect your wallet", type: "error" });
       return;
     }
 
     if (!betAmount || parseFloat(betAmount) <= 0) {
-      showToast("Please enter a valid bet amount", "error");
+      showToast({ message: "Please enter a valid bet amount", type: "error" });
       return;
     }
 
     if (!trackTitle || trackTitle.trim().length === 0) {
-      showToast("Please enter a track title", "error");
+      showToast({ message: "Please enter a track title", type: "error" });
       return;
     }
 
     try {
       const amount = parseUSDC(betAmount);
       await placeBet(marketId, trackTitle.trim(), amount);
-      showToast(`Bet placed: ${betAmount} USDC on "${trackTitle}"`, "success");
+      showToast({ message: `Bet placed: ${betAmount} USDC on "${trackTitle}"`, type: "success" });
       onBetAmountChange("");
       onTrackTitleChange("");
       onCollapse();
     } catch (error) {
       console.error("Failed to place bet:", error);
-      showToast(
-        error instanceof Error ? error.message : "Failed to place bet. Please try again.",
-        "error"
-      );
+      showToast({
+        message: error instanceof Error ? error.message : "Failed to place bet. Please try again.",
+        type: "error"
+      });
     }
   };
 
   const handleClaimWinnings = () => {
     if (!isConnected) {
-      showToast("Please connect your wallet", "error");
+      showToast({ message: "Please connect your wallet", type: "error" });
       return;
     }
 
     try {
       claimWinnings(marketId);
-      showToast("Claiming winnings...", "info");
+      showToast({ message: "Claiming winnings...", type: "info" });
     } catch (error) {
       console.error("Failed to claim winnings:", error);
-      showToast(
-        error instanceof Error ? error.message : "Failed to claim winnings. Please try again.",
-        "error"
-      );
+      showToast({
+        message: error instanceof Error ? error.message : "Failed to claim winnings. Please try again.",
+        type: "error"
+      });
     }
   };
 
@@ -305,7 +305,7 @@ export function AutomatedMarkets() {
   const { data: marketCount, isLoading: isLoadingCount } = useGetMarketCount();
 
   // Generate array of market IDs (1 to marketCount)
-  const marketIds = marketCount && marketCount > 0n
+  const marketIds = marketCount && marketCount > BigInt(0)
     ? Array.from({ length: Number(marketCount) }, (_, i) => BigInt(i + 1))
     : [];
 

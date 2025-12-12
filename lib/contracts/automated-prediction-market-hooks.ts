@@ -12,7 +12,6 @@ import { useRef, useEffect } from "react";
 import {
   automatedPredictionMarketABI,
   tryGetAutomatedPredictionMarketAddress,
-  isAutomatedPredictionMarketDeployed,
 } from "./automated-prediction-market";
 
 /**

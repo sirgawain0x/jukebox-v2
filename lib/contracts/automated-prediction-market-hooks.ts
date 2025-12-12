@@ -1,0 +1,289 @@
+"use client";
+
+import { Address } from "viem";
+import {
+  useReadContract,
+  useWriteContract,
+  useChainId,
+  usePublicClient,
+  useWaitForTransactionReceipt,
+} from "wagmi";
+import { useRef, useEffect } from "react";
+import {
+  automatedPredictionMarketABI,
+  tryGetAutomatedPredictionMarketAddress,
+  isAutomatedPredictionMarketDeployed,
+} from "./automated-prediction-market";
+
+/**
+ * Hook to create a new weekly market (owner only)
+ */
+export function useCreateWeeklyMarket() {
+  const { writeContract, ...rest } = useWriteContract();
+  const chainId = useChainId();
+
+  const createWeeklyMarket = () => {
+    const contractAddress = tryGetAutomatedPredictionMarketAddress(chainId);
+    if (!contractAddress) {
+      throw new Error(`Automated prediction market contract not deployed on chain ${chainId}`);
+    }
+    writeContract({
+      abi: automatedPredictionMarketABI,
+      address: contractAddress,
+      functionName: "createWeeklyMarket",
+      args: [],
+    });
+  };
+
+  return { createWeeklyMarket, ...rest };
+}
+
+/**
+ * Hook to place a bet on a market with a track title
+ * This hook handles the two-step process: approve USDC, then place bet
+ */
+export function usePlaceBetAutomated() {
+  const chainId = useChainId();
+  const publicClient = usePublicClient();
+
+  // Separate hooks for approve and placeBet transactions
+  const {
+    writeContract: writeApprove,
+    data: approveHash,
+    isPending: isApprovingPending,
+    isError: isApproveError,
+    error: approveError,
+  } = useWriteContract();
+
+  const {
+    writeContract: writePlaceBet,
+    data: betHash,
+    isPending: isBetPending,
+    isError: isBetError,
+    error: betError,
+    isSuccess: isBetSuccess,
+  } = useWriteContract();
+
+  // Wait for approve transaction to be confirmed on-chain
+  const {
+    isLoading: isWaitingForApprove,
+    isSuccess: isApproveConfirmed,
+    isError: isApproveFailed,
+  } = useWaitForTransactionReceipt({
+    hash: approveHash,
+    query: {
+      enabled: !!approveHash,
+    },
+  });
+
+  // Use refs to track latest values for use in async promises
+  const approveHashRef = useRef(approveHash);
+  const isApproveErrorRef = useRef(isApproveError);
+  const approveErrorRef = useRef(approveError);
+  const isApproveConfirmedRef = useRef(isApproveConfirmed);
+  const isApproveFailedRef = useRef(isApproveFailed);
+  const betHashRef = useRef(betHash);
+  const isBetErrorRef = useRef(isBetError);
+  const betErrorRef = useRef(betError);
+
+  // Update refs when values change
+  useEffect(() => {
+    approveHashRef.current = approveHash;
+  }, [approveHash]);
+  useEffect(() => {
+    isApproveErrorRef.current = isApproveError;
+  }, [isApproveError]);
+  useEffect(() => {
+    approveErrorRef.current = approveError;
+  }, [approveError]);
+  useEffect(() => {
+    isApproveConfirmedRef.current = isApproveConfirmed;
+  }, [isApproveConfirmed]);
+  useEffect(() => {
+    isApproveFailedRef.current = isApproveFailed;
+  }, [isApproveFailed]);
+  useEffect(() => {
+    betHashRef.current = betHash;
+  }, [betHash]);
+  useEffect(() => {
+    isBetErrorRef.current = isBetError;
+  }, [isBetError]);
+  useEffect(() => {
+    betErrorRef.current = betError;
+  }, [betError]);
+
+  const placeBet = async (marketId: bigint, trackTitle: string, amount: bigint) => {
+    const contractAddress = tryGetAutomatedPredictionMarketAddress(chainId);
+    if (!contractAddress) {
+      throw new Error(`Automated prediction market contract not deployed on chain ${chainId}`);
+    }
+
+    if (!publicClient) {
+      throw new Error("Public client not available");
+    }
+
+    // Get USDC address from contract
+    const usdcAddress = (await publicClient.readContract({
+      abi: automatedPredictionMarketABI,
+      address: contractAddress,
+      functionName: "usdcToken",
+      args: [],
+    })) as Address;
+
+    // Step 1: Approve USDC
+    writeApprove({
+      abi: [
+        {
+          inputs: [
+            { internalType: "address", name: "spender", type: "address" },
+            { internalType: "uint256", name: "amount", type: "uint256" },
+          ],
+          name: "approve",
+          outputs: [{ internalType: "bool", name: "", type: "bool" }],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+      ],
+      address: usdcAddress,
+      functionName: "approve",
+      args: [contractAddress, amount],
+    });
+
+    // Wait for approve to be confirmed
+    return new Promise<void>((resolve, reject) => {
+      const checkApprove = () => {
+        if (isApproveErrorRef.current) {
+          reject(approveErrorRef.current || new Error("Approve failed"));
+          return;
+        }
+        if (isApproveFailedRef.current) {
+          reject(new Error("Approve transaction failed"));
+          return;
+        }
+        if (isApproveConfirmedRef.current) {
+          // Step 2: Place bet
+          writePlaceBet({
+            abi: automatedPredictionMarketABI,
+            address: contractAddress,
+            functionName: "placeBet",
+            args: [marketId, trackTitle, amount],
+          });
+          resolve();
+          return;
+        }
+        // Check again in 100ms
+        setTimeout(checkApprove, 100);
+      };
+      checkApprove();
+    });
+  };
+
+  return {
+    placeBet,
+    approveHash,
+    betHash,
+    isApprovingPending,
+    isBetPending,
+    isWaitingForApprove,
+    isApproveError,
+    isBetError,
+    approveError,
+    betError,
+    isBetSuccess,
+  };
+}
+
+/**
+ * Hook to get market data
+ */
+export function useGetMarket(marketId: bigint | null) {
+  const chainId = useChainId();
+  const contractAddress = tryGetAutomatedPredictionMarketAddress(chainId);
+
+  return useReadContract({
+    abi: automatedPredictionMarketABI,
+    address: contractAddress || undefined,
+    functionName: "markets",
+    args: marketId !== null ? [marketId] : undefined,
+    query: {
+      enabled: !!contractAddress && marketId !== null,
+    },
+  });
+}
+
+/**
+ * Hook to get market count
+ */
+export function useGetMarketCount() {
+  const chainId = useChainId();
+  const contractAddress = tryGetAutomatedPredictionMarketAddress(chainId);
+
+  return useReadContract({
+    abi: automatedPredictionMarketABI,
+    address: contractAddress || undefined,
+    functionName: "s_marketCount",
+    args: [],
+    query: {
+      enabled: !!contractAddress,
+    },
+  });
+}
+
+/**
+ * Hook to get market bets
+ */
+export function useGetMarketBets(marketId: bigint | null) {
+  const chainId = useChainId();
+  const contractAddress = tryGetAutomatedPredictionMarketAddress(chainId);
+
+  return useReadContract({
+    abi: automatedPredictionMarketABI,
+    address: contractAddress || undefined,
+    functionName: "getMarketBets",
+    args: marketId !== null ? [marketId] : undefined,
+    query: {
+      enabled: !!contractAddress && marketId !== null,
+    },
+  });
+}
+
+/**
+ * Hook to claim winnings
+ */
+export function useClaimWinnings() {
+  const { writeContract, ...rest } = useWriteContract();
+  const chainId = useChainId();
+
+  const claimWinnings = (marketId: bigint) => {
+    const contractAddress = tryGetAutomatedPredictionMarketAddress(chainId);
+    if (!contractAddress) {
+      throw new Error(`Automated prediction market contract not deployed on chain ${chainId}`);
+    }
+    writeContract({
+      abi: automatedPredictionMarketABI,
+      address: contractAddress,
+      functionName: "claimWinnings",
+      args: [marketId],
+    });
+  };
+
+  return { claimWinnings, ...rest };
+}
+
+/**
+ * Hook to get next Monday EST time
+ */
+export function useGetNextMondayEST() {
+  const chainId = useChainId();
+  const contractAddress = tryGetAutomatedPredictionMarketAddress(chainId);
+
+  return useReadContract({
+    abi: automatedPredictionMarketABI,
+    address: contractAddress || undefined,
+    functionName: "getNextMondayEST",
+    args: [],
+    query: {
+      enabled: !!contractAddress,
+    },
+  });
+}

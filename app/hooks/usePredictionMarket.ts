@@ -36,11 +36,19 @@ import {
 /**
  * Fetch active markets from API
  */
-async function fetchActiveMarkets(): Promise<PredictionMarket[]> {
-  const cached = await getCachedActiveMarkets();
+async function fetchActiveMarkets(forceRefresh = false): Promise<PredictionMarket[]> {
+  // Don't use local cache if forcing refresh - let the API handle it
+  const cached = forceRefresh ? null : await getCachedActiveMarkets();
   if (cached) return cached;
 
-  const response = await fetch("/api/prediction/markets");
+  const url = forceRefresh 
+    ? "/api/prediction/markets?refresh=true"
+    : "/api/prediction/markets";
+  
+  const response = await fetch(url, { 
+    cache: forceRefresh ? "no-store" : "default" 
+  });
+  
   if (!response.ok) {
     throw new Error("Failed to fetch active markets");
   }
@@ -48,7 +56,12 @@ async function fetchActiveMarkets(): Promise<PredictionMarket[]> {
   // API returns BigInt values as strings, convert back to BigInt
   const marketsData = await response.json();
   const markets = deserializePredictionMarkets(marketsData);
-  await cacheActiveMarkets(markets);
+  
+  // Only cache if we successfully fetched (API already caches server-side)
+  if (markets.length > 0 || !forceRefresh) {
+    await cacheActiveMarkets(markets);
+  }
+  
   return markets;
 }
 
@@ -183,9 +196,11 @@ interface SerializedMarketBet extends Omit<MarketBet, "amount"> {
 export function useActiveMarkets() {
   return useQuery({
     queryKey: ["prediction-markets", "active"],
-    queryFn: fetchActiveMarkets,
+    queryFn: () => fetchActiveMarkets(false),
     refetchInterval: 30000, // Refetch every 30 seconds
     staleTime: 5000, // Consider stale after 5 seconds
+    refetchOnMount: true, // Always refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window regains focus
   });
 }
 

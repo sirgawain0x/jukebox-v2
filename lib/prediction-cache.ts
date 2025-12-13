@@ -287,6 +287,21 @@ export async function invalidateMarketCache(marketId: string): Promise<void> {
   }
 }
 
+/**
+ * Invalidate all active markets cache (when a new market is created)
+ */
+export async function invalidateActiveMarketsCache(): Promise<void> {
+  if (!redis) return;
+
+  try {
+    await redis.del(cacheKeys.activeMarkets());
+    // Also invalidate bet counts cache since new markets will change counts
+    // Note: We'd need contract address to be more specific, but clearing all is safe
+  } catch (error) {
+    console.error("Failed to invalidate active markets cache:", error);
+  }
+}
+
 export interface CachedSongMetadata {
   title: string;
   artist: string;

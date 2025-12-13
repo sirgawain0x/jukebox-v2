@@ -11,16 +11,42 @@ export function PredictionMarket() {
 
   if (isLoading) {
     return (
-      <Card title="🎯 Prediction Markets">
-        <div className="space-y-4">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="flex items-center gap-4">
-              <Skeleton className="w-12 h-12 rounded-lg" />
-              <div className="flex-1 space-y-2">
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-3 w-1/2" />
+      <Card title="🎯 Trending Prediction Markets">
+        <div className="mb-6">
+          <p className="text-sm text-(--app-foreground-muted) mb-2">
+            Active markets created by users predicting which songs will reach #1 in the weekly trending charts.
+          </p>
+          <p className="text-xs text-(--app-foreground-muted)">
+            Bet YES or NO on each prediction. Winners split the pool (minus platform fee).
+          </p>
+        </div>
+        <div className="space-y-3">
+          {[...Array(3)].map((_, i) => (
+            <Card key={i} className="border border-(--app-card-border)">
+              <div className="space-y-4">
+                {/* Song Info Skeleton */}
+                <div className="flex items-start gap-4">
+                  <Skeleton className="w-16 h-16 rounded-lg shrink-0" />
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <Skeleton className="h-5 w-3/4" />
+                    <Skeleton className="h-4 w-1/2" />
+                  </div>
+                </div>
+                
+                {/* Pool Info Skeleton */}
+                <div className="flex items-center justify-between py-2 px-3 bg-[#f0f4ff] rounded-lg">
+                  <div className="flex items-center gap-4">
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-4 w-16" />
+                  </div>
+                  <Skeleton className="h-4 w-24" />
+                </div>
+                
+                {/* Market Status Skeleton */}
+                <Skeleton className="h-12 w-full rounded-lg" />
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       </Card>
@@ -61,24 +87,36 @@ export function PredictionMarket() {
     );
   }
 
-  // Maintain deterministic ordering when marketIndex is available
+  // Sort markets by total pool size (USDC) first, then by number of bets
   const sortedMarkets = [...filteredMarkets].sort((a, b) => {
-    // If both have marketIndex, sort by that
-    if (a.marketIndex !== undefined && b.marketIndex !== undefined) {
-      return a.marketIndex - b.marketIndex;
+    // Calculate total pool for each market
+    const totalPoolA = a.totalPoolYes + a.totalPoolNo;
+    const totalPoolB = b.totalPoolYes + b.totalPoolNo;
+    
+    // First sort by total pool size (descending - highest first)
+    const poolDiff = Number(totalPoolB) - Number(totalPoolA);
+    if (poolDiff !== 0) {
+      return poolDiff;
     }
-    // Otherwise maintain original order (trending songs are already ranked)
-    return 0;
+    
+    // If pools are equal, sort by number of bets (descending - most bets first)
+    const betsDiff = (b.totalBets || 0) - (a.totalBets || 0);
+    if (betsDiff !== 0) {
+      return betsDiff;
+    }
+    
+    // If pools and bets are equal, maintain creation order (newest first)
+    return (b.marketIndex ?? 0) - (a.marketIndex ?? 0);
   });
 
   return (
     <Card title="🎯 Trending Prediction Markets">
       <div className="mb-6">
         <p className="text-sm text-(--app-foreground-muted) mb-2">
-          Bet USDC on which songs will become the hottest on-chain music this week.
+          Active markets created by users predicting which songs will reach #1 in the weekly trending charts.
         </p>
         <p className="text-xs text-(--app-foreground-muted)">
-          Rankings update weekly. Predict correctly and win your share of the pool!
+          Bet YES or NO on each prediction. Winners split the pool (minus platform fee).
         </p>
       </div>
 

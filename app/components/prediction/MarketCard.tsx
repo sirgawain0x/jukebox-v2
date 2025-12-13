@@ -1,20 +1,13 @@
 "use client";
 
-import { useState } from "react";
 import Image from "next/image";
 import { useAccount } from "wagmi";
-import { Transaction, TransactionButton } from "@coinbase/onchainkit/transaction";
-import { formatUSDC, parseUSDC, getUSDCAddress, erc20ABI } from "@/lib/usdc-utils";
-import { useChainId } from "wagmi";
-import { usePlaceBet, useMarketOdds } from "@/app/hooks/usePredictionMarket";
-import type { PredictionMarket, MarketSide } from "@/types/prediction-market";
+import { formatUSDC } from "@/lib/usdc-utils";
+import { useMarketOdds } from "@/app/hooks/usePredictionMarket";
+import type { PredictionMarket } from "@/types/prediction-market";
 import { Card } from "../ui/Card";
-import { Button } from "../ui/Button";
-import { Icon } from "../ui/Icon";
-import { useToast } from "../ui/ToastProvider";
-import { tryGetPredictionMarketAddress, isPredictionMarketDeployed, predictionMarketABI } from "@/lib/contracts/prediction-market";
+import { useGetUserBets } from "@/lib/contracts/prediction-market-hooks";
 import { isTrendingMetadataMissing } from "@/lib/prediction-market-utils";
-import type { Contracts } from "@/types/transactions";
 
 interface MarketCardProps {
   market: PredictionMarket;
@@ -22,56 +15,23 @@ interface MarketCardProps {
 
 export function MarketCard({ market }: MarketCardProps) {
   const { address, isConnected } = useAccount();
-  const chainId = useChainId();
-  const { showToast } = useToast();
-  const [betAmount, setBetAmount] = useState("");
-  const [selectedSide, setSelectedSide] = useState<MarketSide | null>(null);
-  const [isPlacingBet, setIsPlacingBet] = useState(false);
-
-  const { data: odds } = useMarketOdds(market);
-  const { placeBetAsync } = usePlaceBet();
-  const isContractDeployed = isPredictionMarketDeployed(chainId);
-  const contractAddress = tryGetPredictionMarketAddress(chainId);
   
-  // If market has marketIndex and contractAddress, it exists on the contract
-  // (markets from API are already validated as existing and active)
-  const marketExistsOnContract = !!(
-    market.marketIndex !== undefined &&
-    market.contractAddress &&
-    contractAddress &&
-    market.contractAddress === contractAddress && // Add this line to verify addresses match
-    market.status === "ACTIVE" &&
-    market.endTime > Math.floor(Date.now() / 1000)
+  const { data: odds } = useMarketOdds(market);
+  
+  // Get user's current bets on this market (for display only)
+  const { data: userBetsData } = useGetUserBets(
+    market.marketIndex !== undefined ? BigInt(market.marketIndex) : undefined,
+    address
   );
-
-  const _handlePlaceBet = async (side: MarketSide) => {
-    if (!isConnected || !address) {
-      showToast("Please connect your wallet");
-      return;
-    }
-
-    if (!betAmount || parseFloat(betAmount) <= 0) {
-      showToast("Please enter a valid bet amount");
-      return;
-    }
-
-    setIsPlacingBet(true);
-    try {
-      await placeBetAsync({
-        marketId: BigInt(market.marketIndex || 0),
-        amount: betAmount,
-        side,
-      });
-      showToast(`Bet placed: ${side} ${betAmount} USDC`);
-      setBetAmount("");
-      setSelectedSide(null);
-    } catch (error) {
-      console.error("Failed to place bet:", error);
-      showToast("Failed to place bet. Please try again.");
-    } finally {
-      setIsPlacingBet(false);
-    }
-  };
+  
+  // Viem returns contract data as arrays: [amountYes, amountNo, claimed]
+  const userAmountYes = userBetsData && Array.isArray(userBetsData)
+    ? (userBetsData[0] as bigint) || BigInt(0)
+    : BigInt(0);
+  const userAmountNo = userBetsData && Array.isArray(userBetsData)
+    ? (userBetsData[1] as bigint) || BigInt(0)
+    : BigInt(0);
+  const hasExistingBets = userAmountYes > BigInt(0) || userAmountNo > BigInt(0);
 
   const totalPool = market.totalPoolYes + market.totalPoolNo;
   const totalPoolDisplay = formatUSDC(totalPool);
@@ -89,32 +49,6 @@ export function MarketCard({ market }: MarketCardProps) {
 
   const fallbackNotice =
     "This song isn't doing so hot anymore and has fallen off the trending chart.";
-
-  const calls = selectedSide && betAmount && parseFloat(betAmount) > 0 && isConnected && contractAddress && marketExistsOnContract
-    ? [
-        // Approve USDC
-        {
-          abi: erc20ABI,
-          address: getUSDCAddress(chainId),
-          functionName: "approve" as const,
-          args: [
-            contractAddress,
-            parseUSDC(betAmount),
-          ],
-        },
-        // Place bet
-        {
-          abi: predictionMarketABI,
-          address: contractAddress,
-          functionName: "placeBet" as const,
-          args: [
-            BigInt(market.marketIndex || 0),
-            parseUSDC(betAmount),
-            selectedSide === "YES",
-          ],
-        },
-      ] as Contracts
-    : [];
 
   // Get rank badge color based on position
   return (
@@ -177,78 +111,35 @@ export function MarketCard({ market }: MarketCardProps) {
           </span>
         </div>
 
-        {/* Betting Interface */}
+        {/* Market Status Info */}
         {market.status === "ACTIVE" && (
-          <div className="space-y-3">
-            {!isContractDeployed ? (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center">
-                <p className="text-sm font-medium text-yellow-800 mb-1">
-                  Contract Not Deployed
-                </p>
-                <p className="text-xs text-yellow-700">
-                  The prediction market contract is not yet deployed on this chain. Please deploy the contract first.
+          <div className="space-y-2">
+            {/* Show user's existing bets if any */}
+            {isConnected && hasExistingBets && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-1">
+                <p className="text-xs font-semibold text-blue-800 mb-2">Your Current Bets:</p>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-blue-700">YES:</span>
+                  <span className="font-medium text-blue-900">
+                    {userAmountYes > BigInt(0) ? formatUSDC(userAmountYes) : "0"} USDC
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-blue-700">NO:</span>
+                  <span className="font-medium text-blue-900">
+                    {userAmountNo > BigInt(0) ? formatUSDC(userAmountNo) : "0"} USDC
+                  </span>
+                </div>
+                <p className="text-[10px] text-blue-600 mt-2">
+                  💡 Use the &quot;Place Your Bet&quot; section above to bet YES or NO on this market.
                 </p>
               </div>
-            ) : !marketExistsOnContract ? (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center">
-                <p className="text-sm font-medium text-yellow-800 mb-1">
-                  Market Not Available
-                </p>
-                <p className="text-xs text-yellow-700">
-                  This market is not available for betting. It may be expired or resolved.
-                </p>
-              </div>
-            ) : (
-              <>
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    placeholder="Amount (USDC)"
-                    value={betAmount}
-                    onChange={(e) => setBetAmount(e.target.value)}
-                    min="0"
-                    step="0.01"
-                    className="flex-1 px-3 py-2 border border-[rgba(0,0,0,0.1)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0052ff]"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    variant={selectedSide === "YES" ? "primary" : "outline"}
-                    onClick={() => setSelectedSide("YES")}
-                    className="w-full"
-                    disabled={isPlacingBet}
-                  >
-                    <Icon name="check" size="sm" className="mr-1" />
-                    YES
-                  </Button>
-                  <Button
-                    variant={selectedSide === "NO" ? "primary" : "outline"}
-                    onClick={() => setSelectedSide("NO")}
-                    className="w-full"
-                    disabled={isPlacingBet}
-                  >
-                    <Icon name="x" size="sm" className="mr-1" />
-                    NO
-                  </Button>
-                </div>
-
-                {selectedSide && betAmount && parseFloat(betAmount) > 0 && isConnected && contractAddress && marketExistsOnContract && (
-                  <Transaction calls={calls as Contracts}>
-                    <TransactionButton 
-                      text={`Place ${selectedSide} Bet: ${betAmount} USDC`}
-                      className="w-full bg-[#0052ff] hover:bg-[#0040cc] text-white"
-                    />
-                  </Transaction>
-                )}
-
-                {!isConnected && (
-                  <p className="text-xs text-center text-(--app-foreground-muted)">
-                    Connect wallet to place bets
-                  </p>
-                )}
-              </>
             )}
+            {/* <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+              <p className="text-sm font-medium text-green-800">
+                ✓ Betting is open - Use the "Place Your Bet" section above to bet
+              </p>
+            </div> */}
           </div>
         )}
 

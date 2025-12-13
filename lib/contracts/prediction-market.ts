@@ -218,6 +218,27 @@ export const predictionMarketABI = [
   },
   {
     inputs: [],
+    name: "marketCreationFee",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "owner",
+    outputs: [{ internalType: "address", name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "_marketCreationFee", type: "uint256" }],
+    name: "setMarketCreationFee",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
     name: "pause",
     outputs: [],
     stateMutability: "nonpayable",

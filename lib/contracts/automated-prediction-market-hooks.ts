@@ -4,37 +4,114 @@ import { Address } from "viem";
 import {
   useReadContract,
   useWriteContract,
+  useSimulateContract,
   useChainId,
   usePublicClient,
   useWaitForTransactionReceipt,
 } from "wagmi";
 import { useRef, useEffect } from "react";
+import { useAccount } from "wagmi";
 import {
   automatedPredictionMarketABI,
   tryGetAutomatedPredictionMarketAddress,
 } from "./automated-prediction-market";
 
 /**
+ * Hook to get contract owner
+ */
+export function useGetContractOwner() {
+  const chainId = useChainId();
+  const contractAddress = tryGetAutomatedPredictionMarketAddress(chainId);
+
+  return useReadContract({
+    abi: automatedPredictionMarketABI,
+    address: contractAddress || undefined,
+    functionName: "owner",
+    args: [],
+    query: {
+      enabled: !!contractAddress,
+    },
+  });
+}
+
+/**
  * Hook to create a new weekly market (owner only)
  */
 export function useCreateWeeklyMarket() {
-  const { writeContract, ...rest } = useWriteContract();
   const chainId = useChainId();
+  const { address: connectedAddress } = useAccount();
+  const contractAddress = tryGetAutomatedPredictionMarketAddress(chainId);
+  
+  // #region agent log
+  // Log connected address and contract address
+  useEffect(() => {
+    if (connectedAddress && contractAddress) {
+      fetch('http://127.0.0.1:7242/ingest/7ffccca1-2c82-49dc-9cbc-405674609eea',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'automated-prediction-market-hooks.ts:useCreateWeeklyMarket',message:'Hook initialized',data:{connectedAddress,contractAddress,chainId},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'A'})}).catch(()=>{});
+    }
+  }, [connectedAddress, contractAddress, chainId]);
+  // #endregion
 
+  // Use simulateContract to catch errors early
+  const {
+    data: simulateData,
+    isError: isSimulateError,
+    error: simulateError,
+    isFetching: isSimulating,
+  } = useSimulateContract({
+    abi: automatedPredictionMarketABI,
+    address: contractAddress || undefined,
+    functionName: "createWeeklyMarket",
+    args: [],
+    query: {
+      enabled: !!contractAddress && !!connectedAddress,
+    },
+  });
+
+  // #region agent log
+  // Log simulation results
+  useEffect(() => {
+    if (isSimulateError && simulateError) {
+      fetch('http://127.0.0.1:7242/ingest/7ffccca1-2c82-49dc-9cbc-405674609eea',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'automated-prediction-market-hooks.ts:useCreateWeeklyMarket',message:'Simulation error',data:{error:simulateError.message,connectedAddress,contractAddress},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'B'})}).catch(()=>{});
+    }
+    if (simulateData) {
+      fetch('http://127.0.0.1:7242/ingest/7ffccca1-2c82-49dc-9cbc-405674609eea',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'automated-prediction-market-hooks.ts:useCreateWeeklyMarket',message:'Simulation success',data:{connectedAddress,contractAddress},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'B'})}).catch(()=>{});
+    }
+  }, [isSimulateError, simulateError, simulateData, connectedAddress, contractAddress]);
+  // #endregion
+
+  const { writeContract, ...rest } = useWriteContract();
+
+  // #region agent log
   const createWeeklyMarket = () => {
-    const contractAddress = tryGetAutomatedPredictionMarketAddress(chainId);
     if (!contractAddress) {
+      fetch('http://127.0.0.1:7242/ingest/7ffccca1-2c82-49dc-9cbc-405674609eea',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'automated-prediction-market-hooks.ts:createWeeklyMarket',message:'Contract not deployed',data:{chainId},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'A'})}).catch(()=>{});
       throw new Error(`Automated prediction market contract not deployed on chain ${chainId}`);
     }
-    writeContract({
-      abi: automatedPredictionMarketABI,
-      address: contractAddress,
-      functionName: "createWeeklyMarket",
-      args: [],
-    });
+    if (isSimulateError) {
+      fetch('http://127.0.0.1:7242/ingest/7ffccca1-2c82-49dc-9cbc-405674609eea',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'automated-prediction-market-hooks.ts:createWeeklyMarket',message:'Cannot create market - simulation failed',data:{error:simulateError?.message,connectedAddress,contractAddress},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'B'})}).catch(()=>{});
+      throw new Error(simulateError?.message || "Cannot create market. You may not be the contract owner.");
+    }
+    if (!simulateData?.request) {
+      fetch('http://127.0.0.1:7242/ingest/7ffccca1-2c82-49dc-9cbc-405674609eea',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'automated-prediction-market-hooks.ts:createWeeklyMarket',message:'Simulation data not ready',data:{connectedAddress,contractAddress,isSimulating},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'B'})}).catch(()=>{});
+      throw new Error("Transaction simulation not ready. Please wait and try again.");
+    }
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/7ffccca1-2c82-49dc-9cbc-405674609eea',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'automated-prediction-market-hooks.ts:createWeeklyMarket',message:'About to call writeContract with simulated request',data:{contractAddress,connectedAddress},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+    writeContract(simulateData.request);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/7ffccca1-2c82-49dc-9cbc-405674609eea',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'automated-prediction-market-hooks.ts:createWeeklyMarket',message:'writeContract called',data:{contractAddress,connectedAddress},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
   };
+  // #endregion
 
-  return { createWeeklyMarket, ...rest };
+  return { 
+    createWeeklyMarket, 
+    isSimulateError,
+    simulateError,
+    isSimulating,
+    ...rest 
+  };
 }
 
 /**

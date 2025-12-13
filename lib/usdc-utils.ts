@@ -93,10 +93,21 @@ export function getUSDCAddress(chainId: number): Address {
 /**
  * Format USDC amount from wei (6 decimals) to human-readable string
  */
-export function formatUSDC(amount: bigint, decimals: number = 6): string {
-  const divisor = BigInt(10 ** decimals);
-  const whole = amount / divisor;
-  const remainder = amount % divisor;
+export function formatUSDC(amount: bigint | undefined | null, decimals: number = 6): string {
+  // Handle undefined/null values
+  if (amount === undefined || amount === null) {
+    return "0";
+  }
+  
+  // Ensure amount is a BigInt
+  const amountBigInt = typeof amount === "bigint" ? amount : BigInt(amount);
+  
+  // Calculate divisor: convert the numeric power result to BigInt explicitly
+  // This ensures we don't mix BigInt and Number types
+  const powerOfTen = 10 ** decimals;
+  const divisor = BigInt(powerOfTen);
+  const whole = amountBigInt / divisor;
+  const remainder = amountBigInt % divisor;
   
   if (remainder === BigInt(0)) {
     return whole.toString();
@@ -115,7 +126,9 @@ export function parseUSDC(amount: string, decimals: number = 6): bigint {
   const whole = parts[0] || "0";
   const fractional = parts[1]?.padEnd(decimals, "0").slice(0, decimals) || "0".repeat(decimals);
   
-  const wholeBig = BigInt(whole) * BigInt(10 ** decimals);
+  // Calculate power of ten first, then convert to BigInt to avoid mixing types
+  const powerOfTen = 10 ** decimals;
+  const wholeBig = BigInt(whole) * BigInt(powerOfTen);
   const fractionalBig = BigInt(fractional);
   
   return wholeBig + fractionalBig;

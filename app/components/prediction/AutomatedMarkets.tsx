@@ -1,62 +1,43 @@
 "use client";
 
-import { useState } from "react";
 import { useAccount, useChainId } from "wagmi";
 import { Card } from "../ui/Card";
 import { Button } from "../ui/Button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "../ui/ToastProvider";
-import { formatUSDC, parseUSDC } from "@/lib/usdc-utils";
+import { formatUSDC } from "@/lib/usdc-utils";
 import {
   useGetMarketCount,
   useGetMarket,
   useGetMarketBets,
-  usePlaceBetAutomated,
   useClaimWinnings,
 } from "@/lib/contracts/automated-prediction-market-hooks";
 import { isAutomatedPredictionMarketDeployed } from "@/lib/contracts/automated-prediction-market";
 
-interface MarketData {
-  id: bigint;
-  endTime: bigint;
-  resolveTime: bigint;
-  resolved: boolean;
-  winningTrack: string;
-  totalPool: bigint;
-}
-
 interface MarketItemProps {
   marketId: bigint;
-  betAmount: string;
-  trackTitle: string;
-  isExpanded: boolean;
-  onBetAmountChange: (value: string) => void;
-  onTrackTitleChange: (value: string) => void;
-  onExpand: () => void;
-  onCollapse: () => void;
 }
 
 function MarketItem({
   marketId,
-  betAmount,
-  trackTitle,
-  isExpanded,
-  onBetAmountChange,
-  onTrackTitleChange,
-  onExpand,
-  onCollapse,
 }: MarketItemProps) {
-  const { isConnected, address } = useAccount();
+  const { isConnected } = useAccount();
   const { showToast } = useToast();
   const { data: marketData, isLoading: isLoadingMarket } = useGetMarket(marketId);
   const { data: bets } = useGetMarketBets(marketId);
-  const { placeBet, isApprovingPending, isBetPending, isWaitingForApprove } = usePlaceBetAutomated();
   const { claimWinnings, isPending: isClaimingPending } = useClaimWinnings();
 
   const marketIdStr = marketId.toString();
 
-  const formatDate = (timestamp: bigint) => {
-    const date = new Date(Number(timestamp) * 1000);
+  const formatDate = (timestamp: bigint | undefined) => {
+    if (!timestamp || timestamp === BigInt(0) || timestamp === undefined) {
+      return "Loading...";
+    }
+    const timestampNumber = Number(timestamp);
+    if (isNaN(timestampNumber) || timestampNumber === 0) {
+      return "Loading...";
+    }
+    const date = new Date(timestampNumber * 1000);
     return date.toLocaleString("en-US", {
       weekday: "short",
       year: "numeric",
@@ -68,7 +49,8 @@ function MarketItem({
     });
   };
 
-  const getTimeRemaining = (endTime: bigint) => {
+  const getTimeRemaining = (endTime: bigint | undefined) => {
+    if (!endTime || endTime === BigInt(0)) return "N/A";
     const now = BigInt(Math.floor(Date.now() / 1000));
     const remaining = endTime > now ? endTime - now : BigInt(0);
     const days = Number(remaining) / 86400;
@@ -91,47 +73,34 @@ function MarketItem({
     );
   }
 
-  const market = marketData as MarketData | undefined;
-  if (!market || market.id === BigInt(0)) {
+  if (!marketData) {
     return null;
   }
 
-  const isResolved = market.resolved;
-  const isBettingOpen = !isResolved && market.endTime > BigInt(Math.floor(Date.now() / 1000));
+  // Viem returns contract data as an object with named properties from the ABI
+  // Handle both possible formats (array or object) for safety
+  const market = marketData as 
+    | { id?: bigint; endTime?: bigint; resolveTime?: bigint; resolved?: boolean; winningTrack?: string; totalPool?: bigint }
+    | [bigint?, bigint?, bigint?, boolean?, string?, bigint?];
+  
+  const isArray = Array.isArray(market);
+  const endTime: bigint | undefined = isArray ? market[1] : market?.endTime;
+  const resolveTime: bigint | undefined = isArray ? market[2] : market?.resolveTime;
+  const resolved: boolean = isArray ? (market[3] ?? false) : (market?.resolved ?? false);
+  const winningTrack: string = isArray ? (market[4] ?? "") : (market?.winningTrack ?? "");
+  const totalPool: bigint | undefined = isArray ? market[5] : market?.totalPool;
+  const marketIdValue: bigint = isArray ? (market[0] ?? BigInt(0)) : (market?.id ?? BigInt(0));
+  
+  if (!marketIdValue || marketIdValue === BigInt(0)) {
+    return null;
+  }
+
+  const isResolved = resolved ?? false;
+  // Betting is open if market is not resolved AND endTime is in the future
+  // endTime is set to resolveTime - 1 hour, so betting closes 1 hour before resolution
+  const now = BigInt(Math.floor(Date.now() / 1000));
+  const isBettingOpen = !isResolved && endTime ? endTime > now : false;
   const betCount = bets?.length || 0;
-  const isPlacingBet = isApprovingPending || isBetPending || isWaitingForApprove;
-
-  const handlePlaceBet = async () => {
-    if (!isConnected || !address) {
-      showToast({ message: "Please connect your wallet", type: "error" });
-      return;
-    }
-
-    if (!betAmount || parseFloat(betAmount) <= 0) {
-      showToast({ message: "Please enter a valid bet amount", type: "error" });
-      return;
-    }
-
-    if (!trackTitle || trackTitle.trim().length === 0) {
-      showToast({ message: "Please enter a track title", type: "error" });
-      return;
-    }
-
-    try {
-      const amount = parseUSDC(betAmount);
-      await placeBet(marketId, trackTitle.trim(), amount);
-      showToast({ message: `Bet placed: ${betAmount} USDC on "${trackTitle}"`, type: "success" });
-      onBetAmountChange("");
-      onTrackTitleChange("");
-      onCollapse();
-    } catch (error) {
-      console.error("Failed to place bet:", error);
-      showToast({
-        message: error instanceof Error ? error.message : "Failed to place bet. Please try again.",
-        type: "error"
-      });
-    }
-  };
 
   const handleClaimWinnings = () => {
     if (!isConnected) {
@@ -180,18 +149,18 @@ function MarketItem({
             )}
           </div>
           <div className="text-sm text-(--app-foreground-muted) space-y-1">
-            <p>End Time: {formatDate(market.endTime)}</p>
-            <p>Resolution: {formatDate(market.resolveTime)}</p>
-            {!isResolved && isBettingOpen && (
+            <p>End Time: {formatDate(endTime)}</p>
+            <p>Resolution: {formatDate(resolveTime)}</p>
+            {!isResolved && isBettingOpen && endTime && (
               <p className="text-blue-600 font-medium">
-                {getTimeRemaining(market.endTime)} remaining
+                {getTimeRemaining(endTime)} remaining
               </p>
             )}
           </div>
         </div>
         <div className="text-right">
           <p className="font-semibold text-[#0052ff] text-lg">
-            {formatUSDC(market.totalPool)} USDC
+            {formatUSDC(totalPool ?? BigInt(0))} USDC
           </p>
           <p className="text-xs text-(--app-foreground-muted)">
             {betCount} {betCount === 1 ? "bet" : "bets"}
@@ -199,82 +168,18 @@ function MarketItem({
         </div>
       </div>
 
-      {isResolved && market.winningTrack && (
+      {isResolved && winningTrack && (
         <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-sm font-medium text-blue-900 mb-1">🏆 Winning Track:</p>
-          <p className="text-sm text-blue-800">{market.winningTrack}</p>
+          <p className="text-sm text-blue-800">{winningTrack}</p>
         </div>
       )}
 
       {isBettingOpen && (
-        <div className="mt-3 space-y-3">
-          {!isExpanded ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onExpand}
-              className="w-full"
-            >
-              Place Bet
-            </Button>
-          ) : (
-            <div className="space-y-2">
-              <div>
-                <label className="block text-xs font-medium text-(--app-foreground-muted) mb-1">
-                  Track Title *
-                </label>
-                <input
-                  type="text"
-                  placeholder="Enter track title"
-                  value={trackTitle}
-                  onChange={(e) => onTrackTitleChange(e.target.value)}
-                  className="w-full px-3 py-2 border border-[rgba(0,0,0,0.1)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0052ff] text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-(--app-foreground-muted) mb-1">
-                  Bet Amount (USDC) *
-                </label>
-                <input
-                  type="number"
-                  placeholder="0.00"
-                  value={betAmount}
-                  onChange={(e) => onBetAmountChange(e.target.value)}
-                  min="0"
-                  step="0.01"
-                  className="w-full px-3 py-2 border border-[rgba(0,0,0,0.1)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0052ff] text-sm"
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={handlePlaceBet}
-                  disabled={!betAmount || !trackTitle || !isConnected || isPlacingBet}
-                  className="flex-1"
-                >
-                  {isPlacingBet ? "Placing Bet..." : "Place Bet"}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    onBetAmountChange("");
-                    onTrackTitleChange("");
-                    onCollapse();
-                  }}
-                  disabled={isPlacingBet}
-                >
-                  Cancel
-                </Button>
-              </div>
-              {!isConnected && (
-                <p className="text-xs text-center text-(--app-foreground-muted)">
-                  Connect wallet to place bet
-                </p>
-              )}
-            </div>
-          )}
+        <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+          <p className="text-sm text-green-800 text-center">
+            ✅ Betting is open! Use the betting form above to place your bet.
+          </p>
         </div>
       )}
 
@@ -297,10 +202,6 @@ function MarketItem({
 
 export function AutomatedMarkets() {
   const chainId = useChainId();
-  const [betAmounts, setBetAmounts] = useState<Record<string, string>>({});
-  const [trackTitles, setTrackTitles] = useState<Record<string, string>>({});
-  const [expandedMarkets, setExpandedMarkets] = useState<Record<string, boolean>>({});
-
   const isContractDeployed = isAutomatedPredictionMarketDeployed(chainId);
   const { data: marketCount, isLoading: isLoadingCount } = useGetMarketCount();
 
@@ -365,21 +266,6 @@ export function AutomatedMarkets() {
             <MarketItem
               key={marketIdStr}
               marketId={marketId}
-              betAmount={betAmounts[marketIdStr] || ""}
-              trackTitle={trackTitles[marketIdStr] || ""}
-              isExpanded={expandedMarkets[marketIdStr] || false}
-              onBetAmountChange={(value) =>
-                setBetAmounts((prev) => ({ ...prev, [marketIdStr]: value }))
-              }
-              onTrackTitleChange={(value) =>
-                setTrackTitles((prev) => ({ ...prev, [marketIdStr]: value }))
-              }
-              onExpand={() =>
-                setExpandedMarkets((prev) => ({ ...prev, [marketIdStr]: true }))
-              }
-              onCollapse={() =>
-                setExpandedMarkets((prev) => ({ ...prev, [marketIdStr]: false }))
-              }
             />
           );
         })}

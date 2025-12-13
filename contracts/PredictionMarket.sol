@@ -52,6 +52,7 @@ contract PredictionMarket is Ownable, Pausable {
     event TimelockDelayUpdated(uint256 oldDelay, uint256 newDelay);
     event MaxBetAmountUpdated(uint256 indexed marketId, uint256 oldAmount, uint256 newAmount);
     event MinMarketDurationUpdated(uint256 oldDuration, uint256 newDuration);
+    event MarketCreationFeeUpdated(uint256 newFee);
 
     // State variables
     IERC20 public immutable usdc;
@@ -60,6 +61,7 @@ contract PredictionMarket is Ownable, Pausable {
     uint256 public marketCount;
     uint256 public timelockDelay; // Delay in seconds before resolution can be executed
     uint256 public minMarketDuration; // Minimum duration in seconds for a market
+    uint256 public marketCreationFee; // Fee in USDC (6 decimals), owner pays 0
     
     mapping(uint256 => Market) public markets;
     mapping(uint256 => mapping(address => UserBet)) public userBets;
@@ -91,6 +93,7 @@ contract PredictionMarket is Ownable, Pausable {
         platformFeeBps = _platformFeeBps;
         timelockDelay = _timelockDelay;
         minMarketDuration = _minMarketDuration;
+        marketCreationFee = 10 * 10**6; // 10 USDC with 6 decimals
     }
 
     /**
@@ -108,6 +111,11 @@ contract PredictionMarket is Ownable, Pausable {
         require(endTime > block.timestamp, "End time must be in the future");
         require(endTime - block.timestamp >= minMarketDuration, "Market duration below minimum");
         require(bytes(songId).length > 0, "Song ID cannot be empty");
+        
+        // Only non-owners pay the creation fee
+        if (msg.sender != owner() && marketCreationFee > 0) {
+            usdc.safeTransferFrom(msg.sender, feeRecipient, marketCreationFee);
+        }
         
         uint256 marketId = marketCount;
         markets[marketId] = Market({
@@ -366,6 +374,15 @@ contract PredictionMarket is Ownable, Pausable {
         uint256 oldDuration = minMarketDuration;
         minMarketDuration = _minMarketDuration;
         emit MinMarketDurationUpdated(oldDuration, _minMarketDuration);
+    }
+
+    /**
+     * @notice Update market creation fee (only owner)
+     * @param _marketCreationFee New creation fee in USDC (6 decimals)
+     */
+    function setMarketCreationFee(uint256 _marketCreationFee) external onlyOwner {
+        marketCreationFee = _marketCreationFee;
+        emit MarketCreationFeeUpdated(_marketCreationFee);
     }
 
     /**

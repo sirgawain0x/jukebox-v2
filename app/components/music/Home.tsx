@@ -14,7 +14,6 @@ import { ErrorBoundary } from "../ui/ErrorBoundary";
 import { PredictionMarket } from "../prediction/PredictionMarket";
 import { MyBets } from "../prediction/MyBets";
 import { MarketLeaderboard } from "../prediction/MarketLeaderboard";
-import { CreateMarket } from "../prediction/CreateMarket";
 import { CreateAutomatedMarket } from "../prediction/CreateAutomatedMarket";
 import { AutomatedMarkets } from "../prediction/AutomatedMarkets";
 
@@ -121,9 +120,6 @@ export function Home({ setActiveTab, initialSection = "music" }: HomeProps) {
           </ErrorBoundary>
           <ErrorBoundary>
             <AutomatedMarkets />
-          </ErrorBoundary>
-          <ErrorBoundary>
-            <CreateMarket />
           </ErrorBoundary>
           <ErrorBoundary>
             <PredictionMarket />

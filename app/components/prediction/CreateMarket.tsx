@@ -14,9 +14,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useReadContract } from "wagmi";
 import Image from "next/image";
 import { SongPicker } from "./SongPicker";
+import { getUSDCAddress, erc20ABI, formatUSDC } from "@/lib/usdc-utils";
 
 export function CreateMarket() {
-  const { isConnected } = useAccount();
+  const { isConnected, address: connectedAddress } = useAccount();
   const chainId = useChainId();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
@@ -29,10 +30,34 @@ export function CreateMarket() {
   const [maxBetAmount, setMaxBetAmount] = useState("0");
   const [useWeeklyEndTime, setUseWeeklyEndTime] = useState(true);
   const [enableManualEntry, setEnableManualEntry] = useState(false);
+  const [selectedArtist, setSelectedArtist] = useState<string | null>(null);
   
   const isContractDeployed = isPredictionMarketDeployed(chainId);
   const contractAddress = tryGetPredictionMarketAddress(chainId);
   const isFormDisabled = !isConnected;
+  
+  // Check if user is contract owner
+  const { data: contractOwner } = useReadContract({
+    address: contractAddress || undefined,
+    abi: predictionMarketABI,
+    functionName: "owner",
+    query: {
+      enabled: !!contractAddress && isContractDeployed,
+    },
+  });
+  
+  // Get market creation fee
+  const { data: marketCreationFee } = useReadContract({
+    address: contractAddress || undefined,
+    abi: predictionMarketABI,
+    functionName: "marketCreationFee",
+    query: {
+      enabled: !!contractAddress && isContractDeployed,
+    },
+  });
+  
+  const isOwner = contractOwner && connectedAddress && 
+    contractOwner.toLowerCase() === connectedAddress.toLowerCase();
   
   // Fetch trending songs on mount
   useEffect(() => {
@@ -52,6 +77,25 @@ export function CreateMarket() {
     loadSongs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency array - only run once on mount
+  
+  // Group songs by artist
+  const artistsMap = songs.reduce((acc, song) => {
+    const artistKey = song.artistId || song.artist;
+    if (!acc[artistKey]) {
+      acc[artistKey] = {
+        artistId: artistKey,
+        artistName: song.artist,
+        songs: [],
+      };
+    }
+    acc[artistKey].songs.push(song);
+    return acc;
+  }, {} as Record<string, { artistId: string; artistName: string; songs: TrendingTrack[] }>);
+  
+  const artists = Object.values(artistsMap);
+  const filteredSongs = selectedArtist 
+    ? artistsMap[selectedArtist]?.songs || []
+    : songs;
 
   // Update songId when a song is selected
   useEffect(() => {
@@ -95,25 +139,62 @@ export function CreateMarket() {
   };
 
   const calls = isConnected && contractAddress && songId && getEndTime() > BigInt(Math.floor(Date.now() / 1000))
-    ? [
-        {
+    ? (() => {
+        const createMarketCall = {
           abi: predictionMarketABI,
           address: contractAddress,
           functionName: "createMarket" as const,
           args: [songId, getEndTime(), getMaxBetAmount()],
-        },
-      ]
+        };
+
+        // If not owner and fee > 0, add approval call first
+        if (!isOwner && marketCreationFee && marketCreationFee > BigInt(0)) {
+          try {
+            const usdcAddress = getUSDCAddress(chainId);
+            return [
+              {
+                abi: erc20ABI,
+                address: usdcAddress,
+                functionName: "approve" as const,
+                args: [contractAddress, marketCreationFee],
+              },
+              createMarketCall,
+            ];
+          } catch (error) {
+            console.error("Failed to get USDC address:", error);
+            return [createMarketCall];
+          }
+        }
+        
+        // Owner creates for free, no approval needed
+        return [createMarketCall];
+      })()
     : [];
 
-  const handleSuccess = () => {
-    showToast("Market created successfully!");
+  const handleSuccess = async () => {
+    showToast("Market created successfully! Refreshing markets...");
     setSongId("");
     setSelectedSong(null);
     setEndTime("");
     setMaxBetAmount("0");
     setEnableManualEntry(false);
-    // Invalidate queries to refetch markets
+    setSelectedArtist(null);
+    
+    // Invalidate React Query cache
     queryClient.invalidateQueries({ queryKey: ["prediction-markets"] });
+    
+    // Force API cache invalidation and immediate refetch
+    // Wait a moment for transaction to be confirmed on-chain
+    setTimeout(async () => {
+      try {
+        // Call API with refresh flag to clear server cache
+        await fetch("/api/prediction/markets?refresh=true", { cache: "no-store" });
+        // Refetch all market-related queries
+        await queryClient.refetchQueries({ queryKey: ["prediction-markets"] });
+      } catch (error) {
+        console.error("Failed to refresh markets:", error);
+      }
+    }, 2000); // 2 second delay to allow transaction confirmation
   };
 
   const persistSongMetadata = async (song: TrendingTrack) => {
@@ -142,6 +223,7 @@ export function CreateMarket() {
     setSelectedSong(song);
     setSongId(song.id);
     setEnableManualEntry(false);
+    // Keep selectedArtist when song is selected
     void persistSongMetadata(song);
   };
 
@@ -153,6 +235,7 @@ export function CreateMarket() {
   const handleReturnToPicker = () => {
     if (isFormDisabled) return;
     setEnableManualEntry(false);
+    setSelectedArtist(null);
     setSongId("");
     setSelectedSong(null);
   };
@@ -188,44 +271,84 @@ export function CreateMarket() {
         </div>
         
         <div>
-          <Label htmlFor="songSelect">Select Song *</Label>
+          <Label htmlFor="artistSelect">Select Trending Artist *</Label>
           {!enableManualEntry ? (
             <div className="mt-1 space-y-2">
-              <SongPicker
-                songs={songs}
-                selectedSongId={selectedSong?.id}
-                onSelect={handleSelectSong}
-                disabled={isFormDisabled}
-                isLoading={isLoadingSongs}
-                placeholder="-- Select a song --"
-              />
-              {selectedSong && (
-                <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
-                  {selectedSong.cover && (
-                    <Image
-                      src={selectedSong.cover}
-                      alt={selectedSong.title}
-                      width={48}
-                      height={48}
-                      className="h-12 w-12 rounded object-cover"
-                      unoptimized
-                    />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{selectedSong.title}</p>
-                    <p className="truncate text-xs text-(--app-foreground-muted)">{selectedSong.artist}</p>
+              {!selectedArtist ? (
+                <>
+                  <select
+                    id="artistSelect"
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setSelectedArtist(e.target.value);
+                        setSelectedSong(null);
+                        setSongId("");
+                      }
+                    }}
+                    disabled={isFormDisabled || isLoadingSongs}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0052ff] text-sm"
+                  >
+                    <option value="">-- Select a trending artist --</option>
+                    {artists.map((artist) => (
+                      <option key={artist.artistId} value={artist.artistId}>
+                        {artist.artistName} ({artist.songs.length} {artist.songs.length === 1 ? 'song' : 'songs'})
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={handleEnableManualEntry}
+                    className={`text-xs text-[#0052ff] hover:underline ${isFormDisabled ? "cursor-not-allowed opacity-60" : ""}`}
+                    disabled={isFormDisabled}
+                    aria-disabled={isFormDisabled}
+                  >
+                    Or enter song ID manually
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 mb-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedArtist(null);
+                        setSelectedSong(null);
+                        setSongId("");
+                      }}
+                      className="text-xs text-[#0052ff] hover:underline"
+                    >
+                      ← Back to artists
+                    </button>
                   </div>
-                </div>
+                  <SongPicker
+                    songs={filteredSongs}
+                    selectedSongId={selectedSong?.id}
+                    onSelect={handleSelectSong}
+                    disabled={isFormDisabled}
+                    isLoading={isLoadingSongs}
+                    placeholder="-- Select a song --"
+                  />
+                  {selectedSong && (
+                    <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                      {selectedSong.cover && (
+                        <Image
+                          src={selectedSong.cover}
+                          alt={selectedSong.title}
+                          width={48}
+                          height={48}
+                          className="h-12 w-12 rounded object-cover"
+                          unoptimized
+                        />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{selectedSong.title}</p>
+                        <p className="truncate text-xs text-(--app-foreground-muted)">{selectedSong.artist}</p>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
-              <button
-                type="button"
-                onClick={handleEnableManualEntry}
-                className={`text-xs text-[#0052ff] hover:underline ${isFormDisabled ? "cursor-not-allowed opacity-60" : ""}`}
-                disabled={isFormDisabled}
-                aria-disabled={isFormDisabled}
-              >
-                Or enter song ID manually
-              </button>
             </div>
           ) : (
             <div className="mt-1 space-y-2">
@@ -251,7 +374,9 @@ export function CreateMarket() {
           <p className="text-xs text-(--app-foreground-muted) mt-1">
             {enableManualEntry 
               ? "The unique identifier for the song (from Spinamp)"
-              : "Choose a song from the trending list or enter manually"}
+              : selectedArtist
+              ? "Choose a song from this artist"
+              : "Choose a trending artist, then select a song"}
           </p>
         </div>
 
@@ -334,6 +459,16 @@ export function CreateMarket() {
                 <p>Max Bet: {maxBetAmount === "0" ? "No limit" : `${maxBetAmount} USDC`}</p>
               </div>
             </div>
+            {marketCreationFee && marketCreationFee > BigInt(0) && !isOwner && (
+              <div className="border-t border-gray-200 pt-2 mt-2">
+                <p className="text-sm font-medium text-orange-600">
+                  ⚠️ Market Creation Fee: {formatUSDC(marketCreationFee)} USDC
+                </p>
+                <p className="text-xs text-(--app-foreground-muted) mt-1">
+                  This fee will be charged when you create the market.
+                </p>
+              </div>
+            )}
           </div>
         )}
 

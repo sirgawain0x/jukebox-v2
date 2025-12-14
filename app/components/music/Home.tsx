@@ -11,7 +11,6 @@ import { Jukebox } from "./Jukebox";
 // import { PlaylistView } from "./PlaylistView"; // Commented out - playlist functionality disabled
 // import { RecentTips } from "./RecentTips"; // Commented out - playlist functionality disabled
 import { ErrorBoundary } from "../ui/ErrorBoundary";
-import { PredictionMarket } from "../prediction/PredictionMarket";
 import { MyBets } from "../prediction/MyBets";
 import { MarketLeaderboard } from "../prediction/MarketLeaderboard";
 import { CreateAutomatedMarket } from "../prediction/CreateAutomatedMarket";
@@ -120,9 +119,6 @@ export function Home({ setActiveTab, initialSection = "music" }: HomeProps) {
           </ErrorBoundary>
           <ErrorBoundary>
             <AutomatedMarkets />
-          </ErrorBoundary>
-          <ErrorBoundary>
-            <PredictionMarket />
           </ErrorBoundary>
           <ErrorBoundary>
             <MyBets />

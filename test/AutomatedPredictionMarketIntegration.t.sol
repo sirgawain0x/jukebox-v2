@@ -33,6 +33,7 @@ contract AutomatedPredictionMarketIntegrationTest is Test {
     MockFunctionsRouter public mockRouter;
 
     address public owner = address(1);
+    address public feeRecipient = address(2);
     address public user1 = address(3);
     address public user2 = address(4);
     address public user3 = address(5);
@@ -63,7 +64,8 @@ contract AutomatedPredictionMarketIntegrationTest is Test {
             SUBSCRIPTION_ID,
             address(usdc),
             address(mockRouter),
-            TEST_DON_ID
+            TEST_DON_ID,
+            feeRecipient
         );
     }
 

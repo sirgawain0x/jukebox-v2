@@ -5,7 +5,7 @@ import {
   calculateScoresForSongs,
   getWinner,
 } from "@/lib/prediction-metrics";
-import { getPredictionMarketAddress, predictionMarketABI } from "@/lib/contracts/prediction-market";
+import { getAutomatedPredictionMarketAddress, automatedPredictionMarketABI } from "@/lib/contracts/automated-prediction-market";
 import { invalidateMarketCache } from "@/lib/prediction-cache";
 import type { Song } from "@/types/music";
 
@@ -67,11 +67,11 @@ export async function POST(request: NextRequest) {
     // Get contract address with error handling (like markets route)
     let contractAddress: string | null = null;
     try {
-      contractAddress = getPredictionMarketAddress(base.id);
+      contractAddress = getAutomatedPredictionMarketAddress(base.id);
     } catch {
-      console.warn("Prediction market contract not deployed");
+      console.warn("Automated prediction market contract not deployed");
       return NextResponse.json(
-        { error: "Prediction market contract not deployed on this chain" },
+        { error: "Automated prediction market contract not deployed on this chain" },
         { status: 400 }
       );
     }
@@ -79,22 +79,25 @@ export async function POST(request: NextRequest) {
     const results = [];
 
     // Resolve each market
+    // Note: AutomatedPredictionMarket markets are auto-resolved via Chainlink Functions
+    // This endpoint may not be needed, but we'll keep it for compatibility
     for (const marketId of marketIds) {
       try {
-        // Determine if YES or NO won based on whether this market's song is the winner
+        // Read market data from AutomatedPredictionMarket contract
         const marketData = await publicClient.readContract({
-          address: contractAddress as `0x${string}`, // Use the validated address
-          abi: predictionMarketABI,
+          address: contractAddress as `0x${string}`,
+          abi: automatedPredictionMarketABI,
           functionName: "markets",
           args: [BigInt(marketId)],
         });
 
-        // Check if this market's song is the winner
-        // Convert both to strings for comparison to handle type mismatches
-        // marketData[0] is songId (string from contract), winnerSongId is also string
-        const marketSongId = String(marketData[0]);
-        const isWinner = marketSongId === winnerSongId;
-        const winner = isWinner; // true = YES won, false = NO won
+        // AutomatedPredictionMarket Market struct: id, endTime, resolveTime, resolved, winningTrack, totalPool
+        const winningTrack = String(marketData[4] as string); // winningTrack
+        const _isResolved = marketData[3] as boolean; // resolved (unused but kept for potential future use)
+        
+        // Check if this market's winning track matches the winner
+        // Note: winnerSongId should be a track title, not a song ID
+        const isWinner = winningTrack.toLowerCase() === winnerSongId.toLowerCase();
 
         // If we have a private key, we can resolve the market
         // Otherwise, return the resolution data for manual resolution
@@ -103,14 +106,14 @@ export async function POST(request: NextRequest) {
           // For now, we'll just return the resolution data
           results.push({
             marketId,
-            winner,
+            winner: isWinner,
             winnerSongId,
             resolved: false, // Would be true if we actually resolved
           });
         } else {
           results.push({
             marketId,
-            winner,
+            winner: isWinner,
             winnerSongId,
             resolved: false,
             message: "No private key configured. Manual resolution required.",

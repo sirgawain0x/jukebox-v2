@@ -10,7 +10,7 @@ import type { MarketBet, PredictionMarket } from "@/types/prediction-market";
 import { Address, decodeEventLog } from "viem";
 import { createPublicClient, http } from "viem";
 import { base } from "viem/chains";
-import { getPredictionMarketAddress, predictionMarketABI } from "@/lib/contracts/prediction-market";
+import { getAutomatedPredictionMarketAddress, automatedPredictionMarketABI } from "@/lib/contracts/automated-prediction-market";
 import { fetchMarketsFromChain } from "@/lib/server/prediction-market-data";
 
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://mainnet.base.org";
@@ -28,7 +28,7 @@ async function fetchUserBetCount(
   userAddress: Address
 ): Promise<number> {
   try {
-    const betPlacedEvent = predictionMarketABI.find(
+    const betPlacedEvent = automatedPredictionMarketABI.find(
       (item) => item.type === "event" && item.name === "BetPlaced"
     );
 
@@ -42,7 +42,7 @@ async function fetchUserBetCount(
     const latestBlock = await publicClient.getBlockNumber();
 
     if (searchFromBlock === null) {
-      const marketCreatedEvent = predictionMarketABI.find(
+      const marketCreatedEvent = automatedPredictionMarketABI.find(
         (item) => item.type === "event" && item.name === "MarketCreated"
       );
 
@@ -81,15 +81,25 @@ async function fetchUserBetCount(
       const currentToBlock = proposedToBlock > latestBlock ? latestBlock : proposedToBlock;
 
       try {
+        // Note: AutomatedPredictionMarket BetPlaced event only has marketId indexed
+        // We need to fetch all events and filter by user in the decoded args
         const chunkLogs = await publicClient.getLogs({
           address: contractAddress as `0x${string}`,
           event: betPlacedEvent,
-          args: {
-            user: userAddress,
-          },
           fromBlock: currentFromBlock,
           toBlock: currentToBlock,
         });
+        
+        // Filter logs by user address
+        const userLogs = chunkLogs.filter((log) => {
+          if ("args" in log && log.args) {
+            const args = log.args as { user?: Address };
+            return args.user?.toLowerCase() === userAddress.toLowerCase();
+          }
+          return false;
+        });
+        
+        totalCount += userLogs.length;
 
         totalCount += chunkLogs.length;
 
@@ -131,7 +141,7 @@ async function fetchBetTimestamp(
   side: "YES" | "NO"
 ): Promise<number> {
   try {
-    const betPlacedEvent = predictionMarketABI.find(
+    const betPlacedEvent = automatedPredictionMarketABI.find(
       (item) => item.type === "event" && item.name === "BetPlaced"
     );
 
@@ -144,34 +154,41 @@ async function fetchBetTimestamp(
     const latestBlock = await publicClient.getBlockNumber();
     const searchFromBlock = await getCachedDeploymentBlock(contractAddress) || BIGINT_ZERO;
 
-    // Fetch events with both marketId and user filters (both are indexed)
-    const logs = await publicClient.getLogs({
+    // Note: AutomatedPredictionMarket BetPlaced event only has marketId indexed
+    // We need to fetch events for the market and filter by user
+    const allLogs = await publicClient.getLogs({
       address: contractAddress as `0x${string}`,
       event: betPlacedEvent,
       args: {
         marketId: marketId,
-        user: userAddress,
       },
       fromBlock: searchFromBlock,
       toBlock: latestBlock,
     });
+    
+    // Filter logs by user address
+    const logs = allLogs.filter((log) => {
+      if ("args" in log && log.args) {
+        const args = log.args as { user?: Address };
+        return args.user?.toLowerCase() === userAddress.toLowerCase();
+      }
+      return false;
+    });
 
-    // Find the event that matches this market, user, and side
-    // side is true for YES, false for NO
-    const sideBool = side === "YES";
+    // Note: AutomatedPredictionMarket uses track predictions (strings), not YES/NO sides
+    // This function is kept for compatibility but the side parameter is not used
     
     // Process logs in reverse order to get the most recent matching event
     for (const log of logs.reverse()) {
       // When using getLogs with an event, viem automatically decodes it
       // The log should have decoded args
       if ('args' in log && log.args) {
-        const args = log.args as { marketId?: bigint; user?: Address; side?: boolean; amount?: bigint };
+        const args = log.args as { marketId?: bigint; user?: Address; prediction?: string; amount?: bigint };
         
-        // Verify it matches our criteria
+        // Verify it matches our criteria (AutomatedPredictionMarket uses prediction string, not side bool)
         if (
           args.marketId === marketId &&
-          args.user?.toLowerCase() === userAddress.toLowerCase() &&
-          args.side === sideBool
+          args.user?.toLowerCase() === userAddress.toLowerCase()
         ) {
           // Get the block timestamp
           if (log.blockNumber) {
@@ -185,20 +202,19 @@ async function fetchBetTimestamp(
         // Fallback: if args aren't decoded, try to decode manually
         try {
           const decoded = decodeEventLog({
-            abi: predictionMarketABI,
+            abi: automatedPredictionMarketABI,
             data: log.data,
             topics: log.topics,
           });
 
           // Type guard: check if this is a BetPlaced event
-          if (decoded.eventName === "BetPlaced" && "side" in decoded.args) {
-            const args = decoded.args as { marketId?: bigint; user?: Address; side?: boolean; amount?: bigint };
+          if (decoded.eventName === "BetPlaced" && "prediction" in decoded.args) {
+            const args = decoded.args as { marketId?: bigint; user?: Address; prediction?: string; amount?: bigint };
             
-            // Verify it matches our criteria
+            // Verify it matches our criteria (AutomatedPredictionMarket uses prediction string, not side bool)
             if (
               args.marketId === marketId &&
-              args.user?.toLowerCase() === userAddress.toLowerCase() &&
-              args.side === sideBool
+              args.user?.toLowerCase() === userAddress.toLowerCase()
             ) {
               if (log.blockNumber) {
                 const block = await publicClient.getBlock({
@@ -229,12 +245,12 @@ async function fetchUserBetsFromContract(
 ): Promise<MarketBet[]> {
   try {
 
-    // Wrap getPredictionMarketAddress in try-catch (like markets route does)
+    // Wrap getAutomatedPredictionMarketAddress in try-catch (like markets route does)
     let contractAddress: string | null = null;
     try {
-      contractAddress = getPredictionMarketAddress(base.id);
+      contractAddress = getAutomatedPredictionMarketAddress(base.id);
     } catch {
-      console.warn("Prediction market contract not deployed");
+      console.warn("Automated prediction market contract not deployed");
       return [];
     }
 
@@ -243,8 +259,8 @@ async function fetchUserBetsFromContract(
     try {
       const count = await publicClient.readContract({
         address: contractAddress as `0x${string}`,
-        abi: predictionMarketABI,
-        functionName: "marketCount",
+        abi: automatedPredictionMarketABI,
+        functionName: "s_marketCount",
       });
       marketCount = Number(count);
     } catch (error) {
@@ -258,65 +274,73 @@ async function fetchUserBetsFromContract(
 
     const bets: MarketBet[] = [];
 
-    // Check each market for user bets
-    for (let i = 0; i < marketCount; i++) {
+    // AutomatedPredictionMarket uses 1-based market IDs and stores bets in marketBets array
+    // We need to fetch bets from the marketBets mapping for each market
+    for (let marketId = 1; marketId <= marketCount; marketId++) {
       try {
-        const userBet = await publicClient.readContract({
-          address: contractAddress as `0x${string}`,
-          abi: predictionMarketABI,
-          functionName: "userBets",
-          args: [BigInt(i), address],
-        });
+        // Read marketBets array for this market
+        // Note: This contract doesn't have a direct userBets function
+        // We'll need to fetch from BetPlaced events instead
+        // For now, we'll fetch from events (which is already done in fetchUserBetCount)
+        
+        // The contract structure is different - bets are stored per market, not per user
+        // We'll need to query BetPlaced events filtered by user and marketId
+        const betPlacedEvent = automatedPredictionMarketABI.find(
+          (item) => item.type === "event" && item.name === "BetPlaced"
+        );
 
-        // userBet structure: [amountYes, amountNo, claimed]
-        const amountYes = userBet[0] as bigint;
-        const amountNo = userBet[1] as bigint;
-        const claimed = userBet[2] as boolean;
-
-        // Create bet entries for YES and NO if they exist
-        if (amountYes > BigInt(0)) {
-          // Fetch the actual timestamp from BetPlaced events
-          const timestamp = await fetchBetTimestamp(
-            publicClient,
-            contractAddress,
-            BigInt(i),
-            address,
-            "YES"
-          );
-
-          bets.push({
-            id: `bet-${i}-${address}-yes`,
-            marketId: `market-${i}`,
-            userAddress: address,
-            side: "YES",
-            amount: amountYes,
-            timestamp,
-            claimed,
+        if (betPlacedEvent) {
+          const searchFromBlock = await getCachedDeploymentBlock(contractAddress) || BIGINT_ZERO;
+          const latestBlock = await publicClient.getBlockNumber();
+          
+          // Note: AutomatedPredictionMarket BetPlaced event only has marketId indexed
+          // We need to fetch events for the market and filter by user
+          const allLogs = await publicClient.getLogs({
+            address: contractAddress as `0x${string}`,
+            event: betPlacedEvent,
+            args: {
+              marketId: BigInt(marketId),
+            },
+            fromBlock: searchFromBlock,
+            toBlock: latestBlock,
           });
-        }
-
-        if (amountNo > BigInt(0)) {
-          // Fetch the actual timestamp from BetPlaced events
-          const timestamp = await fetchBetTimestamp(
-            publicClient,
-            contractAddress,
-            BigInt(i),
-            address,
-            "NO"
-          );
-
-          bets.push({
-            id: `bet-${i}-${address}-no`,
-            marketId: `market-${i}`,
-            userAddress: address,
-            side: "NO",
-            amount: amountNo,
-            timestamp,
-            claimed,
+          
+          // Filter logs by user address
+          const logs = allLogs.filter((log) => {
+            if ("args" in log && log.args) {
+              const args = log.args as { user?: Address };
+              return args.user?.toLowerCase() === address.toLowerCase();
+            }
+            return false;
           });
+
+          for (const log of logs) {
+            if ("args" in log && log.args) {
+              const args = log.args as { marketId?: bigint; user?: Address; prediction?: string; amount?: bigint };
+              if (args.amount && args.amount > BigInt(0)) {
+                const timestamp = await fetchBetTimestamp(
+                  publicClient,
+                  contractAddress,
+                  BigInt(marketId),
+                  address,
+                  "YES" // AutomatedPredictionMarket uses track predictions, not YES/NO
+                );
+
+                bets.push({
+                  id: `bet-${marketId}-${address}-${log.logIndex}`,
+                  marketId: `market-${marketId}`,
+                  userAddress: address,
+                  side: "YES", // Simplified - actual side depends on if prediction matches winning track
+                  amount: args.amount,
+                  timestamp,
+                  claimed: false, // Would need to check from contract
+                });
+              }
+            }
+          }
         }
       } catch (error) {
-        console.error(`Failed to fetch user bet for market ${i}:`, error);
+        console.error(`Failed to fetch user bet for market ${marketId}:`, error);
         continue;
       }
     }
@@ -351,9 +375,9 @@ export async function GET(
 
     let contractAddress: string | null = null;
     try {
-      contractAddress = getPredictionMarketAddress(base.id);
+      contractAddress = getAutomatedPredictionMarketAddress(base.id);
     } catch {
-      console.warn("Prediction market contract not deployed");
+      console.warn("Automated prediction market contract not deployed");
       return NextResponse.json({ bets: [], betCount: 0 });
     }
 

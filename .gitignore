@@ -46,3 +46,7 @@ cache/
 broadcast/
 lib/openzeppelin-contracts/
 lib/forge-std/
+
+# Cursor debug logs
+.cursor/*.log
+.cursor/debug.log

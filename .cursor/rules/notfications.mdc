@@ -86,11 +86,21 @@ Different client apps handle webhook responses differently:
       } catch (e: unknown) {
         // Handle verification errors (invalid data, invalid app key, etc.)
         // Return appropriate error responses with status codes 400, 401, or 500
+        return new Response(JSON.stringify({ error: "Invalid webhook event" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
       }
 
+      // Validate data was successfully parsed
+      if (!data) {
+        return new Response(JSON.stringify({ error: "Failed to parse webhook event" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
 
       // Extract webhook data
-
       const fid = data.fid;
       const appFid = data.appFid; // The FID of the client app that the user added the Mini App to
       const event = data.event;
@@ -134,9 +144,16 @@ Different client apps handle webhook responses differently:
       }
     } catch (error) {
       console.error("Error processing webhook:", error);
+      return new Response(JSON.stringify({ error: "Internal server error" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
-        return response; 
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }); 
       
     ```
   </Step>

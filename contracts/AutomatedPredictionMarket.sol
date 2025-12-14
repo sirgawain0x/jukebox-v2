@@ -28,6 +28,7 @@ contract AutomatedPredictionMarket is FunctionsClient, AutomationCompatibleInter
 
     uint256 public protocolFeeBasisPoints = 1000; // 10% (1000/10000)
     uint256 public accumulatedFees; // Fees collected for Admin
+    address public feeRecipient; // Address that receives platform fees
 
     // The JavaScript Source (matches lib/source.js)
     // This code queries Spinamp GraphQL API to get the #1 trending track
@@ -77,15 +78,18 @@ contract AutomatedPredictionMarket is FunctionsClient, AutomationCompatibleInter
         uint64 subscriptionId,
         address _usdcAddress,
         address _router,
-        bytes32 _donId
+        bytes32 _donId,
+        address _feeRecipient
     ) FunctionsClient(_router) ConfirmedOwner(msg.sender) {
         require(_router != address(0), "Invalid router address");
         require(_usdcAddress != address(0), "Invalid USDC address");
+        require(_feeRecipient != address(0), "Invalid fee recipient address");
         
         s_subscriptionId = subscriptionId;
         usdcToken = IERC20(_usdcAddress);
         ROUTER = _router;
         DON_ID = _donId;
+        feeRecipient = _feeRecipient;
     }
 
     // --- 1. Market Creation ---
@@ -230,13 +234,21 @@ contract AutomatedPredictionMarket is FunctionsClient, AutomationCompatibleInter
     }
 
     // --- 5. Admin Withdraw ---
-    function withdrawFees() external onlyOwner {
+    function withdrawFees() external {
+        require(msg.sender == feeRecipient, "Only fee recipient can withdraw");
         uint256 amount = accumulatedFees;
+        require(amount > 0, "No fees to withdraw");
         accumulatedFees = 0;
-        usdcToken.safeTransfer(msg.sender, amount);
+        usdcToken.safeTransfer(feeRecipient, amount);
     }
 
-    // --- 6. View Functions ---
+    // --- 6. Owner Functions ---
+    function setFeeRecipient(address _feeRecipient) external onlyOwner {
+        require(_feeRecipient != address(0), "Invalid fee recipient address");
+        feeRecipient = _feeRecipient;
+    }
+
+    // --- 7. View Functions ---
     function getMarketBets(uint256 marketId) external view returns (Bet[] memory) {
         return marketBets[marketId];
     }

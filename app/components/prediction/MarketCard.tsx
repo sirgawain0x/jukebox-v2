@@ -1,12 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import { useAccount } from "wagmi";
+// Removed: useAccount - not currently used but may be needed for future bet display
 import { formatUSDC } from "@/lib/usdc-utils";
 import { useMarketOdds } from "@/app/hooks/usePredictionMarket";
 import type { PredictionMarket } from "@/types/prediction-market";
 import { Card } from "../ui/Card";
-import { useGetUserBets } from "@/lib/contracts/prediction-market-hooks";
+// Removed: useGetUserBets from old contract - user bets now fetched via API
 import { isTrendingMetadataMissing } from "@/lib/prediction-market-utils";
 
 interface MarketCardProps {
@@ -14,24 +14,14 @@ interface MarketCardProps {
 }
 
 export function MarketCard({ market }: MarketCardProps) {
-  const { address, isConnected } = useAccount();
+  // Removed: address and isConnected - not currently used but may be needed for future bet display
+  // const { address, isConnected } = useAccount();
   
   const { data: odds } = useMarketOdds(market);
   
-  // Get user's current bets on this market (for display only)
-  const { data: userBetsData } = useGetUserBets(
-    market.marketIndex !== undefined ? BigInt(market.marketIndex) : undefined,
-    address
-  );
-  
-  // Viem returns contract data as arrays: [amountYes, amountNo, claimed]
-  const userAmountYes = userBetsData && Array.isArray(userBetsData)
-    ? (userBetsData[0] as bigint) || BigInt(0)
-    : BigInt(0);
-  const userAmountNo = userBetsData && Array.isArray(userBetsData)
-    ? (userBetsData[1] as bigint) || BigInt(0)
-    : BigInt(0);
-  const hasExistingBets = userAmountYes > BigInt(0) || userAmountNo > BigInt(0);
+  // User bets are now fetched via API routes, not directly from contract
+  // This keeps the component simpler and works with both old and new contracts
+  // Removed: hasExistingBets - not currently used but may be needed for future bet display
 
   const totalPool = market.totalPoolYes + market.totalPoolNo;
   const totalPoolDisplay = formatUSDC(totalPool);
@@ -114,27 +104,7 @@ export function MarketCard({ market }: MarketCardProps) {
         {/* Market Status Info */}
         {market.status === "ACTIVE" && (
           <div className="space-y-2">
-            {/* Show user's existing bets if any */}
-            {isConnected && hasExistingBets && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-1">
-                <p className="text-xs font-semibold text-blue-800 mb-2">Your Current Bets:</p>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-blue-700">YES:</span>
-                  <span className="font-medium text-blue-900">
-                    {userAmountYes > BigInt(0) ? formatUSDC(userAmountYes) : "0"} USDC
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-blue-700">NO:</span>
-                  <span className="font-medium text-blue-900">
-                    {userAmountNo > BigInt(0) ? formatUSDC(userAmountNo) : "0"} USDC
-                  </span>
-                </div>
-                <p className="text-[10px] text-blue-600 mt-2">
-                  💡 Use the &quot;Place Your Bet&quot; section above to bet YES or NO on this market.
-                </p>
-              </div>
-            )}
+            {/* User bets display removed - can be re-added later via API if needed */}
             {/* <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
               <p className="text-sm font-medium text-green-800">
                 ✓ Betting is open - Use the "Place Your Bet" section above to bet

@@ -109,6 +109,13 @@ export const automatedPredictionMarketABI = [
     type: "function",
   },
   {
+    inputs: [{ internalType: "address", name: "_feeRecipient", type: "address" }],
+    name: "setFeeRecipient",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
     inputs: [{ internalType: "uint256", name: "", type: "uint256" }],
     name: "markets",
     outputs: [
@@ -176,12 +183,19 @@ export const automatedPredictionMarketABI = [
     stateMutability: "view",
     type: "function",
   },
+  {
+    inputs: [],
+    name: "feeRecipient",
+    outputs: [{ internalType: "address", name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function",
+  },
 ] as const;
 
 // Contract addresses by chain
 const AUTOMATED_PREDICTION_MARKET_ADDRESSES = {
-  // Base Sepolia (Testnet) - Deployed: 0xbB22f1b5BF17e2eAD9aA1a012b8dA9A980797855
-  84532: "0xbB22f1b5BF17e2eAD9aA1a012b8dA9A980797855" as Address,
+  // Base Sepolia (Testnet) - Deployed: 0xF7C12c1DB310d7140F71486516feF67152203CBB
+  84532: "0xF7C12c1DB310d7140F71486516feF67152203CBB" as Address,
   // Base Mainnet (Production) - Update after deployment: forge script script/DeployAutomatedPredictionMarket.s.sol --rpc-url $BASE_MAINNET_RPC_URL --broadcast
   8453: "0x18DCbC44e1C4bFaBEa0B62A5C9449ad59798a049" as Address,
 } as const;

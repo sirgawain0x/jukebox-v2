@@ -428,6 +428,85 @@ export const automatedPredictionMarketABI = [
   },
   {
     "type": "function",
+    "name": "pause",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "unpause",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "paused",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "maxBetAmount",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "minMarketDuration",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "setMaxBetAmount",
+    "inputs": [
+      {
+        "name": "_maxBetAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setMinMarketDuration",
+    "inputs": [
+      {
+        "name": "_minDuration",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "transferOwnership",
     "inputs": [
       {
@@ -655,6 +734,58 @@ export const automatedPredictionMarketABI = [
     "anonymous": false
   },
   {
+    "type": "event",
+    "name": "Paused",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Unpaused",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "MaxBetAmountUpdated",
+    "inputs": [
+      {
+        "name": "newMaxBetAmount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "MinMarketDurationUpdated",
+    "inputs": [
+      {
+        "name": "newMinDuration",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
     "type": "error",
     "name": "EmptySource",
     "inputs": []
@@ -673,10 +804,10 @@ export const automatedPredictionMarketABI = [
 
 // Contract addresses by chain
 const AUTOMATED_PREDICTION_MARKET_ADDRESSES = {
-  // Base Sepolia (Testnet) - Deployed: 0xF7C12c1DB310d7140F71486516feF67152203CBB
-  84532: "0xF7C12c1DB310d7140F71486516feF67152203CBB" as Address,
+  // Base Sepolia (Testnet) - SpinampUSDC contract (Deployed: 0x8b944e9d593b5746a4b5bd96e2eb7704d1ffd775)
+  84532: "0xe0c646db384841b974aaf24905e2018aff8aeca4" as Address,
   // Base Mainnet (Production) - SpinampUSDC contract
-  8453: "0x8aCF38D1D28579B14D6d3c17EBD1F5b8047EFCCE" as Address,
+  8453: "0xe77f979eD1B8b8A6e40daD50FE5ED83474f8Bd8b" as Address,
 } as const;
 
 /**

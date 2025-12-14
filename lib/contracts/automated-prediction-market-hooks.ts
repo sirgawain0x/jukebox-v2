@@ -374,3 +374,139 @@ export function useGetNextMondayEST() {
     },
   });
 }
+
+/**
+ * Hook to check if contract is paused
+ */
+export function useIsPaused() {
+  const chainId = useChainId();
+  const contractAddress = tryGetAutomatedPredictionMarketAddress(chainId);
+
+  return useReadContract({
+    abi: automatedPredictionMarketABI,
+    address: contractAddress || undefined,
+    functionName: "paused",
+    args: [],
+    query: {
+      enabled: !!contractAddress,
+    },
+  });
+}
+
+/**
+ * Hook to get maximum bet amount
+ */
+export function useGetMaxBetAmount() {
+  const chainId = useChainId();
+  const contractAddress = tryGetAutomatedPredictionMarketAddress(chainId);
+
+  return useReadContract({
+    abi: automatedPredictionMarketABI,
+    address: contractAddress || undefined,
+    functionName: "maxBetAmount",
+    args: [],
+    query: {
+      enabled: !!contractAddress,
+    },
+  });
+}
+
+/**
+ * Hook to get minimum market duration
+ */
+export function useGetMinMarketDuration() {
+  const chainId = useChainId();
+  const contractAddress = tryGetAutomatedPredictionMarketAddress(chainId);
+
+  return useReadContract({
+    abi: automatedPredictionMarketABI,
+    address: contractAddress || undefined,
+    functionName: "minMarketDuration",
+    args: [],
+    query: {
+      enabled: !!contractAddress,
+    },
+  });
+}
+
+/**
+ * Hook to pause/unpause contract (owner only)
+ */
+export function usePauseContract() {
+  const { writeContract, ...rest } = useWriteContract();
+  const chainId = useChainId();
+
+  const pause = () => {
+    const contractAddress = tryGetAutomatedPredictionMarketAddress(chainId);
+    if (!contractAddress) {
+      throw new Error(`Contract not deployed on chain ${chainId}`);
+    }
+    writeContract({
+      abi: automatedPredictionMarketABI,
+      address: contractAddress,
+      functionName: "pause",
+      args: [],
+    });
+  };
+
+  const unpause = () => {
+    const contractAddress = tryGetAutomatedPredictionMarketAddress(chainId);
+    if (!contractAddress) {
+      throw new Error(`Contract not deployed on chain ${chainId}`);
+    }
+    writeContract({
+      abi: automatedPredictionMarketABI,
+      address: contractAddress,
+      functionName: "unpause",
+      args: [],
+    });
+  };
+
+  return { pause, unpause, ...rest };
+}
+
+/**
+ * Hook to set max bet amount (owner only)
+ */
+export function useSetMaxBetAmount() {
+  const { writeContract, ...rest } = useWriteContract();
+  const chainId = useChainId();
+
+  const setMaxBetAmount = (maxBetAmount: bigint) => {
+    const contractAddress = tryGetAutomatedPredictionMarketAddress(chainId);
+    if (!contractAddress) {
+      throw new Error(`Contract not deployed on chain ${chainId}`);
+    }
+    writeContract({
+      abi: automatedPredictionMarketABI,
+      address: contractAddress,
+      functionName: "setMaxBetAmount",
+      args: [maxBetAmount],
+    });
+  };
+
+  return { setMaxBetAmount, ...rest };
+}
+
+/**
+ * Hook to set min market duration (owner only)
+ */
+export function useSetMinMarketDuration() {
+  const { writeContract, ...rest } = useWriteContract();
+  const chainId = useChainId();
+
+  const setMinMarketDuration = (minDuration: bigint) => {
+    const contractAddress = tryGetAutomatedPredictionMarketAddress(chainId);
+    if (!contractAddress) {
+      throw new Error(`Contract not deployed on chain ${chainId}`);
+    }
+    writeContract({
+      abi: automatedPredictionMarketABI,
+      address: contractAddress,
+      functionName: "setMinMarketDuration",
+      args: [minDuration],
+    });
+  };
+
+  return { setMinMarketDuration, ...rest };
+}

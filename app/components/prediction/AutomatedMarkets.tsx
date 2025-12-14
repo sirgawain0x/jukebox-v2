@@ -7,37 +7,25 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "../ui/ToastProvider";
 import { formatUSDC } from "@/lib/usdc-utils";
 import {
-  useGetMarketCount,
-  useGetMarket,
-
   useClaimWinnings,
 } from "@/lib/contracts/automated-prediction-market-hooks";
+import { useActiveMarkets } from "@/app/hooks/usePredictionMarket";
 import { isAutomatedPredictionMarketDeployed } from "@/lib/contracts/automated-prediction-market";
+import type { PredictionMarket } from "@/types/prediction-market";
 
 interface MarketItemProps {
-  marketId: bigint;
+  market: PredictionMarket;
 }
 
 function MarketItem({
-  marketId,
+  market,
 }: MarketItemProps) {
   const { isConnected } = useAccount();
   const { showToast } = useToast();
-  const { data: marketData, isLoading: isLoadingMarket } = useGetMarket(marketId);
-  // const { data: bets } = useGetMarketBets(marketId);
   const { claimWinnings, isPending: isClaimingPending } = useClaimWinnings();
 
-  const marketIdStr = marketId.toString();
-
-  const formatDate = (timestamp: bigint | undefined) => {
-    if (!timestamp || timestamp === BigInt(0) || timestamp === undefined) {
-      return "Loading...";
-    }
-    const timestampNumber = Number(timestamp);
-    if (isNaN(timestampNumber) || timestampNumber === 0) {
-      return "Loading...";
-    }
-    const date = new Date(timestampNumber * 1000);
+  const formatDate = (timestamp: number) => {
+    const date = new Date(timestamp * 1000);
     return date.toLocaleString("en-US", {
       weekday: "short",
       year: "numeric",
@@ -49,12 +37,11 @@ function MarketItem({
     });
   };
 
-  const getTimeRemaining = (endTime: bigint | undefined) => {
-    if (!endTime || endTime === BigInt(0)) return "N/A";
-    const now = BigInt(Math.floor(Date.now() / 1000));
-    const remaining = endTime > now ? endTime - now : BigInt(0);
-    const days = Number(remaining) / 86400;
-    const hours = (Number(remaining) % 86400) / 3600;
+  const getTimeRemaining = (endTime: number) => {
+    const now = Math.floor(Date.now() / 1000);
+    const remaining = endTime > now ? endTime - now : 0;
+    const days = remaining / 86400;
+    const hours = (remaining % 86400) / 3600;
     if (days >= 1) {
       return `${Math.floor(days)}d ${Math.floor(hours)}h`;
     }
@@ -64,43 +51,14 @@ function MarketItem({
     return "Less than 1h";
   };
 
-  if (isLoadingMarket) {
-    return (
-      <div className="border border-gray-200 rounded-lg p-4">
-        <Skeleton className="h-6 w-3/4 mb-2" />
-        <Skeleton className="h-4 w-1/2" />
-      </div>
-    );
-  }
+  const isResolved = market.status === "RESOLVED";
+  const isBettingOpen = market.status === "ACTIVE" && market.endTime > Math.floor(Date.now() / 1000);
 
-  if (!marketData) {
-    return null;
-  }
+  // Use the bet count from the API data
+  const betCount = market.totalBets;
 
-  // Viem returns contract data as an object with named properties from the ABI
-  // Handle both possible formats (array or object) for safety
-  const market = marketData as
-    | { id?: bigint; endTime?: bigint; resolveTime?: bigint; resolved?: boolean; winningTrack?: string; totalPool?: bigint }
-    | [bigint?, bigint?, bigint?, boolean?, string?, bigint?];
-
-  const isArray = Array.isArray(market);
-  const endTime: bigint | undefined = isArray ? market[1] : market?.endTime;
-  const resolveTime: bigint | undefined = isArray ? market[2] : market?.resolveTime;
-  const resolved: boolean = isArray ? (market[3] ?? false) : (market?.resolved ?? false);
-  const winningTrack: string = isArray ? (market[4] ?? "") : (market?.winningTrack ?? "");
-  const totalPool: bigint | undefined = isArray ? market[5] : market?.totalPool;
-  const marketIdValue: bigint = isArray ? (market[0] ?? BigInt(0)) : (market?.id ?? BigInt(0));
-
-  if (!marketIdValue || marketIdValue === BigInt(0)) {
-    return null;
-  }
-
-  const isResolved = resolved ?? false;
-  // Betting is open if market is not resolved AND endTime is in the future
-  // endTime is set to resolveTime - 1 hour, so betting closes 1 hour before resolution
-  const now = BigInt(Math.floor(Date.now() / 1000));
-  const isBettingOpen = !isResolved && endTime ? endTime > now : false;
-  const betCount = 0; // Bet count unavailable in new contract
+  // Calculate total pool from the API data
+  const totalPool = market.totalPoolYes + market.totalPoolNo;
 
   const handleClaimWinnings = () => {
     if (!isConnected) {
@@ -109,7 +67,9 @@ function MarketItem({
     }
 
     try {
-      claimWinnings(marketId);
+      // Market ID is the numeric ID from the contract
+      const numericId = BigInt(market.marketIndex || market.id.replace("market-", ""));
+      claimWinnings(numericId);
       showToast({ message: "Claiming winnings...", type: "info" });
     } catch (error) {
       console.error("Failed to claim winnings:", error);
@@ -123,15 +83,15 @@ function MarketItem({
   return (
     <div
       className={`border rounded-lg p-4 ${isResolved
-        ? "bg-gray-50 border-gray-200"
-        : "bg-[#f0f4ff] border-[#0052ff]/20"
+          ? "bg-gray-50 border-gray-200"
+          : "bg-[#f0f4ff] border-[#0052ff]/20"
         }`}
     >
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
             <h3 className="font-semibold text-[#111111]">
-              Market #{marketIdStr}
+              Market #{market.marketIndex || market.id.replace("market-", "")}
             </h3>
             {isResolved ? (
               <span className="px-2 py-0.5 text-xs bg-gray-200 text-gray-700 rounded">
@@ -148,29 +108,29 @@ function MarketItem({
             )}
           </div>
           <div className="text-sm text-(--app-foreground-muted) space-y-1">
-            <p>End Time: {formatDate(endTime)}</p>
-            <p>Resolution: {formatDate(resolveTime)}</p>
-            {!isResolved && isBettingOpen && endTime && (
+            <p>End Time: {formatDate(market.endTime)}</p>
+            {/* Resolve time isn't strictly in the PredictionMarket type but endTime + 1h is approx */}
+            {!isResolved && isBettingOpen && (
               <p className="text-blue-600 font-medium">
-                {getTimeRemaining(endTime)} remaining
+                {getTimeRemaining(market.endTime)} remaining
               </p>
             )}
           </div>
         </div>
         <div className="text-right">
           <p className="font-semibold text-[#0052ff] text-lg">
-            {formatUSDC(totalPool ?? BigInt(0))} USDC
+            {formatUSDC(totalPool)} USDC
           </p>
           <p className="text-xs text-(--app-foreground-muted)">
-            {betCount} bets
+            {betCount} {betCount === 1 ? "bet" : "bets"}
           </p>
         </div>
       </div>
 
-      {isResolved && winningTrack && (
+      {isResolved && market.songTitle && (
         <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-sm font-medium text-blue-900 mb-1">🏆 Winning Track:</p>
-          <p className="text-sm text-blue-800">{winningTrack}</p>
+          <p className="text-sm text-blue-800">{market.songTitle}</p>
         </div>
       )}
 
@@ -202,12 +162,10 @@ function MarketItem({
 export function AutomatedMarkets() {
   const chainId = useChainId();
   const isContractDeployed = isAutomatedPredictionMarketDeployed(chainId);
-  const { data: marketCount, isLoading: isLoadingCount } = useGetMarketCount();
 
-  // Generate array of market IDs (1 to marketCount)
-  const marketIds = marketCount && marketCount > BigInt(0)
-    ? Array.from({ length: Number(marketCount) }, (_, i) => BigInt(i + 1))
-    : [];
+  // Use API hook instead of contract hook
+  // This provides richer data including bet counts and song metadata
+  const { data: markets, isLoading } = useActiveMarkets();
 
   if (!isContractDeployed) {
     return (
@@ -220,7 +178,7 @@ export function AutomatedMarkets() {
     );
   }
 
-  if (isLoadingCount) {
+  if (isLoading) {
     return (
       <Card title="🤖 Automated Prediction Markets">
         <div className="space-y-4">
@@ -236,7 +194,7 @@ export function AutomatedMarkets() {
     );
   }
 
-  if (marketIds.length === 0) {
+  if (!markets || markets.length === 0) {
     return (
       <Card title="🤖 Automated Prediction Markets">
         <div className="text-center py-8 text-(--app-foreground-muted)">
@@ -259,15 +217,12 @@ export function AutomatedMarkets() {
       </div>
 
       <div className="space-y-4">
-        {marketIds.map((marketId) => {
-          const marketIdStr = marketId.toString();
-          return (
-            <MarketItem
-              key={marketIdStr}
-              marketId={marketId}
-            />
-          );
-        })}
+        {markets.map((market) => (
+          <MarketItem
+            key={market.id}
+            market={market}
+          />
+        ))}
       </div>
     </Card>
   );

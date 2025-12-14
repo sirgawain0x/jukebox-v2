@@ -33,37 +33,85 @@ export async function sendFarcasterTransaction(
       throw new Error("No Farcaster wallet address available");
     }
 
+    console.log("Sending Farcaster transaction:", options);
+
+    // CHECK FOR CONTRACT INTERACTION (has data)
+    // If data is present and not just "0x", this is likely a smart contract call
+    const isContractInteraction = options.data && options.data !== "0x";
+
+    // Define minimal Ethereum provider interface to avoid using 'any'
+    interface WindowWithEthereum extends Window {
+      ethereum?: {
+        request: (args: { method: string; params?: Array<unknown> }) => Promise<string>;
+      };
+    }
+
+    if (isContractInteraction) {
+      console.log("Detected contract interaction, attempting to use injected provider...");
+
+      // Try to use the injected Ethereum provider (standard in Farcaster Frames/MiniApps)
+      // This is required because sdk.actions.sendToken often ignores 'data' field
+      if (typeof window !== 'undefined' && (window as unknown as WindowWithEthereum).ethereum) {
+        try {
+          const provider = (window as unknown as WindowWithEthereum).ethereum;
+
+          if (!provider) {
+            throw new Error("Ethereum provider not found");
+          }
+
+          // Request account access if needed (though usually already connected in miniapp)
+          // await provider.request({ method: 'eth_requestAccounts' });
+
+          const txHash = await provider.request({
+            method: 'eth_sendTransaction',
+            params: [{
+              from: userAddress,
+              to: options.to,
+              value: options.value, // Hex string expected by some providers, but generally handles string numbers
+              data: options.data,
+              gas: options.gasLimit, // 'gas' vs 'gasLimit' depends on provider, best to use 'gas' for EIP-1193
+            }],
+          });
+
+          console.log("Contract interaction successful, hash:", txHash);
+          return {
+            hash: txHash,
+            success: true,
+          };
+        } catch (providerError) {
+          console.error("Provider transaction failed:", providerError);
+          // If provider fails, we might fall through or just throw
+          throw new Error(`Provider transaction failed: ${providerError instanceof Error ? providerError.message : String(providerError)}`);
+        }
+      } else {
+        console.warn("No injected provider found for contract interaction. Trying SDK fallback (may fail for contracts)...");
+      }
+    }
+
+    // FALLBACK / SIMPLE TRANSFER LOGIC using Farcaster SDK
+    // This works well for simple ETH transfers (tipping)
+
     // Verify SDK has transaction capabilities
     if (!sdk || !sdk.actions) {
       throw new Error("Farcaster SDK not properly initialized");
     }
 
-    // Prepare transaction data
-    const transactionData = {
-      to: options.to,
-      value: options.value,
-      data: options.data || "0x",
-      gasLimit: options.gasLimit || "21000", // Default gas limit for simple transfers
-    };
-
-    console.log("Sending Farcaster transaction:", transactionData);
-
     // Check what methods are available on the SDK
     const availableMethods = Object.keys(sdk.actions || {});
     console.log("Available SDK methods:", availableMethods);
-    
+
     // Check if any transaction-related methods exist
-    const hasTransactionMethod = availableMethods.some(method => 
-      method.toLowerCase().includes('transaction') || 
+    const hasTransactionMethod = availableMethods.some(method =>
+      method.toLowerCase().includes('transaction') ||
       method.toLowerCase().includes('send') ||
       method.toLowerCase().includes('transfer') ||
       method.toLowerCase().includes('token')
     );
-    
+
     if (!hasTransactionMethod) {
       throw new Error(`No transaction methods found in Farcaster SDK. Available methods: ${availableMethods.join(', ')}`);
     }
-    
+
     // Use the correct Farcaster SDK method for sending tokens
     let result;
     try {
@@ -74,7 +122,7 @@ export async function sendFarcasterTransaction(
           amount: options.value,
           token: 'ETH'
         });
-        
+
         // Use correct SendTokenOptions format
         result = await sdk.actions.sendToken({
           recipientAddress: options.to,
@@ -108,14 +156,14 @@ export async function sendFarcasterTransaction(
           };
         }
       }
-      
+
       // If we have a result but no clear success indicator, assume success
       return {
         hash: "unknown",
         success: true,
       };
     }
-    
+
     // If result is undefined or null, the transaction might have failed silently
     return {
       hash: "",
@@ -154,17 +202,17 @@ export async function sendFarcasterBatchTransactions(
     // For Farcaster, we might need to handle batch transactions differently
     // Since sendToken might not support batching, we'll send them sequentially
     const results: FarcasterTransactionResult[] = [];
-    
+
     for (const transaction of transactions) {
       try {
         const result = await sendFarcasterTransaction(transaction);
         results.push(result);
-        
+
         // If any transaction fails, log it but continue
         if (!result.success) {
           console.warn("Transaction failed:", result.error);
         }
-        
+
         // Add a small delay between transactions to avoid rate limiting
         if (transactions.length > 1) {
           await new Promise(resolve => setTimeout(resolve, 1000));
@@ -226,7 +274,7 @@ export function createFarcasterContractTransaction(
 export function useFarcasterTransactions() {
   const canUseFarcaster = shouldUseFarcasterTransactions();
   const userAddress = getFarcasterWalletAddress();
-  
+
   // Additional check for SDK availability
   const sdkAvailable = typeof sdk !== 'undefined' && !!sdk.actions;
   const finalCanUseFarcaster = canUseFarcaster && sdkAvailable;

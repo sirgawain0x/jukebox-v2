@@ -188,7 +188,7 @@ export function CreateAutomatedMarket() {
 
       // Auto-share new market creation if in miniapp
       if (isMiniapp && composeCast) {
-        const shareText = `🎯 New prediction market just opened! Bet on which track will be #1 trending on Spinamp. Pool is growing - join the action on Jukebox! 🎵💰`;
+        const shareText = `🎯 New prediction market just opened! Bet on which track will be #1 trending on Jukebox. Pool is growing - join the action on Jukebox! 🎵💰`;
         composeCast({
           text: shareText,
           embeds: [window.location.href]
@@ -371,7 +371,7 @@ export function CreateAutomatedMarket() {
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <p className="text-sm font-medium text-blue-900 mb-2">How it works:</p>
               <ul className="text-xs text-blue-800 space-y-1 list-disc list-inside">
-                <li>Bet on which track will be #1 trending on Spinamp by the resolution time</li>
+                <li>Bet on which track will be #1 trending on Jukebox by the resolution time</li>
                 <li>Market resolves on {resolveTime ? formatDate(resolveTime) : "Monday 5:00 AM EST"}</li>
                 <li>Winners split the pool (minus 10% protocol fee)</li>
                 <li>Resolution happens automatically via Chainlink Functions</li>
@@ -681,7 +681,7 @@ export function CreateAutomatedMarket() {
                         {isMiniapp && latestMarketId && (
                           <button
                             onClick={() => {
-                              const shareText = `🎯 New prediction market is live! Bet on which track will be #1 trending on Spinamp. Pool: ${formatUSDC(totalPool ?? BigInt(0), 6)} USDC - Join the action on Jukebox! 🎵💰`;
+                              const shareText = `🎯 New prediction market is live! Bet on which track will be #1 trending on Jukebox. Pool: ${formatUSDC(totalPool ?? BigInt(0), 6)} USDC - Join the action on Jukebox! 🎵💰`;
                               composeCast({
                                 text: shareText,
                                 embeds: [window.location.href]

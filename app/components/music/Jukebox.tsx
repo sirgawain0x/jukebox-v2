@@ -97,6 +97,7 @@ export function Jukebox({
   // const [hasSeenPlaylistPrompt, setHasSeenPlaylistPrompt] = useState(false); // Commented out - playlist functionality disabled
   const errorHandledRef = useRef(false);
   const successHandledRef = useRef(false);
+  const [hasTippedCurrentSong, setHasTippedCurrentSong] = useState(false);
 
   // Use global music state for audio playback
   const selectedSong = globalMusic.selectedSong;
@@ -105,6 +106,11 @@ export function Jukebox({
   const playQueue = globalMusic.playQueue;
   const currentQueueIndex = globalMusic.currentQueueIndex;
   const isAutoPlayEnabled = globalMusic.isAutoPlayEnabled;
+
+  // Reset tipped state when song changes
+  useEffect(() => {
+    setHasTippedCurrentSong(false);
+  }, [selectedSong?.id]);
 
   // Load tip count and prompt status from localStorage
   useEffect(() => {
@@ -602,6 +608,7 @@ export function Jukebox({
       // }
 
       onSongTipped(selectedSong);
+      setHasTippedCurrentSong(true);
       handleShareTip();
     },
     [selectedSong, onSongTipped, showToast, handleShareTip, tipCount] // Removed playlist, showInteractiveToast, hasSeenPlaylistPrompt from dependencies
@@ -799,8 +806,8 @@ export function Jukebox({
         style={style}
         {...attributes}
         className={`flex items-center p-2 rounded text-sm transition-all ${index === currentQueueIndex
-            ? 'bg-[#0052ff]/10 border border-[#0052ff]/20'
-            : 'hover:bg-(--app-card-border)'
+          ? 'bg-[#0052ff]/10 border border-[#0052ff]/20'
+          : 'hover:bg-(--app-card-border)'
           } ${isDragging ? 'shadow-lg scale-105 bg-white' : ''}`}
       >
         {/* Drag handle - hidden on mobile, visible on desktop */}
@@ -1004,8 +1011,8 @@ export function Jukebox({
                 <div
                   key={song.id}
                   className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all ${selectedSong?.id === song.id
-                      ? "border-[#0052ff] bg-[#e6edff]"
-                      : "border-[rgba(0,0,0,0.1)] bg-[rgba(255,255,255,0.4)] hover:bg-[#e6edff]"
+                    ? "border-[#0052ff] bg-[#e6edff]"
+                    : "border-[rgba(0,0,0,0.1)] bg-[rgba(255,255,255,0.4)] hover:bg-[#e6edff]"
                     }`}
                   onClick={() => handleSelectSong(song)}
                 >
@@ -1372,10 +1379,14 @@ export function Jukebox({
               {isMiniapp && (
                 <button
                   onClick={handleShareTip}
-                  className="w-full mt-3 bg-white/20 hover:bg-white/30 text-white rounded-lg py-2 px-4 transition-all duration-200 flex items-center justify-center gap-2 text-sm font-medium cursor-pointer"
+                  disabled={!hasTippedCurrentSong}
+                  className={`w-full mt-3 rounded-lg py-2 px-4 transition-all duration-200 flex items-center justify-center gap-2 text-sm font-medium ${hasTippedCurrentSong
+                    ? "bg-white/20 hover:bg-white/30 text-white cursor-pointer"
+                    : "bg-white/5 text-white/40 cursor-not-allowed"
+                    }`}
                 >
                   <Icon name="share" size="sm" />
-                  Share My Tip
+                  {hasTippedCurrentSong ? "Share My Tip" : "Tip First to Share"}
                 </button>
               )}
             </div>

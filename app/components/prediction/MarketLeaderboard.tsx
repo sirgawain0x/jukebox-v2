@@ -45,6 +45,13 @@ export function MarketLeaderboard() {
       <div className="space-y-3">
         {sortedMarkets.map((market, index) => {
           const totalPool = market.totalPoolYes + market.totalPoolNo;
+
+          // Check if it's a generic active market (Unknown Track)
+          const isGenericMarket = market.songTitle === "Unknown Track";
+          const displayTitle = isGenericMarket
+            ? `Weekly Market #${market.marketIndex || market.id.replace("market-", "")}`
+            : market.songTitle;
+
           return (
             <div
               key={market.id}
@@ -56,11 +63,18 @@ export function MarketLeaderboard() {
                 </div>
                 <div>
                   <p className="font-medium text-[#111111] truncate max-w-[200px]">
-                    {market.songTitle}
+                    {displayTitle}
                   </p>
-                  <p className="text-xs text-[var(--app-foreground-muted)] truncate max-w-[200px]">
-                    {market.songArtist}
-                  </p>
+                  {!isGenericMarket && (
+                    <p className="text-xs text-[var(--app-foreground-muted)] truncate max-w-[200px]">
+                      {market.songArtist}
+                    </p>
+                  )}
+                  {isGenericMarket && (
+                    <p className="text-xs text-[var(--app-foreground-muted)] truncate max-w-[200px]">
+                      Ends {new Date(market.endTime * 1000).toLocaleDateString()}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="text-right">

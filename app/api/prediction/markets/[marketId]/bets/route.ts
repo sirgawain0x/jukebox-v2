@@ -83,6 +83,7 @@ const buildBetId = (log: Log) => {
     timestamp,
     claimed: false,
     txHash: transactionHash ?? undefined,
+    predictedTrack: prediction, // Store the predicted track title
   };
 };
 

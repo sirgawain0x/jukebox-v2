@@ -38,29 +38,37 @@ import {
 async function fetchActiveMarkets(forceRefresh = false): Promise<PredictionMarket[]> {
   // Don't use local cache if forcing refresh - let the API handle it
   const cached = forceRefresh ? null : await getCachedActiveMarkets();
-  if (cached) return cached;
+  if (cached) {
 
-  const url = forceRefresh 
+    return cached;
+  }
+
+  const url = forceRefresh
     ? "/api/prediction/markets?refresh=true"
     : "/api/prediction/markets";
-  
-  const response = await fetch(url, { 
-    cache: forceRefresh ? "no-store" : "default" 
+
+
+
+  const response = await fetch(url, {
+    cache: forceRefresh ? "no-store" : "default"
   });
-  
+
   if (!response.ok) {
+
     throw new Error("Failed to fetch active markets");
   }
 
   // API returns BigInt values as strings, convert back to BigInt
   const marketsData = await response.json();
   const markets = deserializePredictionMarkets(marketsData);
-  
+
+
+
   // Only cache if we successfully fetched (API already caches server-side)
   if (markets.length > 0 || !forceRefresh) {
     await cacheActiveMarkets(markets);
   }
-  
+
   return markets;
 }
 
@@ -107,7 +115,7 @@ async function fetchMarketBets(marketId: string): Promise<MarketBet[]> {
  */
 async function fetchUserBets(address: Address): Promise<{ bets: MarketBetWithPreview[]; betCount: number }> {
   const cached = await getCachedUserBets(address);
-  
+
   const response = await fetch(`/api/prediction/users/${address}/bets`);
   if (!response.ok) {
     throw new Error("Failed to fetch user bets");
@@ -137,12 +145,12 @@ async function fetchUserBets(address: Address): Promise<{ bets: MarketBetWithPre
     []
   );
   const betCount = data.betCount ?? bets.length;
-  
+
   // Cache the bets
   if (!cached) {
     await cacheUserBets(address, bets);
   }
-  
+
   return { bets, betCount };
 }
 

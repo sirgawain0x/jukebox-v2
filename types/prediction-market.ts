@@ -27,6 +27,7 @@ export interface MarketBet {
   timestamp: number;
   claimed: boolean;
   txHash?: string;
+  predictedTrack?: string; // Track title the user predicted (for AutomatedPredictionMarket)
 }
 
 export interface MarketPreview {

@@ -92,7 +92,7 @@ async function fetchUserBetCount(
           fromBlock: currentFromBlock,
           toBlock: currentToBlock,
         });
-        
+
         // Filter logs by user address
         const userLogs = chunkLogs.filter((log) => {
           if ("args" in log && log.args) {
@@ -101,7 +101,7 @@ async function fetchUserBetCount(
           }
           return false;
         });
-        
+
         totalCount += userLogs.length;
 
         if (currentToBlock === latestBlock) break;
@@ -166,7 +166,7 @@ async function fetchBetTimestamp(
       fromBlock: searchFromBlock,
       toBlock: latestBlock,
     });
-    
+
     // Filter logs by user address
     const logs = allLogs.filter((log) => {
       if ("args" in log && log.args) {
@@ -178,14 +178,14 @@ async function fetchBetTimestamp(
 
     // Note: AutomatedPredictionMarket uses track predictions (strings), not YES/NO sides
     // This function is kept for compatibility but the side parameter is not used
-    
+
     // Process logs in reverse order to get the most recent matching event
     for (const log of logs.reverse()) {
       // When using getLogs with an event, viem automatically decodes it
       // The log should have decoded args
       if ('args' in log && log.args) {
         const args = log.args as { marketId?: bigint; user?: Address; prediction?: string; amount?: bigint };
-        
+
         // Verify it matches our criteria (AutomatedPredictionMarket uses prediction string, not side bool)
         if (
           args.marketId === marketId &&
@@ -211,7 +211,7 @@ async function fetchBetTimestamp(
           // Type guard: check if this is a BetPlaced event
           if (decoded.eventName === "BetPlaced" && "prediction" in decoded.args) {
             const args = decoded.args as { marketId?: bigint; user?: Address; prediction?: string; amount?: bigint };
-            
+
             // Verify it matches our criteria (AutomatedPredictionMarket uses prediction string, not side bool)
             if (
               args.marketId === marketId &&
@@ -283,7 +283,7 @@ async function fetchUserBetsFromContract(
         // Note: This contract doesn't have a direct userBets function
         // We'll need to fetch from BetPlaced events instead
         // For now, we'll fetch from events (which is already done in fetchUserBetCount)
-        
+
         // The contract structure is different - bets are stored per market, not per user
         // We'll need to query BetPlaced events filtered by user and marketId
         const betPlacedEvent = automatedPredictionMarketABI.find(
@@ -293,7 +293,7 @@ async function fetchUserBetsFromContract(
         if (betPlacedEvent) {
           const searchFromBlock = await getCachedDeploymentBlock(contractAddress) || BIGINT_ZERO;
           const latestBlock = await publicClient.getBlockNumber();
-          
+
           // Note: AutomatedPredictionMarket BetPlaced event only has marketId indexed
           // We need to fetch events for the market and filter by user
           const allLogs = await publicClient.getLogs({
@@ -305,7 +305,7 @@ async function fetchUserBetsFromContract(
             fromBlock: searchFromBlock,
             toBlock: latestBlock,
           });
-          
+
           // Filter logs by user address
           const logs = allLogs.filter((log) => {
             if ("args" in log && log.args) {
@@ -360,6 +360,8 @@ export async function GET(
 ) {
   try {
     const { address } = await params;
+    const { searchParams } = new URL(request.url);
+    const forceRefresh = searchParams.get("refresh") === "true";
 
     // Validate address format
     if (!address || !address.startsWith("0x") || address.length !== 42) {
@@ -383,7 +385,17 @@ export async function GET(
       return NextResponse.json({ bets: [], betCount: 0 });
     }
 
-    const cached = await getCachedUserBets(address as Address);
+    let cached = await getCachedUserBets(address as Address);
+
+    // Check if we need to invalidate cache due to missing predictedTrack
+    if (cached && !forceRefresh) {
+      const hasInvalidBets = cached.some(bet => !bet.predictedTrack);
+      if (hasInvalidBets) {
+        console.log("Found cached bets without predictedTrack, refreshing data...");
+        cached = null;
+      }
+    }
+
     let bets: MarketBet[] = [];
     let betCount = 0;
 
@@ -397,7 +409,7 @@ export async function GET(
     // Helper to fetch song metadata by track title
     const fetchMetadataForTrack = async (trackTitle: string): Promise<{ title: string; artist: string; cover: string } | null> => {
       if (!trackTitle) return null;
-      
+
       // Try cached metadata first
       const cached = await getCachedSongMetadata(trackTitle);
       if (cached && !cached.isFallback) {
@@ -407,7 +419,7 @@ export async function GET(
           cover: cached.cover,
         };
       }
-      
+
       // Try to find in trending songs
       try {
         const trendingSongs = await fetchTrendingSongs(100);
@@ -415,7 +427,7 @@ export async function GET(
         const matchingSong = trendingSongs.find(
           (song) => song.title.toLowerCase() === trackTitleLower
         );
-        
+
         if (matchingSong) {
           const metadata = {
             title: matchingSong.title,
@@ -433,7 +445,7 @@ export async function GET(
       } catch (error) {
         console.warn(`Failed to fetch metadata for track "${trackTitle}":`, error);
       }
-      
+
       // Try Spinamp API
       try {
         const query = `
@@ -455,7 +467,7 @@ export async function GET(
             }
           }
         `;
-        
+
         const response = await fetch("https://api.spinamp.xyz/v3/graphql", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -464,7 +476,7 @@ export async function GET(
             variables: { title: trackTitle },
           }),
         });
-        
+
         if (response.ok) {
           const result = await response.json();
           const edges = result.data?.processedTracks?.edges;
@@ -486,7 +498,7 @@ export async function GET(
       } catch (error) {
         console.warn(`Failed to fetch from Spinamp for "${trackTitle}":`, error);
       }
-      
+
       return null;
     };
 
@@ -498,9 +510,9 @@ export async function GET(
         betList.map(async (bet) => {
           const baseBet = serializeMarketBet(bet);
           const market = marketsById.get(bet.marketId);
-          
+
           let marketPreview: MarketPreview | null = null;
-          
+
           if (market) {
             // If market has proper metadata, use it
             if (market.songTitle !== "Unknown Track" && market.songArtist !== "Unknown Artist") {
@@ -547,18 +559,18 @@ export async function GET(
               };
             }
           }
-          
+
           return {
             ...baseBet,
             market: marketPreview,
           };
         })
       );
-      
+
       return results;
     };
 
-    if (cached) {
+    if (cached && !forceRefresh) {
       bets = cached;
       const marketsById = await buildMarketsMap();
       const serialized = await serializeBets(bets, marketsById);

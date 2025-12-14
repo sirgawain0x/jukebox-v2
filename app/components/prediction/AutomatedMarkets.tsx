@@ -9,7 +9,7 @@ import { formatUSDC } from "@/lib/usdc-utils";
 import {
   useGetMarketCount,
   useGetMarket,
-  useGetMarketBets,
+
   useClaimWinnings,
 } from "@/lib/contracts/automated-prediction-market-hooks";
 import { isAutomatedPredictionMarketDeployed } from "@/lib/contracts/automated-prediction-market";
@@ -24,7 +24,7 @@ function MarketItem({
   const { isConnected } = useAccount();
   const { showToast } = useToast();
   const { data: marketData, isLoading: isLoadingMarket } = useGetMarket(marketId);
-  const { data: bets } = useGetMarketBets(marketId);
+  // const { data: bets } = useGetMarketBets(marketId);
   const { claimWinnings, isPending: isClaimingPending } = useClaimWinnings();
 
   const marketIdStr = marketId.toString();
@@ -79,10 +79,10 @@ function MarketItem({
 
   // Viem returns contract data as an object with named properties from the ABI
   // Handle both possible formats (array or object) for safety
-  const market = marketData as 
+  const market = marketData as
     | { id?: bigint; endTime?: bigint; resolveTime?: bigint; resolved?: boolean; winningTrack?: string; totalPool?: bigint }
     | [bigint?, bigint?, bigint?, boolean?, string?, bigint?];
-  
+
   const isArray = Array.isArray(market);
   const endTime: bigint | undefined = isArray ? market[1] : market?.endTime;
   const resolveTime: bigint | undefined = isArray ? market[2] : market?.resolveTime;
@@ -90,7 +90,7 @@ function MarketItem({
   const winningTrack: string = isArray ? (market[4] ?? "") : (market?.winningTrack ?? "");
   const totalPool: bigint | undefined = isArray ? market[5] : market?.totalPool;
   const marketIdValue: bigint = isArray ? (market[0] ?? BigInt(0)) : (market?.id ?? BigInt(0));
-  
+
   if (!marketIdValue || marketIdValue === BigInt(0)) {
     return null;
   }
@@ -100,7 +100,7 @@ function MarketItem({
   // endTime is set to resolveTime - 1 hour, so betting closes 1 hour before resolution
   const now = BigInt(Math.floor(Date.now() / 1000));
   const isBettingOpen = !isResolved && endTime ? endTime > now : false;
-  const betCount = bets?.length || 0;
+  const betCount = 0; // Bet count unavailable in new contract
 
   const handleClaimWinnings = () => {
     if (!isConnected) {
@@ -122,11 +122,10 @@ function MarketItem({
 
   return (
     <div
-      className={`border rounded-lg p-4 ${
-        isResolved
-          ? "bg-gray-50 border-gray-200"
-          : "bg-[#f0f4ff] border-[#0052ff]/20"
-      }`}
+      className={`border rounded-lg p-4 ${isResolved
+        ? "bg-gray-50 border-gray-200"
+        : "bg-[#f0f4ff] border-[#0052ff]/20"
+        }`}
     >
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
@@ -163,7 +162,7 @@ function MarketItem({
             {formatUSDC(totalPool ?? BigInt(0))} USDC
           </p>
           <p className="text-xs text-(--app-foreground-muted)">
-            {betCount} {betCount === 1 ? "bet" : "bets"}
+            {betCount} bets
           </p>
         </div>
       </div>

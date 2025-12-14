@@ -8,11 +8,13 @@ import { Card } from "../ui/Card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function MyBets() {
-  const { isConnected } = useAccount();
+  const { isConnected, address: _address } = useAccount();
   const { data: betsData, isLoading } = useUserBets();
-  
+
   const bets = betsData?.bets || [];
   const betCount = betsData?.betCount ?? bets.length;
+
+
 
   const renderBetCard = (
     bet: (typeof bets)[number],
@@ -66,15 +68,14 @@ export function MyBets() {
             </p>
           </div>
           <span
-            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-              bet.side === "YES"
-                ? variant === "active"
-                  ? "bg-green-100 text-green-800"
-                  : "bg-green-200 text-green-900"
-                : variant === "active"
+            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${bet.side === "YES"
+              ? variant === "active"
+                ? "bg-green-100 text-green-800"
+                : "bg-green-200 text-green-900"
+              : variant === "active"
                 ? "bg-red-100 text-red-800"
                 : "bg-red-200 text-red-900"
-            }`}
+              }`}
           >
             {variant === "resolved" ? `${bet.side} - Claimed` : bet.side}
           </span>

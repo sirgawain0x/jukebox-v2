@@ -83,8 +83,8 @@ function MarketItem({
   return (
     <div
       className={`border rounded-lg p-4 ${isResolved
-          ? "bg-gray-50 border-gray-200"
-          : "bg-[#f0f4ff] border-[#0052ff]/20"
+        ? "bg-gray-50 border-gray-200"
+        : "bg-[#f0f4ff] border-[#0052ff]/20"
         }`}
     >
       <div className="flex items-start justify-between mb-3">
@@ -166,6 +166,8 @@ export function AutomatedMarkets() {
   // Use API hook instead of contract hook
   // This provides richer data including bet counts and song metadata
   const { data: markets, isLoading } = useActiveMarkets();
+
+
 
   if (!isContractDeployed) {
     return (

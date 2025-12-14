@@ -4,14 +4,17 @@ import {
   cacheUserBets,
   getCachedDeploymentBlock,
   cacheDeploymentBlock,
+  getCachedSongMetadata,
+  saveSongMetadata,
 } from "@/lib/prediction-cache";
 import { serializeMarketBet } from "@/lib/bigint-serialization";
-import type { MarketBet, PredictionMarket } from "@/types/prediction-market";
+import type { MarketBet, PredictionMarket, MarketPreview } from "@/types/prediction-market";
 import { Address, decodeEventLog } from "viem";
 import { createPublicClient, http } from "viem";
 import { base } from "viem/chains";
 import { getAutomatedPredictionMarketAddress, automatedPredictionMarketABI } from "@/lib/contracts/automated-prediction-market";
 import { fetchMarketsFromChain } from "@/lib/server/prediction-market-data";
+import { fetchTrendingSongs } from "@/lib/trending-songs";
 
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://mainnet.base.org";
 const BIGINT_ZERO = BigInt(0);
@@ -100,8 +103,6 @@ async function fetchUserBetCount(
         });
         
         totalCount += userLogs.length;
-
-        totalCount += chunkLogs.length;
 
         if (currentToBlock === latestBlock) break;
 
@@ -317,7 +318,7 @@ async function fetchUserBetsFromContract(
           for (const log of logs) {
             if ("args" in log && log.args) {
               const args = log.args as { marketId?: bigint; user?: Address; prediction?: string; amount?: bigint };
-              if (args.amount && args.amount > BigInt(0)) {
+              if (args.amount && args.amount > BigInt(0) && args.prediction) {
                 const timestamp = await fetchBetTimestamp(
                   publicClient,
                   contractAddress,
@@ -334,6 +335,7 @@ async function fetchUserBetsFromContract(
                   amount: args.amount,
                   timestamp,
                   claimed: false, // Would need to check from contract
+                  predictedTrack: args.prediction, // Store the predicted track title
                 });
               }
             }
@@ -392,32 +394,174 @@ export async function GET(
       );
     };
 
-    const serializeBets = (
+    // Helper to fetch song metadata by track title
+    const fetchMetadataForTrack = async (trackTitle: string): Promise<{ title: string; artist: string; cover: string } | null> => {
+      if (!trackTitle) return null;
+      
+      // Try cached metadata first
+      const cached = await getCachedSongMetadata(trackTitle);
+      if (cached && !cached.isFallback) {
+        return {
+          title: cached.title,
+          artist: cached.artist,
+          cover: cached.cover,
+        };
+      }
+      
+      // Try to find in trending songs
+      try {
+        const trendingSongs = await fetchTrendingSongs(100);
+        const trackTitleLower = trackTitle.toLowerCase();
+        const matchingSong = trendingSongs.find(
+          (song) => song.title.toLowerCase() === trackTitleLower
+        );
+        
+        if (matchingSong) {
+          const metadata = {
+            title: matchingSong.title,
+            artist: matchingSong.artist,
+            cover: matchingSong.cover,
+          };
+          // Cache it
+          await saveSongMetadata(trackTitle, {
+            ...metadata,
+            source: "trending",
+            isFallback: false,
+          });
+          return metadata;
+        }
+      } catch (error) {
+        console.warn(`Failed to fetch metadata for track "${trackTitle}":`, error);
+      }
+      
+      // Try Spinamp API
+      try {
+        const query = `
+          query GetTrack($title: String!) {
+            processedTracks(
+              filter: { title: { likeInsensitive: $title } }
+              first: 1
+            ) {
+              edges {
+                node {
+                  id
+                  title
+                  lossyArtworkUrl
+                  artistByArtistId {
+                    name
+                  }
+                }
+              }
+            }
+          }
+        `;
+        
+        const response = await fetch("https://api.spinamp.xyz/v3/graphql", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            query,
+            variables: { title: trackTitle },
+          }),
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          const edges = result.data?.processedTracks?.edges;
+          if (edges && edges.length > 0) {
+            const track = edges[0].node;
+            const metadata = {
+              title: track.title || trackTitle,
+              artist: track.artistByArtistId?.name || "Unknown Artist",
+              cover: track.lossyArtworkUrl || "",
+            };
+            await saveSongMetadata(trackTitle, {
+              ...metadata,
+              source: "spinamp",
+              isFallback: false,
+            });
+            return metadata;
+          }
+        }
+      } catch (error) {
+        console.warn(`Failed to fetch from Spinamp for "${trackTitle}":`, error);
+      }
+      
+      return null;
+    };
+
+    const serializeBets = async (
       betList: MarketBet[],
       marketsById: Map<string, PredictionMarket>
-    ) =>
-      betList.map((bet) => {
-        const baseBet = serializeMarketBet(bet);
-        const market = marketsById.get(bet.marketId);
-        return {
-          ...baseBet,
-          market: market
-            ? {
+    ): Promise<Array<{ [key: string]: unknown }>> => {
+      const results = await Promise.all(
+        betList.map(async (bet) => {
+          const baseBet = serializeMarketBet(bet);
+          const market = marketsById.get(bet.marketId);
+          
+          let marketPreview: MarketPreview | null = null;
+          
+          if (market) {
+            // If market has proper metadata, use it
+            if (market.songTitle !== "Unknown Track" && market.songArtist !== "Unknown Artist") {
+              marketPreview = {
                 id: market.id,
                 songTitle: market.songTitle,
                 songArtist: market.songArtist,
                 songCover: market.songCover,
                 endTime: market.endTime,
                 status: market.status,
+              };
+            } else if (bet.predictedTrack) {
+              // Market metadata is missing, try to fetch using the bet's predicted track
+              const metadata = await fetchMetadataForTrack(bet.predictedTrack);
+              if (metadata) {
+                marketPreview = {
+                  id: market.id,
+                  songTitle: metadata.title,
+                  songArtist: metadata.artist,
+                  songCover: metadata.cover,
+                  endTime: market.endTime,
+                  status: market.status,
+                };
+              } else {
+                // Fallback to predicted track title
+                marketPreview = {
+                  id: market.id,
+                  songTitle: bet.predictedTrack,
+                  songArtist: "Unknown Artist",
+                  songCover: "",
+                  endTime: market.endTime,
+                  status: market.status,
+                };
               }
-            : null,
-        };
-      });
+            } else {
+              // No predicted track, use market data as-is
+              marketPreview = {
+                id: market.id,
+                songTitle: market.songTitle,
+                songArtist: market.songArtist,
+                songCover: market.songCover,
+                endTime: market.endTime,
+                status: market.status,
+              };
+            }
+          }
+          
+          return {
+            ...baseBet,
+            market: marketPreview,
+          };
+        })
+      );
+      
+      return results;
+    };
 
     if (cached) {
       bets = cached;
       const marketsById = await buildMarketsMap();
-      const serialized = serializeBets(bets, marketsById);
+      const serialized = await serializeBets(bets, marketsById);
 
       try {
         betCount = await fetchUserBetCount(publicClient, contractAddress, address as Address);
@@ -433,7 +577,7 @@ export async function GET(
     await cacheUserBets(address as Address, bets);
 
     const marketsById = await buildMarketsMap();
-    const serialized = serializeBets(bets, marketsById);
+    const serialized = await serializeBets(bets, marketsById);
 
     try {
       betCount = await fetchUserBetCount(publicClient, contractAddress, address as Address);

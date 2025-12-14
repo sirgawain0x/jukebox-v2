@@ -54,7 +54,7 @@ export function Jukebox({
 }: JukeboxProps) {
   // Use global music context for persistent player
   const globalMusic = useMusic();
-  
+
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -81,15 +81,15 @@ export function Jukebox({
   const minTipEth = BigInt(Math.floor(0.00001429 * 1e18));
   const { composeCast } = useComposeCast();
   const { showToast } = useToast();
-  
+
   // Use OnchainKit's built-in wallet hooks
   const { address, isConnected, connector } = useAccount();
   const farcasterTransactions = useFarcasterTransactions();
-  
+
   // Detect Farcaster context properly using the hook
   const { isInFarcaster, isMiniapp } = useFarcasterContext();
   const shouldUseFarcasterWallet = isInFarcaster || isMiniapp;
-  
+
   const [failedImages, setFailedImages] = useState<{ [id: string]: boolean }>(
     {}
   );
@@ -116,24 +116,30 @@ export function Jukebox({
     }
   }, []);
 
-  // Sharing functions
-  const handleShareSong = useCallback(() => {
+  // Sharing functions with context-aware messages
+  const _handleShareSong = useCallback(() => {
     if (!selectedSong) return;
-    
+
+    // Different message for trending vs browse
+    const isTrending = sortBy === "TRENDING";
+    const shareText = isTrending
+      ? `🔥 Found this trending track "${selectedSong.title}" by ${selectedSong.artist} on Jukebox! Currently #1 on the trending list 🎵`
+      : `🎵 Discovered "${selectedSong.title}" by ${selectedSong.artist} while browsing new music on Jukebox! Check it out 🎶`;
+
     composeCast({
-      text: `🎵 Currently vibing to "${selectedSong.title}" by ${selectedSong.artist}! Check out this amazing track on Jukebox 🎶`,
+      text: shareText,
       embeds: [window.location.href]
     });
-  }, [selectedSong, composeCast]);
+  }, [selectedSong, composeCast, sortBy]);
 
   const handleShareTip = useCallback(() => {
     if (!selectedSong) return;
-    
+
     composeCast({
-      text: `💎 Just tipped ${selectedSong.artist} for their incredible track "${selectedSong.title}"! Supporting artists directly on the blockchain 🎵✨`,
+      text: `💎 Just tipped ${selectedSong.artist} ${minTipEth ? `${Number(minTipEth) / 1e18} ETH` : ''} for "${selectedSong.title}"! Supporting artists directly on-chain 🎵✨ Join me on Jukebox to discover and tip amazing music!`,
       embeds: [window.location.href]
     });
-  }, [selectedSong, composeCast]);
+  }, [selectedSong, composeCast, minTipEth]);
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const sortOptions = [
@@ -167,21 +173,21 @@ export function Jukebox({
     if (sortBy !== "CREATED_AT_TIME_DESC" || !searchQuery.trim()) {
       return songs;
     }
-    
+
     const query = searchQuery.toLowerCase().trim();
     if (!query) {
       return songs;
     }
-    
+
     return songs.filter((song) => {
       const title = (song.title || "").toLowerCase();
       const artist = (song.artist || "").toLowerCase();
       const platform = (song.platformName || "").toLowerCase();
-      
+
       const titleMatch = title.includes(query);
       const artistMatch = artist.includes(query);
       const platformMatch = platform.includes(query);
-      
+
       return titleMatch || artistMatch || platformMatch;
     });
   }, [songs, searchQuery, sortBy]);
@@ -193,7 +199,7 @@ export function Jukebox({
     if (sortBy !== "CREATED_AT_TIME_DESC" || !searchQuery.trim()) {
       return filteredSongs;
     }
-    
+
     const startIndex = (searchPage - 1) * ITEMS_PER_PAGE;
     const endIndex = startIndex + ITEMS_PER_PAGE;
     return filteredSongs.slice(startIndex, endIndex);
@@ -222,20 +228,20 @@ export function Jukebox({
         let query = "";
         let dataPath = "";
         const variables: Record<string, unknown> = {};
-        
+
         // When searching on Newest tab, fetch more results to enable searching through entire database
         const isSearching = sortBy === "CREATED_AT_TIME_DESC" && searchQuery.trim();
         const fetchLimit = isSearching ? 500 : 10; // Fetch 500 results when searching to cover more of the database
-        
+
         if (sortBy === "TRENDING") {
-        if (direction === "forward") {
-          variables.first = fetchLimit;
-          if (after && !isSearching) variables.after = after;
-        } else {
-          variables.last = fetchLimit;
-          if (before && !isSearching) variables.before = before;
-        }
-        query = `query TrendingTracks($first: Int, $last: Int, $after: Cursor, $before: Cursor) {
+          if (direction === "forward") {
+            variables.first = fetchLimit;
+            if (after && !isSearching) variables.after = after;
+          } else {
+            variables.last = fetchLimit;
+            if (before && !isSearching) variables.before = before;
+          }
+          query = `query TrendingTracks($first: Int, $last: Int, $after: Cursor, $before: Cursor) {
           allTrendingTracks(first: $first, last: $last, after: $after, before: $before) {
             edges {
               cursor
@@ -315,18 +321,18 @@ export function Jukebox({
             }
           }
         }`;
-        dataPath = "allTrendingTracks";
-      } else {
-        // CREATED_AT_TIME_DESC - Newest songs
-        if (direction === "forward") {
-          variables.first = fetchLimit;
-          if (after && !isSearching) variables.after = after;
+          dataPath = "allTrendingTracks";
         } else {
-          variables.last = fetchLimit;
-          if (before && !isSearching) variables.before = before;
-        }
-        variables.orderBy = [sortBy, "ID_DESC"];
-        query = `query ProcessedTracks($first: Int, $last: Int, $after: Cursor, $before: Cursor, $orderBy: [ProcessedTracksOrderBy!]) {
+          // CREATED_AT_TIME_DESC - Newest songs
+          if (direction === "forward") {
+            variables.first = fetchLimit;
+            if (after && !isSearching) variables.after = after;
+          } else {
+            variables.last = fetchLimit;
+            if (before && !isSearching) variables.before = before;
+          }
+          variables.orderBy = [sortBy, "ID_DESC"];
+          query = `query ProcessedTracks($first: Int, $last: Int, $after: Cursor, $before: Cursor, $orderBy: [ProcessedTracksOrderBy!]) {
           allProcessedTracks(first: $first, last: $last, after: $after, before: $before, orderBy: $orderBy) {
             edges {
               cursor
@@ -404,92 +410,92 @@ export function Jukebox({
             }
           }
         }`;
-        dataPath = "allProcessedTracks";
-      }
+          dataPath = "allProcessedTracks";
+        }
 
-      type TrackNode = {
-        id: string;
-        title?: string;
-        lossyArtworkUrl?: string;
-        lossyAudioUrl?: string;
-        artistByArtistId?: {
-          name?: string;
-        };
-        platformByPlatformId?: {
-          name?: string;
-        };
-        artistId?: string;
-        processedTrackByTrackId?: Omit<TrackNode, "processedTrackByTrackId">;
-      };
-
-      const response = await fetch("https://api.spinamp.xyz/v3/graphql", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          query,
-          variables,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (result.errors) {
-        console.error(result.errors);
-        setError("Failed to fetch tracks.");
-        return;
-      }
-
-      const connection = result.data?.[dataPath] || {};
-      const edges: {
-        node: TrackNode;
-      }[] = connection.edges || [];
-      const pageInfo = connection.pageInfo || {};
-      setPageInfo({
-        endCursor: pageInfo.endCursor || null,
-        hasNextPage: !!pageInfo.hasNextPage,
-        hasPreviousPage: !!pageInfo.hasPreviousPage,
-        startCursor: pageInfo.startCursor || null,
-      });
-
-      if (!Array.isArray(edges) || edges.length === 0) {
-        console.error("No edges returned for", sortBy, result);
-      }
-
-      const mappedSongs: Song[] = edges
-        .map((edge: { node: TrackNode }) => {
-          // Support both node structures
-          let track: TrackNode | null = null;
-          let artistId: string | undefined;
-          if (sortBy === "TRENDING") {
-            track = edge.node.processedTrackByTrackId || null;
-            artistId = edge.node.processedTrackByTrackId?.artistId;
-          } else {
-            track = edge.node;
-            artistId = edge.node.artistId;
-          }
-          if (!track) return null;
-          return {
-            id: track.id || "unknown-id",
-            title: track.title || "Untitled",
-            artist: track.artistByArtistId?.name || "Unknown Artist",
-            cover: track.lossyArtworkUrl || "",
-            creatorAddress: artistId?.split("/")[1] || "",
-            audioUrl: track.lossyAudioUrl || "",
-            playCount: 0,
-            platformName: track.platformByPlatformId?.name || undefined,
+        type TrackNode = {
+          id: string;
+          title?: string;
+          lossyArtworkUrl?: string;
+          lossyAudioUrl?: string;
+          artistByArtistId?: {
+            name?: string;
           };
-        })
-        .filter(Boolean) as Song[];
+          platformByPlatformId?: {
+            name?: string;
+          };
+          artistId?: string;
+          processedTrackByTrackId?: Omit<TrackNode, "processedTrackByTrackId">;
+        };
 
-      setSongs(mappedSongs);
-      setLoading(false);
-    } catch (error) {
-      console.error("Failed to load songs from Spinamp:", error);
-      setError("Failed to load songs from Spinamp.");
-      setLoading(false);
-    }
+        const response = await fetch("https://api.spinamp.xyz/v3/graphql", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            query,
+            variables,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (result.errors) {
+          console.error(result.errors);
+          setError("Failed to fetch tracks.");
+          return;
+        }
+
+        const connection = result.data?.[dataPath] || {};
+        const edges: {
+          node: TrackNode;
+        }[] = connection.edges || [];
+        const pageInfo = connection.pageInfo || {};
+        setPageInfo({
+          endCursor: pageInfo.endCursor || null,
+          hasNextPage: !!pageInfo.hasNextPage,
+          hasPreviousPage: !!pageInfo.hasPreviousPage,
+          startCursor: pageInfo.startCursor || null,
+        });
+
+        if (!Array.isArray(edges) || edges.length === 0) {
+          console.error("No edges returned for", sortBy, result);
+        }
+
+        const mappedSongs: Song[] = edges
+          .map((edge: { node: TrackNode }) => {
+            // Support both node structures
+            let track: TrackNode | null = null;
+            let artistId: string | undefined;
+            if (sortBy === "TRENDING") {
+              track = edge.node.processedTrackByTrackId || null;
+              artistId = edge.node.processedTrackByTrackId?.artistId;
+            } else {
+              track = edge.node;
+              artistId = edge.node.artistId;
+            }
+            if (!track) return null;
+            return {
+              id: track.id || "unknown-id",
+              title: track.title || "Untitled",
+              artist: track.artistByArtistId?.name || "Unknown Artist",
+              cover: track.lossyArtworkUrl || "",
+              creatorAddress: artistId?.split("/")[1] || "",
+              audioUrl: track.lossyAudioUrl || "",
+              playCount: 0,
+              platformName: track.platformByPlatformId?.name || undefined,
+            };
+          })
+          .filter(Boolean) as Song[];
+
+        setSongs(mappedSongs);
+        setLoading(false);
+      } catch (error) {
+        console.error("Failed to load songs from Spinamp:", error);
+        setError("Failed to load songs from Spinamp.");
+        setLoading(false);
+      }
     }, 300); // 300ms debounce delay
 
     // Cleanup function
@@ -534,25 +540,25 @@ export function Jukebox({
       if (successHandledRef.current || !selectedSong) {
         return;
       }
-      
+
       successHandledRef.current = true;
-      
+
       // Reset the flag after a short delay
       setTimeout(() => {
         successHandledRef.current = false;
       }, 1000);
-      
+
       const newTipCount = tipCount + 1;
       setTipCount(newTipCount);
-      
+
       // Persist to localStorage
       if (typeof window !== 'undefined') {
         localStorage.setItem('jukebox_tip_count', newTipCount.toString());
       }
-      
+
       // Playlist functionality commented out - simplified toast message
       showToast(`🎵 Tip sent to ${selectedSong.artist}! Thank you for supporting the artist.`);
-      
+
       // Original playlist-related logic commented out:
       // if (playlist) {
       //   // User has playlist - show success with confirmation
@@ -594,7 +600,7 @@ export function Jukebox({
       //     showToast(`🎵 Tip sent to ${selectedSong.artist}! Thank you for supporting the artist.`);
       //   }
       // }
-      
+
       onSongTipped(selectedSong);
       handleShareTip();
     },
@@ -623,7 +629,7 @@ export function Jukebox({
         console.log("Using Farcaster transaction handling");
         // Use Farcaster transaction handling
         const transactions = [];
-        
+
         // Add tip transaction
         const tipTransaction = farcasterTransactions.createTipTransaction(
           selectedSong.creatorAddress,
@@ -644,7 +650,7 @@ export function Jukebox({
         // }
 
         const results = await farcasterTransactions.sendBatchTransactions(transactions);
-        
+
         // Check if all transactions succeeded
         const allSuccessful = results.every(result => result.success);
         if (allSuccessful) {
@@ -668,7 +674,7 @@ export function Jukebox({
     // Use global music context to set the selected song
     globalMusic.setSelectedSong(song);
     setSelectedSong(song);
-    
+
     // Start with minimized player when song is selected
     globalMusic.setIsMinimized(true);
   }, [globalMusic, setSelectedSong]);
@@ -717,16 +723,16 @@ export function Jukebox({
     if (errorHandledRef.current) {
       return;
     }
-    
+
     errorHandledRef.current = true;
-    
+
     // Reset the flag after a short delay
     setTimeout(() => {
       errorHandledRef.current = false;
     }, 1000);
-    
+
     // console.error("Transaction failed:", error.message);
-    
+
     // Handle different error types gracefully
     if (error.message.includes("Request denied") || error.message.includes("User rejected") || error.message.includes("User denied")) {
       // Don't show toast for user cancellation - this is normal behavior
@@ -764,7 +770,7 @@ export function Jukebox({
     if (over && active.id !== over.id) {
       const oldIndex = playQueue.findIndex((item) => item.id === active.id);
       const newIndex = playQueue.findIndex((item) => item.id === over.id);
-      
+
       globalMusic.reorderQueue(oldIndex, newIndex);
     }
   };
@@ -792,11 +798,10 @@ export function Jukebox({
         ref={setNodeRef}
         style={style}
         {...attributes}
-        className={`flex items-center p-2 rounded text-sm transition-all ${
-          index === currentQueueIndex
+        className={`flex items-center p-2 rounded text-sm transition-all ${index === currentQueueIndex
             ? 'bg-[#0052ff]/10 border border-[#0052ff]/20'
             : 'hover:bg-(--app-card-border)'
-        } ${isDragging ? 'shadow-lg scale-105 bg-white' : ''}`}
+          } ${isDragging ? 'shadow-lg scale-105 bg-white' : ''}`}
       >
         {/* Drag handle - hidden on mobile, visible on desktop */}
         <div
@@ -805,13 +810,13 @@ export function Jukebox({
           title="Drag to reorder"
           aria-label="Drag to reorder queue item"
         >
-          <svg 
-            xmlns="http://www.w3.org/2000/svg" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="2" 
-            strokeLinecap="round" 
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
             strokeLinejoin="round"
             className="w-4 h-4 rotate-90"
             aria-hidden="true"
@@ -821,7 +826,7 @@ export function Jukebox({
             <circle cx="12" cy="19" r="1" />
           </svg>
         </div>
-        
+
         {/* Mobile reorder buttons - visible on mobile only */}
         <div className="flex flex-col mr-1 md:hidden">
           <button
@@ -834,13 +839,13 @@ export function Jukebox({
             title="Move up"
             aria-label={`Move ${song.title} up in queue`}
           >
-            <svg 
-              xmlns="http://www.w3.org/2000/svg" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
               strokeLinejoin="round"
               className="w-3 h-3"
             >
@@ -857,13 +862,13 @@ export function Jukebox({
             title="Move down"
             aria-label={`Move ${song.title} down in queue`}
           >
-            <svg 
-              xmlns="http://www.w3.org/2000/svg" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
               strokeLinejoin="round"
               className="w-3 h-3"
             >
@@ -871,7 +876,7 @@ export function Jukebox({
             </svg>
           </button>
         </div>
-        
+
         <span className="w-6 text-center text-xs text-(--app-foreground-muted)">
           {index + 1}
         </span>
@@ -918,7 +923,7 @@ export function Jukebox({
     <Card title="🎵 Discover Music">
       {/* Dynamic meta tags for song sharing */}
       {selectedSong && (
-        <SongShareMetaTags 
+        <SongShareMetaTags
           song={selectedSong}
           title={`${selectedSong.title} by ${selectedSong.artist}`}
           description={`Listen to "${selectedSong.title}" by ${selectedSong.artist} on Jukebox`}
@@ -998,11 +1003,10 @@ export function Jukebox({
               {(sortBy === "CREATED_AT_TIME_DESC" && searchQuery.trim() ? paginatedFilteredSongs : filteredSongs).map((song) => (
                 <div
                   key={song.id}
-                  className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all ${
-                    selectedSong?.id === song.id
+                  className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all ${selectedSong?.id === song.id
                       ? "border-[#0052ff] bg-[#e6edff]"
                       : "border-[rgba(0,0,0,0.1)] bg-[rgba(255,255,255,0.4)] hover:bg-[#e6edff]"
-                  }`}
+                    }`}
                   onClick={() => handleSelectSong(song)}
                 >
                   {song.cover && !failedImages[song.id] ? (
@@ -1046,26 +1050,32 @@ export function Jukebox({
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {selectedSong?.id === song.id && (
-                      <AnimatedAudioIndicator 
+                      <AnimatedAudioIndicator
                         isPlaying={isPlaying && selectedSong?.id === song.id}
                         size="sm"
                         className="text-[#0052ff]"
                         variant="bars"
                       />
                     )}
-                    {/* Quick share button */}
+                    {/* Quick share button - context-aware messaging */}
                     {isMiniapp && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
+                          // Different message for trending vs browse
+                          const isTrending = sortBy === "TRENDING";
+                          const shareText = isTrending
+                            ? `🔥 This track "${song.title}" by ${song.artist} is trending on Jukebox! Currently on the trending list 🎵`
+                            : `🎵 Found "${song.title}" by ${song.artist} while browsing new music on Jukebox! Discover amazing tracks 🎶`;
+
                           composeCast({
-                            text: `🎵 Check out "${song.title}" by ${song.artist}! Discovered this amazing track on Jukebox 🎶`,
+                            text: shareText,
                             embeds: [window.location.href]
                           });
                           showToast(`Shared "${song.title}" to Farcaster!`);
                         }}
                         className="p-1 hover:bg-blue-100 rounded transition-all duration-200 cursor-pointer hover:scale-110"
-                        title="Quick share to Farcaster"
+                        title={sortBy === "TRENDING" ? "Share trending track" : "Share discovered track"}
                         aria-label={`Share ${song.title} to Farcaster`}
                       >
                         <Icon name="share" size="sm" className="text-blue-600" />
@@ -1092,9 +1102,9 @@ export function Jukebox({
                       title={playQueue.some(queueSong => queueSong.id === song.id) ? "Remove from queue" : "Add to queue"}
                       aria-label={playQueue.some(queueSong => queueSong.id === song.id) ? `Remove ${song.title} from queue` : `Add ${song.title} to queue`}
                     >
-                      <Icon 
-                        name={playQueue.some(queueSong => queueSong.id === song.id) ? "check" : "plus"} 
-                        size="sm" 
+                      <Icon
+                        name={playQueue.some(queueSong => queueSong.id === song.id) ? "check" : "plus"}
+                        size="sm"
                       />
                     </button>
                   </div>
@@ -1191,14 +1201,14 @@ export function Jukebox({
                   <h3 className="font-semibold text-lg">{selectedSong.title}</h3>
                   <p className="text-sm opacity-90">{selectedSong.artist}</p>
                 </div>
-                <AnimatedAudioIndicator 
+                <AnimatedAudioIndicator
                   isPlaying={isPlaying}
                   size="md"
                   className="text-white"
                   variant="bars"
                 />
               </div>
-              
+
               {/* Audio playback is now handled by the global MusicContext */}
               {/* Visual controls and status */}
               <div className="mt-4 space-y-2">
@@ -1210,13 +1220,13 @@ export function Jukebox({
                     title="Previous song"
                     aria-label="Previous song"
                   >
-                    <svg 
-                      xmlns="http://www.w3.org/2000/svg" 
-                      viewBox="0 0 24 24" 
-                      fill="none" 
-                      stroke="currentColor" 
-                      strokeWidth="2" 
-                      strokeLinecap="round" 
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
                       strokeLinejoin="round"
                       className="w-5 h-5 text-white"
                     >
@@ -1233,13 +1243,13 @@ export function Jukebox({
                     aria-label="Rewind 15 seconds"
                   >
                     <div className="relative w-5 h-5">
-                      <svg 
-                        xmlns="http://www.w3.org/2000/svg" 
-                        viewBox="0 0 24 24" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        strokeWidth="2" 
-                        strokeLinecap="round" 
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
                         strokeLinejoin="round"
                         className="w-5 h-5"
                       >
@@ -1261,9 +1271,9 @@ export function Jukebox({
                     {audioLoading ? (
                       <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     ) : isPlaying ? (
-                      <svg 
-                        xmlns="http://www.w3.org/2000/svg" 
-                        viewBox="0 0 24 24" 
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
                         fill="currentColor"
                         className="w-5 h-5 text-white"
                       >
@@ -1271,9 +1281,9 @@ export function Jukebox({
                         <rect x="14" y="4" width="4" height="16" />
                       </svg>
                     ) : (
-                      <svg 
-                        xmlns="http://www.w3.org/2000/svg" 
-                        viewBox="0 0 24 24" 
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
                         fill="currentColor"
                         className="w-5 h-5 text-white"
                       >
@@ -1290,13 +1300,13 @@ export function Jukebox({
                     aria-label="Fast forward 30 seconds"
                   >
                     <div className="relative w-5 h-5">
-                      <svg 
-                        xmlns="http://www.w3.org/2000/svg" 
-                        viewBox="0 0 24 24" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        strokeWidth="2" 
-                        strokeLinecap="round" 
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
                         strokeLinejoin="round"
                         className="w-5 h-5"
                       >
@@ -1316,13 +1326,13 @@ export function Jukebox({
                     title="Next song"
                     aria-label="Next song"
                   >
-                    <svg 
-                      xmlns="http://www.w3.org/2000/svg" 
-                      viewBox="0 0 24 24" 
-                      fill="none" 
-                      stroke="currentColor" 
-                      strokeWidth="2" 
-                      strokeLinecap="round" 
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
                       strokeLinejoin="round"
                       className="w-5 h-5 text-white"
                     >
@@ -1332,7 +1342,7 @@ export function Jukebox({
                   </button>
                 </div>
               </div>
-              
+
               {/* Tip button */}
               <Transaction
                 key={selectedSong.id}
@@ -1358,16 +1368,16 @@ export function Jukebox({
                 </div>
               </Transaction>
 
-               {/* Share Song Button */}
-               {isMiniapp && (
-                 <button
-                   onClick={handleShareSong}
-                   className="w-full mt-3 bg-white/20 hover:bg-white/30 text-white rounded-lg py-2 px-4 transition-all duration-200 flex items-center justify-center gap-2 text-sm font-medium cursor-pointer"
-                 >
-                   <Icon name="share" size="sm" />
-                   Share This Track
-                 </button>
-               )}
+              {/* Share Tip Button - specifically for tipping context */}
+              {isMiniapp && (
+                <button
+                  onClick={handleShareTip}
+                  className="w-full mt-3 bg-white/20 hover:bg-white/30 text-white rounded-lg py-2 px-4 transition-all duration-200 flex items-center justify-center gap-2 text-sm font-medium cursor-pointer"
+                >
+                  <Icon name="share" size="sm" />
+                  Share My Tip
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -1404,7 +1414,7 @@ export function Jukebox({
                 </button>
               </div>
             </div>
-            
+
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -1425,7 +1435,7 @@ export function Jukebox({
                 </div>
               </SortableContext>
             </DndContext>
-            
+
             {playQueue.length > 1 && (
               <div className="flex justify-between items-center mt-3 pt-3 border-t border-(--app-card-border)">
                 <button
@@ -1436,11 +1446,11 @@ export function Jukebox({
                   <Icon name="chevron-left" size="sm" />
                   Previous
                 </button>
-                
+
                 <span className="text-xs text-(--app-foreground-muted)">
                   {currentQueueIndex + 1} of {playQueue.length}
                 </span>
-                
+
                 <button
                   onClick={handleNextSong}
                   className="flex items-center gap-1 text-sm text-(--app-foreground-muted) hover:text-(--app-foreground) transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"

@@ -352,55 +352,139 @@ export async function fetchMarketsFromChain(options: FetchMarketsOptions = {}): 
     if (!entry) continue;
 
     const { marketId, data } = entry;
-    // AutomatedPredictionMarket Market struct: id, endTime, resolveTime, resolved, winningTrack, totalPool
+    // AutomatedPredictionMarket Market struct: id, endTime, resolveTime, resolved, winningTrack, creator, totalPool, totalPaidOut
     const endTime = Number(data[1] as bigint); // endTime
     const _resolveTime = Number(data[2] as bigint); // resolveTime (unused but kept for potential future use)
     const resolved = data[3] as boolean;
     const winningTrack = data[4] as string;
-    
-    // For AutomatedPredictionMarket, we need to fetch bets to calculate pools
-    // The contract doesn't store totalPoolYes/totalPoolNo separately
-    // We'll need to aggregate from bets or use a different approach
-    // For now, we'll set both to 0 and calculate from bets if needed
-    const totalPoolYes = BigInt(0); // Will be calculated from bets
-    const totalPoolNo = BigInt(0); // Will be calculated from bets
+    const _creator = data[5] as string; // creator (unused)
+    const totalPool = data[6] as bigint; // totalPool from contract
+
+
+
+    // The contract stores totalPool as a single value
+    // For display purposes, we'll split it evenly between YES and NO
+    // (In reality, the contract doesn't track YES/NO separately - it's all one pool)
+    // We'll use totalPool for both to show the correct total amount
+    const totalPoolYes = totalPool ?? BigInt(0);
+    const totalPoolNo = BigInt(0); // Contract doesn't track NO pool separately
 
     if (!includeResolved && resolved) continue;
     if (!includeExpired && !resolved && endTime <= now) continue;
 
     // Try to find matching song by title (case-insensitive)
-    const trackTitleLower = winningTrack.toLowerCase();
+    const trackTitleLower = winningTrack?.toLowerCase().trim() || "";
     let metadata: { title: string; artist: string; cover: string } | null = null;
-    
-    // First try to find in trending songs
-    for (const [title, song] of trendingMap.entries()) {
-      if (title === trackTitleLower || song.title.toLowerCase() === trackTitleLower) {
-        metadata = {
-          title: song.title,
-          artist: song.artist,
-          cover: song.cover,
-        };
-        break;
+
+    // If winningTrack is empty (unresolved market), we can't determine the track yet
+    // But we'll still try to fetch metadata if we have a title
+    if (trackTitleLower) {
+      // First try to find in trending songs (exact match)
+      for (const [title, song] of trendingMap.entries()) {
+        if (title === trackTitleLower || song.title.toLowerCase() === trackTitleLower) {
+          metadata = {
+            title: song.title,
+            artist: song.artist,
+            cover: song.cover,
+          };
+          break;
+        }
+      }
+
+      // If not found, try fuzzy matching in trending songs
+      if (!metadata) {
+        for (const song of trendingSongs) {
+          const songTitleLower = song.title.toLowerCase().trim();
+          // Try exact match, or match if one contains the other
+          if (
+            songTitleLower === trackTitleLower ||
+            songTitleLower.includes(trackTitleLower) ||
+            trackTitleLower.includes(songTitleLower)
+          ) {
+            metadata = {
+              title: song.title,
+              artist: song.artist,
+              cover: song.cover,
+            };
+            break;
+          }
+        }
+      }
+
+      // If still not found, try to fetch from Spinamp API by title
+      if (!metadata) {
+        try {
+          const query = `
+            query SearchTrack($title: String!) {
+              processedTracks(
+                filter: { title: { likeInsensitive: $title } }
+                first: 1
+              ) {
+                edges {
+                  node {
+                    id
+                    title
+                    lossyArtworkUrl
+                    artistByArtistId {
+                      name
+                    }
+                  }
+                }
+              }
+            }
+          `;
+
+          const response = await fetch("https://api.spinamp.xyz/v3/graphql", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              query,
+              variables: { title: winningTrack },
+            }),
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            const edges = result.data?.processedTracks?.edges;
+            if (edges && edges.length > 0) {
+              const track = edges[0].node;
+              metadata = {
+                title: track.title || winningTrack,
+                artist: track.artistByArtistId?.name || "Unknown Artist",
+                cover: track.lossyArtworkUrl || "",
+              };
+              // Cache it
+              await saveSongMetadata(winningTrack, {
+                ...metadata,
+                source: "spinamp",
+                isFallback: false,
+              });
+            }
+          }
+        } catch (error) {
+          console.warn(`Failed to fetch Spinamp metadata for "${winningTrack}":`, error);
+        }
+      }
+
+      // If still not found, try to find song ID from title in trending songs and fetch metadata
+      if (!metadata) {
+        const matchingSong = Array.from(trendingSongs.values()).find(
+          (song) => song.title.toLowerCase() === trackTitleLower
+        );
+
+        if (matchingSong) {
+          metadata = await fetchSongMetadata(matchingSong.id, songCache, new Map(trendingSongs.map((s) => [s.id, s])));
+        }
       }
     }
-    
-    // If not found, try to fetch metadata
+
+    // Fallback if no metadata found
     if (!metadata) {
-      // Try to find song ID from title in trending songs
-      const matchingSong = Array.from(trendingSongs.values()).find(
-        (song) => song.title.toLowerCase() === trackTitleLower
-      );
-      
-      if (matchingSong) {
-        metadata = await fetchSongMetadata(matchingSong.id, songCache, new Map(trendingSongs.map((s) => [s.id, s])));
-      } else {
-        // Use the track title as-is
-        metadata = {
-          title: winningTrack || "Unknown Track",
-          artist: "Unknown Artist",
-          cover: "",
-        };
-      }
+      metadata = {
+        title: winningTrack || "Unknown Track",
+        artist: "Unknown Artist",
+        cover: "",
+      };
     }
 
     markets.push({

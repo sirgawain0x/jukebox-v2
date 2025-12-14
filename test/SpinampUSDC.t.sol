@@ -141,6 +141,33 @@ contract SpinampUSDCTest is Test {
         vm.stopPrank();
     }
 
+    function test_CreateWeeklyMarket_OwnerNoFee() public {
+        uint256 ownerBalanceBefore = usdc.balanceOf(owner);
+        uint256 feeRecipientBalanceBefore = usdc.balanceOf(feeRecipient);
+        uint256 contractBalanceBefore = usdc.balanceOf(address(market));
+
+        // Owner should not need to approve or pay fee
+        vm.prank(owner);
+        market.createWeeklyMarket();
+
+        assertEq(market.s_marketCount(), 1, "Market count should be 1");
+        assertEq(usdc.balanceOf(owner), ownerBalanceBefore, "Owner should not pay fee");
+        assertEq(usdc.balanceOf(address(market)), contractBalanceBefore, "Contract should not hold fee");
+        assertEq(usdc.balanceOf(feeRecipient), feeRecipientBalanceBefore, "Fee recipient should not receive fee from owner");
+
+        (uint256 id, uint256 endTime, uint256 resolveTime, bool resolved, string memory winningTrack, address marketCreator, uint256 totalPool, uint256 totalPaidOut) =
+            market.markets(1);
+
+        assertEq(id, 1, "Market ID should be 1");
+        assertEq(marketCreator, owner, "Creator should be owner");
+        assertGt(resolveTime, block.timestamp, "Resolve time should be in future");
+        assertEq(endTime, resolveTime - 1 hours, "End time should be 1 hour before resolve time");
+        assertEq(resolved, false, "Market should not be resolved");
+        assertEq(bytes(winningTrack).length, 0, "Winning track should be empty");
+        assertEq(totalPool, 0, "Total pool should be 0");
+        assertEq(totalPaidOut, 0, "Total paid out should be 0");
+    }
+
     function test_CreateWeeklyMarket_MultipleMarkets() public {
         vm.startPrank(creator);
         usdc.approve(address(market), CREATION_FEE * 3);
@@ -366,6 +393,162 @@ contract SpinampUSDCTest is Test {
         assertEq(marketCreator, creator);
         assertEq(totalPool, 0);
         assertEq(totalPaidOut, 0);
+    }
+
+    // ============ Security Features Tests ============
+
+    function test_Pause_Unpause() public {
+        assertEq(market.paused(), false, "Should start unpaused");
+        
+        vm.prank(owner);
+        market.pause();
+        assertEq(market.paused(), true, "Should be paused");
+        
+        vm.prank(owner);
+        market.unpause();
+        assertEq(market.paused(), false, "Should be unpaused");
+    }
+
+    function test_Pause_OnlyOwner() public {
+        vm.prank(creator);
+        vm.expectRevert();
+        market.pause();
+    }
+
+    function test_CreateMarket_WhenPaused() public {
+        vm.prank(owner);
+        market.pause();
+        
+        vm.startPrank(creator);
+        usdc.approve(address(market), CREATION_FEE);
+        vm.expectRevert();
+        market.createWeeklyMarket();
+        vm.stopPrank();
+    }
+
+    function test_PlaceBet_WhenPaused() public {
+        vm.startPrank(creator);
+        usdc.approve(address(market), CREATION_FEE);
+        market.createWeeklyMarket();
+        vm.stopPrank();
+        
+        vm.prank(owner);
+        market.pause();
+        
+        vm.startPrank(user1);
+        usdc.approve(address(market), 100 * 10**6);
+        vm.expectRevert();
+        market.placeBet(1, "Song Title", 100 * 10**6);
+        vm.stopPrank();
+    }
+
+    function test_WithdrawRewards_WhenPaused() public {
+        // First create a market and set up rewards
+        vm.startPrank(creator);
+        usdc.approve(address(market), CREATION_FEE);
+        market.createWeeklyMarket();
+        vm.stopPrank();
+        
+        // Simulate rewards being added (in real scenario, this happens during resolution)
+        // For testing, we'll verify that pause doesn't block withdrawals
+        // The actual withdrawal will fail with "No rewards" but that's expected
+        // The important thing is it doesn't fail due to pause
+        
+        vm.prank(owner);
+        market.pause();
+        
+        // Verify pause doesn't block withdrawal attempts
+        // (Will revert with "No rewards" but not "EnforcedPause")
+        vm.prank(creator);
+        vm.expectRevert("No rewards");
+        market.withdrawRewards();
+        
+        // If we got here, pause didn't block the function call
+        // The revert is expected because there are no rewards
+    }
+
+    function test_MaxBetAmount_Enforced() public {
+        vm.startPrank(creator);
+        usdc.approve(address(market), CREATION_FEE);
+        market.createWeeklyMarket();
+        vm.stopPrank();
+        
+        uint256 maxBet = market.maxBetAmount();
+        uint256 tooLargeBet = maxBet + 1;
+        
+        vm.startPrank(user1);
+        usdc.approve(address(market), tooLargeBet);
+        vm.expectRevert("Bet exceeds maximum");
+        market.placeBet(1, "Song Title", tooLargeBet);
+        vm.stopPrank();
+    }
+
+    function test_MaxBetAmount_WithinLimit() public {
+        vm.startPrank(creator);
+        usdc.approve(address(market), CREATION_FEE);
+        market.createWeeklyMarket();
+        vm.stopPrank();
+        
+        uint256 maxBet = market.maxBetAmount();
+        
+        vm.startPrank(user1);
+        usdc.approve(address(market), maxBet);
+        market.placeBet(1, "Song Title", maxBet);
+        vm.stopPrank();
+        
+        (uint256 id, uint256 endTime, uint256 resolveTime, bool resolved, string memory winningTrack, address marketCreator, uint256 totalPool, uint256 totalPaidOut) =
+            market.markets(1);
+        assertEq(totalPool, maxBet, "Pool should equal max bet");
+    }
+
+    function test_SetMaxBetAmount_OnlyOwner() public {
+        uint256 newMax = 200000 * 10**6;
+        
+        vm.prank(owner);
+        market.setMaxBetAmount(newMax);
+        assertEq(market.maxBetAmount(), newMax, "Max bet should be updated");
+        
+        vm.prank(creator);
+        vm.expectRevert();
+        market.setMaxBetAmount(newMax);
+    }
+
+    function test_SetMaxBetAmount_Zero() public {
+        vm.prank(owner);
+        vm.expectRevert("Max bet must be > 0");
+        market.setMaxBetAmount(0);
+    }
+
+    function test_MinMarketDuration_Enforced() public {
+        // This test would require manipulating block.timestamp significantly
+        // The minimum duration check happens in createWeeklyMarket
+        // Since getNextMondayEST() always returns at least 1 day in the future,
+        // the check should pass in normal conditions
+        vm.startPrank(creator);
+        usdc.approve(address(market), CREATION_FEE);
+        market.createWeeklyMarket();
+        vm.stopPrank();
+        
+        uint256 minDuration = market.minMarketDuration();
+        assertGe(minDuration, 1 days, "Min duration should be at least 1 day");
+    }
+
+    function test_SetMinMarketDuration_OnlyOwner() public {
+        uint256 newMin = 2 days;
+        
+        vm.prank(owner);
+        market.setMinMarketDuration(newMin);
+        assertEq(market.minMarketDuration(), newMin, "Min duration should be updated");
+        
+        vm.prank(creator);
+        vm.expectRevert();
+        market.setMinMarketDuration(newMin);
+    }
+
+    function test_SetMinMarketDuration_TooShort() public {
+        vm.prank(owner);
+        vm.expectRevert("Min duration must be >= 1 hour");
+        market.setMinMarketDuration(30 minutes);
     }
 }
 

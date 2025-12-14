@@ -66,13 +66,38 @@ elif [ -z "$CHAINLINK_FUNCTIONS_SUBSCRIPTION_ID" ]; then
     exit 1
 fi
 
+# Support both TESTNET_ prefixed and non-prefixed variable names for Router
+if [ -n "$TESTNET_CHAINLINK_FUNCTIONS_ROUTER" ]; then
+    CHAINLINK_FUNCTIONS_ROUTER="$TESTNET_CHAINLINK_FUNCTIONS_ROUTER"
+elif [ -z "$CHAINLINK_FUNCTIONS_ROUTER" ]; then
+    echo "⚠️  TESTNET_CHAINLINK_FUNCTIONS_ROUTER not set, using Base Sepolia default"
+    CHAINLINK_FUNCTIONS_ROUTER="0xf9B8fc078197181C841c296C876945aaa425B278"
+fi
+
+# Support both TESTNET_ prefixed and non-prefixed variable names for DON_ID
+if [ -n "$TESTNET_CHAINLINK_FUNCTIONS_DON_ID" ]; then
+    CHAINLINK_FUNCTIONS_DON_ID="$TESTNET_CHAINLINK_FUNCTIONS_DON_ID"
+elif [ -z "$CHAINLINK_FUNCTIONS_DON_ID" ]; then
+    echo "⚠️  TESTNET_CHAINLINK_FUNCTIONS_DON_ID not set, using Base Sepolia default"
+    CHAINLINK_FUNCTIONS_DON_ID="0x66756e2d626173652d7365706f6c69612d310000000000000000000000000000"
+fi
+
+# Verify FEE_RECIPIENT is set
+if [ -z "$FEE_RECIPIENT" ]; then
+    echo "❌ Error: FEE_RECIPIENT not set"
+    echo "   Please set FEE_RECIPIENT in your .env file"
+    echo "   Example: FEE_RECIPIENT=0x14cda4b78d9e7ca923b8f535c73ea69a6c6708d8"
+    exit 1
+fi
+
 echo "📋 Deployment Configuration:"
 echo "  Network: Base Sepolia (Chain ID: 84532)"
 echo "  USDC: $USDC_ADDRESS"
 echo "  Subscription ID: $CHAINLINK_FUNCTIONS_SUBSCRIPTION_ID"
-echo "  Router: 0xf9B8fc078197181C841c296C876945aaa425B278 (Base Sepolia)"
-echo "  DON ID: 0x66756e2d626173652d7365706f6c69612d310000000000000000000000000000"
-echo "  Creation Fee: $5 USDC"
+echo "  Router: $CHAINLINK_FUNCTIONS_ROUTER"
+echo "  DON ID: $CHAINLINK_FUNCTIONS_DON_ID"
+echo "  Creation Fee: $5 USDC (Owner exempt)"
+echo "  Fee Recipient: $FEE_RECIPIENT"
 echo ""
 
 echo ""
@@ -114,6 +139,9 @@ DEPLOY_ARGS="$DEPLOY_ARGS -vvvv"
 # Export environment variables for the script
 export USDC_ADDRESS
 export CHAINLINK_FUNCTIONS_SUBSCRIPTION_ID
+export CHAINLINK_FUNCTIONS_ROUTER
+export CHAINLINK_FUNCTIONS_DON_ID
+export FEE_RECIPIENT
 
 forge script script/DeploySpinampUSDC.s.sol:DeploySpinampUSDC $DEPLOY_ARGS
 

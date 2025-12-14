@@ -6,8 +6,9 @@ import {FunctionsRequest} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/l
 import {AutomationCompatibleInterface} from "@chainlink/contracts/src/v0.8/automation/AutomationCompatible.sol";
 import {ConfirmedOwner} from "@chainlink/contracts/src/v0.8/shared/access/ConfirmedOwner.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 
-contract SpinampUSDC is FunctionsClient, AutomationCompatibleInterface, ConfirmedOwner {
+contract SpinampUSDC is FunctionsClient, AutomationCompatibleInterface, ConfirmedOwner, Pausable {
     using FunctionsRequest for FunctionsRequest.Request;
 
     // --- Configuration ---
@@ -26,6 +27,10 @@ contract SpinampUSDC is FunctionsClient, AutomationCompatibleInterface, Confirme
     
     // Fees (Creation & Splits)
     uint256 public creationFee = 5 * 10**6; // $5 USDC to create a market
+    
+    // Security Limits
+    uint256 public maxBetAmount = 100000 * 10**6; // $100,000 USDC max bet per transaction
+    uint256 public minMarketDuration = 1 days; // Minimum 1 day from creation to resolution
     
     // Internal Balances (Pull Payment Pattern for Creators/Artists)
     // Tracks how much USDC each User/Artist can withdraw
@@ -73,6 +78,8 @@ contract SpinampUSDC is FunctionsClient, AutomationCompatibleInterface, Confirme
     event MarketResolved(uint256 indexed marketId, string winningTrack, address winningArtist, uint256 netPool);
     event RewardsWithdrawn(address indexed user, uint256 amount);
     event WinningsClaimed(uint256 indexed marketId, address user, uint256 amount);
+    event MaxBetAmountUpdated(uint256 newMaxBetAmount);
+    event MinMarketDurationUpdated(uint256 newMinDuration);
 
     constructor(
         uint64 subscriptionId,
@@ -100,10 +107,13 @@ contract SpinampUSDC is FunctionsClient, AutomationCompatibleInterface, Confirme
         return EST_MONDAY_ANCHOR + ((weeksPassed + 1) * WEEK_IN_SECONDS);
     }
 
-    function createWeeklyMarket() external {
-        // 1. Charge Creation Fee ($5) and send directly to fee recipient
-        require(usdcToken.transferFrom(msg.sender, address(this), creationFee), "Fee transfer failed");
-        require(usdcToken.transfer(feeRecipient, creationFee), "Fee transfer to recipient failed");
+    function createWeeklyMarket() external whenNotPaused {
+        // 1. Charge Creation Fee ($5) only if caller is not the owner
+        // Owner/admin can create markets without paying the fee
+        if (msg.sender != owner()) {
+            require(usdcToken.transferFrom(msg.sender, address(this), creationFee), "Fee transfer failed");
+            require(usdcToken.transfer(feeRecipient, creationFee), "Fee transfer to recipient failed");
+        }
 
         // 2. Setup Timing
         s_marketCount++;
@@ -111,8 +121,11 @@ contract SpinampUSDC is FunctionsClient, AutomationCompatibleInterface, Confirme
         if (resolveTime - block.timestamp < 1 days) {
             resolveTime += WEEK_IN_SECONDS;
         }
+        
+        // 3. Enforce minimum market duration
+        require(resolveTime - block.timestamp >= minMarketDuration, "Market duration too short");
 
-        // 3. Initialize Market
+        // 4. Initialize Market
         markets[s_marketCount] = Market({
             id: s_marketCount,
             endTime: resolveTime - 1 hours, 
@@ -129,11 +142,12 @@ contract SpinampUSDC is FunctionsClient, AutomationCompatibleInterface, Confirme
 
     // --- 2. Betting ---
     
-    function placeBet(uint256 marketId, string calldata predictedTrack, uint256 amount) external {
+    function placeBet(uint256 marketId, string calldata predictedTrack, uint256 amount) external whenNotPaused {
         Market storage market = markets[marketId];
         require(block.timestamp < market.endTime, "Betting closed");
         require(!market.resolved, "Already resolved");
         require(amount > 0, "Bet > 0");
+        require(amount <= maxBetAmount, "Bet exceeds maximum");
 
         require(usdcToken.transferFrom(msg.sender, address(this), amount), "USDC Transfer failed");
 
@@ -243,10 +257,36 @@ contract SpinampUSDC is FunctionsClient, AutomationCompatibleInterface, Confirme
         emit RewardsWithdrawn(msg.sender, amount);
     }
 
+    // --- 7. Owner Functions ---
+    
     // Owner function to set/update fee recipient
     function setFeeRecipient(address _feeRecipient) external onlyOwner {
         require(_feeRecipient != address(0), "Invalid fee recipient address");
         feeRecipient = _feeRecipient;
+    }
+    
+    // Emergency pause function
+    function pause() external onlyOwner {
+        _pause();
+    }
+    
+    // Unpause function
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+    
+    // Update maximum bet amount (owner only)
+    function setMaxBetAmount(uint256 _maxBetAmount) external onlyOwner {
+        require(_maxBetAmount > 0, "Max bet must be > 0");
+        maxBetAmount = _maxBetAmount;
+        emit MaxBetAmountUpdated(_maxBetAmount);
+    }
+    
+    // Update minimum market duration (owner only)
+    function setMinMarketDuration(uint256 _minDuration) external onlyOwner {
+        require(_minDuration >= 1 hours, "Min duration must be >= 1 hour");
+        minMarketDuration = _minDuration;
+        emit MinMarketDurationUpdated(_minDuration);
     }
 
     // --- 6. Withdrawals (Winners) ---

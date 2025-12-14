@@ -10,6 +10,9 @@ import {
   useGetContractOwner,
   useGetMarket,
   usePlaceBetAutomated,
+  useIsPaused,
+  useGetMaxBetAmount,
+  usePauseContract,
 } from "@/lib/contracts/automated-prediction-market-hooks";
 import { isAutomatedPredictionMarketDeployed } from "@/lib/contracts/automated-prediction-market";
 import { Button } from "../ui/Button";
@@ -45,6 +48,9 @@ export function CreateAutomatedMarket() {
   const { data: nextMondayEST } = useGetNextMondayEST();
   const { data: marketCount, isLoading: isLoadingMarketCount, isError: isMarketCountError, error: marketCountError } = useGetMarketCount();
   const { data: contractOwner, isLoading: isLoadingOwner, isError: isOwnerError, error: ownerError } = useGetContractOwner();
+  const { data: isPaused } = useIsPaused();
+  const { data: maxBetAmount } = useGetMaxBetAmount();
+  const { pause, unpause, isPending: isPausePending, isSuccess: isPauseSuccess } = usePauseContract();
   
   // #region agent log
   // Log contract deployment and market count state
@@ -217,6 +223,11 @@ export function CreateAutomatedMarket() {
       return;
     }
 
+    if (isPaused) {
+      showToast({ message: "Contract is currently paused. Betting is temporarily disabled.", type: "error" });
+      return;
+    }
+
     if (!betAmount || parseFloat(betAmount) <= 0) {
       showToast({ message: "Please enter a valid bet amount", type: "error" });
       return;
@@ -234,6 +245,17 @@ export function CreateAutomatedMarket() {
 
     try {
       const amount = parseUSDC(betAmount);
+      
+      // Check max bet limit
+      if (maxBetAmount && amount > maxBetAmount) {
+        const maxBetFormatted = formatUSDC(maxBetAmount);
+        showToast({ 
+          message: `Bet amount exceeds maximum of ${maxBetFormatted} USDC`, 
+          type: "error" 
+        });
+        return;
+      }
+
       await placeBet(latestMarketId, trackTitle.trim(), amount);
       showToast({ message: `Bet placed: ${betAmount} USDC on "${trackTitle}"`, type: "success" });
       setBetAmount("");
@@ -291,6 +313,17 @@ export function CreateAutomatedMarket() {
               <div className="text-center py-4 text-(--app-foreground-muted)">
                 <p className="mb-2">No markets created yet.</p>
                 <p className="text-sm">Markets are created weekly by Creative Organization.</p>
+              </div>
+            ) : isPaused ? (
+              <div className="text-center py-4">
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <p className="text-sm font-medium text-yellow-900 mb-2">
+                    ⚠️ Contract Temporarily Paused
+                  </p>
+                  <p className="text-xs text-yellow-800">
+                    Betting is temporarily disabled. Please check back later.
+                  </p>
+                </div>
               </div>
             ) : !isBettingOpen ? (
               <div className="text-center py-4">
@@ -463,65 +496,141 @@ export function CreateAutomatedMarket() {
                     onChange={(e) => setBetAmount(e.target.value)}
                     min="0"
                     step="0.01"
+                    max={maxBetAmount ? Number(maxBetAmount) / 1e6 : undefined}
                     className="w-full px-4 py-3 border border-[rgba(0,0,0,0.1)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0052ff] text-sm"
                   />
+                  {maxBetAmount && (
+                    <p className="text-xs text-(--app-foreground-muted) mt-1">
+                      Maximum bet: {formatUSDC(maxBetAmount)} USDC
+                    </p>
+                  )}
                 </div>
                 <Button
                   variant="primary"
                   onClick={handlePlaceBet}
-                  disabled={!betAmount || !trackTitle || !isConnected || isPlacingBet}
+                  disabled={!betAmount || !trackTitle || !isConnected || isPlacingBet || isPaused}
                   className="w-full"
                 >
-                  {isPlacingBet ? "Placing Bet..." : "Place Bet"}
+                  {isPaused ? "Contract Paused" : isPlacingBet ? "Placing Bet..." : "Place Bet"}
                 </Button>
               </div>
             )}
           </>
         )}
 
-        {/* Owner-only market creation section - show if owner address matches (even if wallet not connected) */}
+        {/* Owner-only controls section */}
         {ownerAddress && (
           <div className="mt-6 pt-6 border-t border-gray-200">
             <details className="cursor-pointer" open={!isConnected}>
               <summary className="text-sm font-medium text-(--app-foreground-muted) mb-3">
-                {isOwnerAddress ? "Owner: Create New Market" : "Contract Owner: Create New Market"}
+                {isOwnerAddress ? "🔧 Owner Controls" : "Contract Owner Controls"}
               </summary>
-              <div className="space-y-3 mt-3">
+              <div className="space-y-4 mt-3">
                 {!isConnected ? (
                   <div className="text-center py-4">
                     <p className="text-sm text-(--app-foreground-muted) mb-3">
-                      Connect your wallet to create a new market. Only the Creative Organization can create markets.
+                      Connect your wallet to access owner controls.
                     </p>
                   </div>
                 ) : !isOwnerAddress ? (
                   <div className="text-center py-4">
                     <p className="text-sm text-(--app-foreground-muted) mb-3">
-                      Only the Creative Organization can create markets.
+                      Only the contract owner can access these controls.
                     </p>
                   </div>
                 ) : (
                   <>
-                    <Button
-                      onClick={() => {
-                        try {
-                          createWeeklyMarket();
-                        } catch (err) {
-                          showToast({
-                            message: err instanceof Error ? err.message : "Failed to create market",
-                            type: "error"
-                          });
-                        }
-                      }}
-                      disabled={isPending || isSimulating || isSimulateError}
-                      variant="outline"
-                      className="w-full"
-                    >
-                      {isPending ? "Creating Market..." : isSimulating ? "Validating..." : isSimulateError ? "Cannot Create Market" : "Create Weekly Market"}
-                    </Button>
-                    
-                    <p className="text-xs text-center text-(--app-foreground-muted)">
-                      This will create a new market that resolves on {nextMondayEST ? formatDate(nextMondayEST) : "the next Monday"}
-                    </p>
+                    {/* Contract Status */}
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                      <h4 className="text-sm font-medium mb-2">Contract Status</h4>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-(--app-foreground-muted)">
+                          Status:
+                        </span>
+                        <span className={`text-sm font-medium ${isPaused ? "text-yellow-600" : "text-green-600"}`}>
+                          {isPaused ? "⏸️ Paused" : "▶️ Active"}
+                        </span>
+                      </div>
+                      {maxBetAmount && (
+                        <div className="flex items-center justify-between mt-2">
+                          <span className="text-sm text-(--app-foreground-muted)">
+                            Max Bet:
+                          </span>
+                          <span className="text-sm font-medium">
+                            {formatUSDC(maxBetAmount)} USDC
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Emergency Controls */}
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium">Emergency Controls</h4>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => {
+                            try {
+                              if (isPaused) {
+                                unpause();
+                                showToast({ message: "Unpausing contract...", type: "info" });
+                              } else {
+                                pause();
+                                showToast({ message: "Pausing contract...", type: "warning" });
+                              }
+                            } catch (err) {
+                              showToast({
+                                message: err instanceof Error ? err.message : "Failed to toggle pause",
+                                type: "error"
+                              });
+                            }
+                          }}
+                          disabled={isPausePending}
+                          variant={isPaused ? "primary" : "outline"}
+                          className="flex-1"
+                        >
+                          {isPausePending ? "Processing..." : isPaused ? "Unpause Contract" : "Pause Contract"}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-(--app-foreground-muted)">
+                        {isPaused 
+                          ? "Contract is paused. Betting and market creation are disabled."
+                          : "Pause the contract in case of emergency. Users can still withdraw rewards and winnings."}
+                      </p>
+                    </div>
+
+                    {/* Market Creation */}
+                    <div className="space-y-2 pt-4 border-t border-gray-200">
+                      <h4 className="text-sm font-medium">Market Creation</h4>
+                      {isPaused && (
+                        <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                          <p className="text-sm text-yellow-800">
+                            ⚠️ Contract is paused. Unpause to create markets.
+                          </p>
+                        </div>
+                      )}
+                      <Button
+                        onClick={() => {
+                          try {
+                            createWeeklyMarket();
+                          } catch (err) {
+                            showToast({
+                              message: err instanceof Error ? err.message : "Failed to create market",
+                              type: "error"
+                            });
+                          }
+                        }}
+                        disabled={isPending || isSimulating || isSimulateError || isPaused}
+                        variant="outline"
+                        className="w-full"
+                      >
+                        {isPaused ? "Cannot Create (Paused)" : isPending ? "Creating Market..." : isSimulating ? "Validating..." : isSimulateError ? "Cannot Create Market" : "Create Weekly Market"}
+                      </Button>
+                      
+                      <p className="text-xs text-center text-(--app-foreground-muted)">
+                        Creates a new market resolving on {nextMondayEST ? formatDate(nextMondayEST) : "the next Monday"}
+                        {isOwnerAddress && " (No fee for owner)"}
+                      </p>
+                    </div>
                   </>
                 )}
               </div>
@@ -531,6 +640,14 @@ export function CreateAutomatedMarket() {
               <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
                 <p className="text-sm text-red-800">
                   {error?.message || simulateError?.message || "Failed to create market. Please try again."}
+                </p>
+              </div>
+            )}
+
+            {isPauseSuccess && isOwnerAddress && (
+              <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-sm text-green-800">
+                  ✅ Contract status updated successfully
                 </p>
               </div>
             )}

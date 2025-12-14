@@ -43,16 +43,41 @@ export function CreateAutomatedMarket() {
   const isContractDeployed = isAutomatedPredictionMarketDeployed(chainId);
   const { createWeeklyMarket, isPending, isSuccess, isError, error, isSimulateError, simulateError, isSimulating } = useCreateWeeklyMarket();
   const { data: nextMondayEST } = useGetNextMondayEST();
-  const { data: marketCount } = useGetMarketCount();
-  const { data: contractOwner } = useGetContractOwner();
+  const { data: marketCount, isLoading: isLoadingMarketCount, isError: isMarketCountError, error: marketCountError } = useGetMarketCount();
+  const { data: contractOwner, isLoading: isLoadingOwner, isError: isOwnerError, error: ownerError } = useGetContractOwner();
+  
+  // #region agent log
+  // Log contract deployment and market count state
+  useEffect(() => {
+    fetch('http://127.0.0.1:7242/ingest/7ffccca1-2c82-49dc-9cbc-405674609eea', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'CreateAutomatedMarket.tsx:useEffect-marketCount', message: 'Market count state', data: { isContractDeployed, chainId, marketCount: marketCount?.toString(), isLoadingMarketCount, isMarketCountError, marketCountError: marketCountError?.message }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'A' }) }).catch(() => { });
+  }, [isContractDeployed, chainId, marketCount, isLoadingMarketCount, isMarketCountError, marketCountError]);
+  // #endregion
+  
+  // #region agent log
+  // Log contract owner state
+  useEffect(() => {
+    fetch('http://127.0.0.1:7242/ingest/7ffccca1-2c82-49dc-9cbc-405674609eea', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'CreateAutomatedMarket.tsx:useEffect-owner', message: 'Contract owner state', data: { contractOwner, connectedAddress, isLoadingOwner, isOwnerError, ownerError: ownerError?.message }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'C' }) }).catch(() => { });
+  }, [contractOwner, connectedAddress, isLoadingOwner, isOwnerError, ownerError]);
+  // #endregion
   
   // Get the most recent market (highest market ID)
   const latestMarketId = useMemo(() => {
+    // #region agent log
+    const result = (!marketCount || marketCount === BigInt(0)) ? null : marketCount;
+    fetch('http://127.0.0.1:7242/ingest/7ffccca1-2c82-49dc-9cbc-405674609eea', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'CreateAutomatedMarket.tsx:latestMarketId', message: 'Latest market ID computed', data: { marketCount: marketCount?.toString(), latestMarketId: result?.toString() }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'A' }) }).catch(() => { });
+    // #endregion
     if (!marketCount || marketCount === BigInt(0)) return null;
     return marketCount; // Latest market is the highest ID
   }, [marketCount]);
   
-  const { data: marketData, isLoading: isLoadingMarket } = useGetMarket(latestMarketId);
+  const { data: marketData, isLoading: isLoadingMarket, isError: isMarketError, error: marketError } = useGetMarket(latestMarketId);
+  
+  // #region agent log
+  // Log market loading state
+  useEffect(() => {
+    fetch('http://127.0.0.1:7242/ingest/7ffccca1-2c82-49dc-9cbc-405674609eea', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'CreateAutomatedMarket.tsx:useEffect-marketData', message: 'Market data loading state', data: { latestMarketId: latestMarketId?.toString(), isLoadingMarket, isMarketError, marketError: marketError?.message, hasMarketData: !!marketData }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'B' }) }).catch(() => { });
+  }, [latestMarketId, isLoadingMarket, isMarketError, marketError, marketData]);
+  // #endregion
   const { placeBet, isApprovingPending, isBetPending, isWaitingForApprove } = usePlaceBetAutomated();
   
   // Manual market betting removed - old contract deleted
@@ -225,7 +250,30 @@ export function CreateAutomatedMarket() {
 
   const isPlacingBet = isApprovingPending || isBetPending || isWaitingForApprove;
 
+  // Check if user is owner (allows checking even when wallet not connected)
   const isOwner = contractOwner && connectedAddress && connectedAddress.toLowerCase() === (contractOwner as string).toLowerCase();
+  const isOwnerAddress = contractOwner && connectedAddress && connectedAddress.toLowerCase() === (contractOwner as string).toLowerCase();
+  // Also check if the owner address matches even without wallet connected (for UI display)
+  const ownerAddress = contractOwner as string | undefined;
+  
+  // #region agent log
+  // Log owner check and loading condition
+  useEffect(() => {
+    const showLoadingMarket = isLoadingMarketCount || isLoadingMarket;
+    const hasNoMarkets = !isLoadingMarketCount && marketCount !== undefined && (marketCount === BigInt(0) || !latestMarketId);
+    const logData = { isContractDeployed, isLoadingMarket, isLoadingMarketCount, latestMarketId: latestMarketId?.toString(), marketCount: marketCount?.toString(), showLoadingMarket, hasNoMarkets, isOwner, isOwnerAddress, contractOwner, connectedAddress };
+    console.log('[DEBUG] Render condition check:', logData);
+    fetch('http://127.0.0.1:7242/ingest/7ffccca1-2c82-49dc-9cbc-405674609eea', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'CreateAutomatedMarket.tsx:useEffect-render', message: 'Render condition check', data: logData, timestamp: Date.now(), sessionId: 'debug-session', runId: 'post-fix', hypothesisId: 'A,B,C' }) }).catch(() => { });
+  }, [isContractDeployed, isLoadingMarket, isLoadingMarketCount, latestMarketId, marketCount, isOwner, isOwnerAddress, contractOwner, connectedAddress]);
+  // #endregion
+
+  // Determine which UI to show
+  const showLoading = isLoadingMarketCount || (isLoadingMarket && latestMarketId !== null);
+  const showNoMarkets = !isLoadingMarketCount && !isLoadingMarket && (!latestMarketId || (marketCount !== undefined && marketCount === BigInt(0)));
+  
+  // #region agent log
+  console.log('[DEBUG] Render decision:', { showLoading, showNoMarkets, isLoadingMarketCount, isLoadingMarket, latestMarketId: latestMarketId?.toString(), marketCount: marketCount?.toString() });
+  // #endregion
 
   return (
     <Card title="🎯 Place Your Bet">
@@ -233,11 +281,16 @@ export function CreateAutomatedMarket() {
         {!isContractDeployed ? (
               <div className="text-center py-4 text-(--app-foreground-muted)">
                 <p>Automated prediction market contract not deployed on this network.</p>
-                <p className="text-sm mt-2">Please switch to Base Sepolia or Base Mainnet.</p>
+                <p className="text-sm mt-2">Please switch to Base Mainnet.</p>
               </div>
-            ) : isLoadingMarket || !latestMarketId ? (
+            ) : showLoading ? (
               <div className="text-center py-4 text-(--app-foreground-muted)">
                 <p>Loading market...</p>
+              </div>
+            ) : showNoMarkets ? (
+              <div className="text-center py-4 text-(--app-foreground-muted)">
+                <p className="mb-2">No markets created yet.</p>
+                <p className="text-sm">Markets are created weekly by Creative Organization.</p>
               </div>
             ) : !isBettingOpen ? (
               <div className="text-center py-4">
@@ -426,39 +479,55 @@ export function CreateAutomatedMarket() {
           </>
         )}
 
-        {/* Owner-only market creation section */}
-        {isOwner && (
+        {/* Owner-only market creation section - show if owner address matches (even if wallet not connected) */}
+        {ownerAddress && (
           <div className="mt-6 pt-6 border-t border-gray-200">
-            <details className="cursor-pointer">
+            <details className="cursor-pointer" open={!isConnected}>
               <summary className="text-sm font-medium text-(--app-foreground-muted) mb-3">
-                Owner: Create New Market
+                {isOwnerAddress ? "Owner: Create New Market" : "Contract Owner: Create New Market"}
               </summary>
               <div className="space-y-3 mt-3">
-                <Button
-                  onClick={() => {
-                    try {
-                      createWeeklyMarket();
-                    } catch (err) {
-                      showToast({
-                        message: err instanceof Error ? err.message : "Failed to create market",
-                        type: "error"
-                      });
-                    }
-                  }}
-                  disabled={isPending || isSimulating || isSimulateError}
-                  variant="outline"
-                  className="w-full"
-                >
-                  {isPending ? "Creating Market..." : isSimulating ? "Validating..." : isSimulateError ? "Cannot Create Market" : "Create Weekly Market"}
-                </Button>
-                
-                <p className="text-xs text-center text-(--app-foreground-muted)">
-                  This will create a new market that resolves on {nextMondayEST ? formatDate(nextMondayEST) : "the next Monday"}
-                </p>
+                {!isConnected ? (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-(--app-foreground-muted) mb-3">
+                      Connect your wallet to create a new market. Only the Creative Organization can create markets.
+                    </p>
+                  </div>
+                ) : !isOwnerAddress ? (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-(--app-foreground-muted) mb-3">
+                      Only the Creative Organization can create markets.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <Button
+                      onClick={() => {
+                        try {
+                          createWeeklyMarket();
+                        } catch (err) {
+                          showToast({
+                            message: err instanceof Error ? err.message : "Failed to create market",
+                            type: "error"
+                          });
+                        }
+                      }}
+                      disabled={isPending || isSimulating || isSimulateError}
+                      variant="outline"
+                      className="w-full"
+                    >
+                      {isPending ? "Creating Market..." : isSimulating ? "Validating..." : isSimulateError ? "Cannot Create Market" : "Create Weekly Market"}
+                    </Button>
+                    
+                    <p className="text-xs text-center text-(--app-foreground-muted)">
+                      This will create a new market that resolves on {nextMondayEST ? formatDate(nextMondayEST) : "the next Monday"}
+                    </p>
+                  </>
+                )}
               </div>
             </details>
 
-            {(isError || isSimulateError) && (
+            {(isError || isSimulateError) && isOwnerAddress && (
               <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
                 <p className="text-sm text-red-800">
                   {error?.message || simulateError?.message || "Failed to create market. Please try again."}

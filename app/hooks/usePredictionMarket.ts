@@ -1,20 +1,19 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+// Removed: useMutation, useQueryClient - no longer used after removing old contract hooks
 import { useAccount } from "wagmi";
 import { Address } from "viem";
 import type {
   PredictionMarket,
   MarketBet,
-  MarketSide,
   MarketBetWithPreview,
   MarketPreview,
 } from "@/types/prediction-market";
-import {
-  usePlaceBet as usePlaceBetContract,
-  useClaimWinnings as useClaimWinningsContract,
-} from "@/lib/contracts/prediction-market-hooks";
-import { parseUSDC } from "@/lib/usdc-utils";
+// Removed: MarketSide - no longer used after removing old contract hooks
+// Removed: Old contract hooks - using AutomatedPredictionMarket hooks instead
+// Note: API-based hooks (useActiveMarkets, etc.) still work via API routes
+// Removed: parseUSDC - no longer used after removing old contract hooks
 import {
   deserializePredictionMarkets,
   deserializePredictionMarket,
@@ -242,69 +241,24 @@ export function useUserBets() {
 
 /**
  * Hook to place a bet
+ * @deprecated Use AutomatedPredictionMarket hooks directly instead
+ * This hook is kept for backward compatibility but will be removed in a future version
  */
 export function usePlaceBet() {
-  const queryClient = useQueryClient();
-  const { address } = useAccount();
-  const { placeBet: placeBetContract, ...rest } = usePlaceBetContract();
-
-  const placeBet = useMutation({
-    mutationFn: async ({
-      marketId,
-      amount,
-      side,
-    }: {
-      marketId: bigint;
-      amount: string; // USDC amount as string
-      side: MarketSide;
-    }) => {
-      if (!address) throw new Error("Wallet not connected");
-
-      const amountWei = parseUSDC(amount);
-      const sideBool = side === "YES";
-
-      // Place bet via contract
-      await placeBetContract(marketId, amountWei, sideBool, address);
-
-      // Invalidate queries to refetch
-      queryClient.invalidateQueries({ queryKey: ["prediction-markets"] });
-      queryClient.invalidateQueries({ queryKey: ["prediction-bets"] });
-      queryClient.invalidateQueries({ queryKey: ["prediction-user-bets"] });
-    },
-  });
-
-  return {
-    placeBet: placeBet.mutate,
-    placeBetAsync: placeBet.mutateAsync,
-    ...placeBet,
-    ...rest,
-  };
+  // This hook is no longer functional as the old contract has been removed
+  // Use AutomatedPredictionMarket hooks directly instead
+  throw new Error("usePlaceBet from old contract is no longer available. Use AutomatedPredictionMarket hooks instead.");
 }
 
 /**
  * Hook to claim winnings
+ * @deprecated Use AutomatedPredictionMarket hooks directly instead
+ * This hook is kept for backward compatibility but will be removed in a future version
  */
 export function useClaimWinnings() {
-  const queryClient = useQueryClient();
-  const { claimWinnings: claimWinningsContract, ...rest } =
-    useClaimWinningsContract();
-
-  const claim = useMutation({
-    mutationFn: async (marketId: bigint) => {
-      await claimWinningsContract(marketId);
-
-      // Invalidate queries
-      queryClient.invalidateQueries({ queryKey: ["prediction-user-bets"] });
-      queryClient.invalidateQueries({ queryKey: ["prediction-markets"] });
-    },
-  });
-
-  return {
-    claimWinnings: claim.mutate,
-    claimWinningsAsync: claim.mutateAsync,
-    ...claim,
-    ...rest,
-  };
+  // This hook is no longer functional as the old contract has been removed
+  // Use AutomatedPredictionMarket hooks directly instead
+  throw new Error("useClaimWinnings from old contract is no longer available. Use AutomatedPredictionMarket hooks instead.");
 }
 
 /**

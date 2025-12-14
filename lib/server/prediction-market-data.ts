@@ -1,7 +1,7 @@
 import { createPublicClient, http } from "viem";
 import type { AbiEvent } from "viem";
 import { base } from "viem/chains";
-import { getPredictionMarketAddress, predictionMarketABI } from "@/lib/contracts/prediction-market";
+import { getAutomatedPredictionMarketAddress, automatedPredictionMarketABI } from "@/lib/contracts/automated-prediction-market";
 import { fetchTrendingSongs, type TrendingTrack } from "@/lib/trending-songs";
 import type { PredictionMarket } from "@/types/prediction-market";
 import {
@@ -36,7 +36,7 @@ function createBaseClient() {
 }
 
 function getAbiEvent(name: string): AbiEvent | undefined {
-  return predictionMarketABI.find((item) => item.type === "event" && "name" in item && item.name === name) as
+  return automatedPredictionMarketABI.find((item) => item.type === "event" && "name" in item && item.name === name) as
     | AbiEvent
     | undefined;
 }
@@ -287,7 +287,7 @@ export async function fetchMarketsFromChain(options: FetchMarketsOptions = {}): 
 
   let contractAddress: string;
   try {
-    contractAddress = getPredictionMarketAddress(base.id);
+    contractAddress = getAutomatedPredictionMarketAddress(base.id);
   } catch {
     return [];
   }
@@ -298,8 +298,8 @@ export async function fetchMarketsFromChain(options: FetchMarketsOptions = {}): 
   try {
     const count = await client.readContract({
       address: contractAddress as `0x${string}`,
-      abi: predictionMarketABI,
-      functionName: "marketCount",
+      abi: automatedPredictionMarketABI,
+      functionName: "s_marketCount",
     });
     marketCount = Number(count);
   } catch (error) {
@@ -316,7 +316,7 @@ export async function fetchMarketsFromChain(options: FetchMarketsOptions = {}): 
     fetchMarketCreationLogs(client, contractAddress),
   ]);
 
-  const trendingMap = new Map(trendingSongs.map((song) => [song.id, song]));
+  const trendingMap = new Map(trendingSongs.map((song) => [song.title.toLowerCase(), song]));
   const songCache = new Map<string, { title: string; artist: string; cover: string } | null>();
   const creationTimestampMap = await buildCreationTimestampMap(client, creationLogs);
 
@@ -329,17 +329,19 @@ export async function fetchMarketsFromChain(options: FetchMarketsOptions = {}): 
   const markets: PredictionMarket[] = [];
   const now = Math.floor(Date.now() / 1000);
 
-  const marketReadPromises = Array.from({ length: marketCount }).map((_, index) =>
+  // Read markets from AutomatedPredictionMarket contract
+  // Note: This contract uses 1-based indexing (market IDs start at 1)
+  const marketReadPromises = Array.from({ length: marketCount }, (_, i) => i + 1).map((marketId) =>
     client
       .readContract({
         address: contractAddress as `0x${string}`,
-        abi: predictionMarketABI,
+        abi: automatedPredictionMarketABI,
         functionName: "markets",
-        args: [BigInt(index)],
+        args: [BigInt(marketId)],
       })
-      .then((data) => ({ index, data }))
+      .then((data) => ({ marketId, data }))
       .catch((error) => {
-        console.error(`Failed to fetch market ${index}:`, error);
+        console.error(`Failed to fetch market ${marketId}:`, error);
         return null;
       })
   );
@@ -349,32 +351,72 @@ export async function fetchMarketsFromChain(options: FetchMarketsOptions = {}): 
   for (const entry of marketData) {
     if (!entry) continue;
 
-    const { index, data } = entry;
-    const songId = data[0] as string;
-    const endTime = Number(data[1]);
-    const resolved = data[2] as boolean;
-    const totalPoolYes = data[4] as bigint;
-    const totalPoolNo = data[5] as bigint;
+    const { marketId, data } = entry;
+    // AutomatedPredictionMarket Market struct: id, endTime, resolveTime, resolved, winningTrack, totalPool
+    const endTime = Number(data[1] as bigint); // endTime
+    const _resolveTime = Number(data[2] as bigint); // resolveTime (unused but kept for potential future use)
+    const resolved = data[3] as boolean;
+    const winningTrack = data[4] as string;
+    
+    // For AutomatedPredictionMarket, we need to fetch bets to calculate pools
+    // The contract doesn't store totalPoolYes/totalPoolNo separately
+    // We'll need to aggregate from bets or use a different approach
+    // For now, we'll set both to 0 and calculate from bets if needed
+    const totalPoolYes = BigInt(0); // Will be calculated from bets
+    const totalPoolNo = BigInt(0); // Will be calculated from bets
 
     if (!includeResolved && resolved) continue;
     if (!includeExpired && !resolved && endTime <= now) continue;
 
-    const metadata = await fetchSongMetadata(songId, songCache, trendingMap);
+    // Try to find matching song by title (case-insensitive)
+    const trackTitleLower = winningTrack.toLowerCase();
+    let metadata: { title: string; artist: string; cover: string } | null = null;
+    
+    // First try to find in trending songs
+    for (const [title, song] of trendingMap.entries()) {
+      if (title === trackTitleLower || song.title.toLowerCase() === trackTitleLower) {
+        metadata = {
+          title: song.title,
+          artist: song.artist,
+          cover: song.cover,
+        };
+        break;
+      }
+    }
+    
+    // If not found, try to fetch metadata
+    if (!metadata) {
+      // Try to find song ID from title in trending songs
+      const matchingSong = Array.from(trendingSongs.values()).find(
+        (song) => song.title.toLowerCase() === trackTitleLower
+      );
+      
+      if (matchingSong) {
+        metadata = await fetchSongMetadata(matchingSong.id, songCache, new Map(trendingSongs.map((s) => [s.id, s])));
+      } else {
+        // Use the track title as-is
+        metadata = {
+          title: winningTrack || "Unknown Track",
+          artist: "Unknown Artist",
+          cover: "",
+        };
+      }
+    }
 
     markets.push({
-      id: `market-${index}`,
-      songId,
-      songTitle: metadata?.title ?? songId,
+      id: `market-${marketId}`,
+      songId: winningTrack || `track-${marketId}`, // Use track title as songId for compatibility
+      songTitle: metadata?.title ?? winningTrack ?? "Unknown Track",
       songArtist: metadata?.artist ?? "Unknown Artist",
       songCover: metadata?.cover ?? "",
       endTime,
       status: resolved ? "RESOLVED" : "ACTIVE",
-      createdAt: creationTimestampMap.get(index) ?? now,
+      createdAt: creationTimestampMap.get(marketId) ?? now,
       totalPoolYes,
       totalPoolNo,
-      totalBets: betCounts.get(index) ?? 0,
+      totalBets: betCounts.get(marketId) ?? 0,
       contractAddress,
-      marketIndex: index,
+      marketIndex: marketId,
     });
   }
 

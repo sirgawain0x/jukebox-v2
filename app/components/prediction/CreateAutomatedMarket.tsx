@@ -13,29 +13,25 @@ import {
 } from "@/lib/contracts/automated-prediction-market-hooks";
 import { isAutomatedPredictionMarketDeployed } from "@/lib/contracts/automated-prediction-market";
 import { Button } from "../ui/Button";
-import { Icon } from "../ui/Icon";
+// Removed: Icon - no longer used after removing manual betting
 import { useEffect, useState, useMemo } from "react";
 import { formatUSDC, parseUSDC } from "@/lib/usdc-utils";
 import { fetchTrendingSongs, type TrendingTrack } from "@/lib/trending-songs";
 import { SongPicker } from "./SongPicker";
 import { Label } from "@/components/ui/label";
 import Image from "next/image";
-import { useActiveMarkets, usePlaceBet } from "@/app/hooks/usePredictionMarket";
-import type { PredictionMarket, MarketSide } from "@/types/prediction-market";
-import { Transaction, TransactionButton } from "@coinbase/onchainkit/transaction";
-import { getUSDCAddress, erc20ABI } from "@/lib/usdc-utils";
-import { tryGetPredictionMarketAddress, isPredictionMarketDeployed, predictionMarketABI } from "@/lib/contracts/prediction-market";
-import type { Contracts } from "@/types/transactions";
+// Removed: usePlaceBet from old contract - manual betting removed
+// Removed: PredictionMarket and MarketSide types - no longer used after removing manual betting
+// Removed: Transaction, TransactionButton - no longer used after removing manual betting
+// Removed: getUSDCAddress, erc20ABI - no longer used after removing manual betting
+// Removed: Contracts type - no longer used after removing manual betting
 
 export function CreateAutomatedMarket() {
   const { isConnected, address: connectedAddress } = useAccount();
   const chainId = useChainId();
   const { showToast } = useToast();
   
-  // Betting type selection
-  const [bettingType, setBettingType] = useState<"automated" | "manual">("automated");
-  
-  // Automated market betting state
+  // Automated market betting state (manual betting removed - old contract deleted)
   const [betAmount, setBetAmount] = useState("");
   const [trackTitle, setTrackTitle] = useState("");
   const [selectedSong, setSelectedSong] = useState<TrendingTrack | null>(null);
@@ -43,11 +39,6 @@ export function CreateAutomatedMarket() {
   const [songs, setSongs] = useState<TrendingTrack[]>([]);
   const [isLoadingSongs, setIsLoadingSongs] = useState(true);
   const [enableManualEntry, setEnableManualEntry] = useState(false);
-  
-  // Manual market betting state
-  const [selectedMarket, setSelectedMarket] = useState<PredictionMarket | null>(null);
-  const [selectedSide, setSelectedSide] = useState<MarketSide | null>(null);
-  const [manualBetAmount, setManualBetAmount] = useState("");
   
   const isContractDeployed = isAutomatedPredictionMarketDeployed(chainId);
   const { createWeeklyMarket, isPending, isSuccess, isError, error, isSimulateError, simulateError, isSimulating } = useCreateWeeklyMarket();
@@ -64,11 +55,7 @@ export function CreateAutomatedMarket() {
   const { data: marketData, isLoading: isLoadingMarket } = useGetMarket(latestMarketId);
   const { placeBet, isApprovingPending, isBetPending, isWaitingForApprove } = usePlaceBetAutomated();
   
-  // Manual market hooks
-  const { data: manualMarkets } = useActiveMarkets();
-  const { placeBetAsync: placeManualBet, isPending: isPlacingManualBet } = usePlaceBet();
-  const isManualContractDeployed = isPredictionMarketDeployed(chainId);
-  const manualContractAddress = tryGetPredictionMarketAddress(chainId);
+  // Manual market betting removed - old contract deleted
 
   // Fetch trending songs on mount
   useEffect(() => {
@@ -236,96 +223,14 @@ export function CreateAutomatedMarket() {
     }
   };
 
-  // Note: handlePlaceManualBet is not used because we use TransactionButton with calls directly
-  // This function is kept for potential future use or debugging
-  const _handlePlaceManualBet = async () => {
-    if (!selectedMarket || !selectedSide || !manualBetAmount) {
-      showToast({ message: "Please select a market, side, and bet amount", type: "error" });
-      return;
-    }
-
-    try {
-      await placeManualBet({
-        marketId: BigInt(selectedMarket.marketIndex || 0),
-        amount: manualBetAmount,
-        side: selectedSide,
-      });
-      showToast({ message: `Bet placed: ${selectedSide} ${manualBetAmount} USDC`, type: "success" });
-      setManualBetAmount("");
-      // Keep market and side selected for easy re-betting
-    } catch (error) {
-      console.error("Failed to place bet:", error);
-      showToast({
-        message: error instanceof Error ? error.message : "Failed to place bet. Please try again.",
-        type: "error"
-      });
-    }
-  };
-
   const isPlacingBet = isApprovingPending || isBetPending || isWaitingForApprove;
-
-  // Don't early return - allow manual market betting even if automated contract isn't deployed
 
   const isOwner = contractOwner && connectedAddress && connectedAddress.toLowerCase() === (contractOwner as string).toLowerCase();
 
-  // Manual market transaction calls
-  const manualBetCalls = selectedMarket && selectedSide && manualBetAmount && parseFloat(manualBetAmount) > 0 && isConnected && manualContractAddress && selectedMarket.marketIndex !== undefined
-    ? [
-        {
-          abi: erc20ABI,
-          address: getUSDCAddress(chainId),
-          functionName: "approve" as const,
-          args: [
-            manualContractAddress,
-            parseUSDC(manualBetAmount),
-          ],
-        },
-        {
-          abi: predictionMarketABI,
-          address: manualContractAddress,
-          functionName: "placeBet" as const,
-          args: [
-            BigInt(selectedMarket.marketIndex),
-            parseUSDC(manualBetAmount),
-            selectedSide === "YES",
-          ],
-        },
-      ] as Contracts
-    : [];
-
-  // Filter active manual markets
-  const activeManualMarkets = (manualMarkets || []).filter(
-    (m) => m.status === "ACTIVE" && m.endTime > Math.floor(Date.now() / 1000)
-  );
-
   return (
     <Card title="🎯 Place Your Bet">
-      {/* Betting Type Selection */}
-      <div className="mb-4">
-        <div className="flex gap-2">
-          <Button
-            variant={bettingType === "automated" ? "primary" : "outline"}
-            onClick={() => setBettingType("automated")}
-            className="flex-1"
-            disabled={isPlacingBet || isPlacingManualBet}
-          >
-            Automated Market
-          </Button>
-          <Button
-            variant={bettingType === "manual" ? "primary" : "outline"}
-            onClick={() => setBettingType("manual")}
-            className="flex-1"
-            disabled={isPlacingBet || isPlacingManualBet}
-          >
-            YES/NO Market
-          </Button>
-        </div>
-      </div>
-
       <div className="space-y-4">
-        {bettingType === "automated" ? (
-          <>
-            {!isContractDeployed ? (
+        {!isContractDeployed ? (
               <div className="text-center py-4 text-(--app-foreground-muted)">
                 <p>Automated prediction market contract not deployed on this network.</p>
                 <p className="text-sm mt-2">Please switch to Base Sepolia or Base Mainnet.</p>
@@ -518,160 +423,11 @@ export function CreateAutomatedMarket() {
                 </Button>
               </div>
             )}
-              </>
-            )}
-          </>
-        ) : (
-          <>
-            {/* Manual Market Betting */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm font-medium text-blue-900 mb-2">How it works:</p>
-              <ul className="text-xs text-blue-800 space-y-1 list-disc list-inside">
-                <li>Select a market from the list below</li>
-                <li>Bet YES if you think the song will reach #1, or NO if you think it won&apos;t</li>
-                <li>Winners split the pool (minus platform fee)</li>
-                <li>You can bet multiple times on either side</li>
-              </ul>
-            </div>
-
-            {!isConnected ? (
-              <div className="text-center py-4">
-                <p className="text-sm text-(--app-foreground-muted)">
-                  Connect your wallet to place a bet
-                </p>
-              </div>
-            ) : !isManualContractDeployed ? (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center">
-                <p className="text-sm font-medium text-yellow-800">
-                  Manual prediction market contract not deployed
-                </p>
-              </div>
-            ) : activeManualMarkets.length === 0 ? (
-              <div className="text-center py-4">
-                <p className="text-sm text-(--app-foreground-muted)">
-                  No active YES/NO markets available
-                </p>
-                <p className="text-xs text-(--app-foreground-muted) mt-2">
-                  Check the &quot;Trending Prediction Markets&quot; section below to see available markets
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div>
-                  <Label htmlFor="marketSelect">Select Market *</Label>
-                  <select
-                    id="marketSelect"
-                    value={selectedMarket?.id || ""}
-                    onChange={(e) => {
-                      const market = activeManualMarkets.find((m) => m.id === e.target.value);
-                      setSelectedMarket(market || null);
-                      setSelectedSide(null);
-                      setManualBetAmount("");
-                    }}
-                    disabled={isPlacingManualBet}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0052ff] text-sm mt-1"
-                  >
-                    <option value="">-- Select a market --</option>
-                    {activeManualMarkets.map((market) => {
-                      const totalPool = market.totalPoolYes + market.totalPoolNo;
-                      return (
-                        <option key={market.id} value={market.id}>
-                          {market.songTitle} by {market.songArtist} ({formatUSDC(totalPool)} USDC pool)
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
-
-                {selectedMarket && (
-                  <>
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                      <div className="flex items-center gap-3">
-                        {selectedMarket.songCover && (
-                          <Image
-                            src={selectedMarket.songCover}
-                            alt={selectedMarket.songTitle}
-                            width={48}
-                            height={48}
-                            className="h-12 w-12 rounded object-cover"
-                            unoptimized
-                          />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">{selectedMarket.songTitle}</p>
-                          <p className="text-xs text-(--app-foreground-muted) truncate">{selectedMarket.songArtist}</p>
-                        </div>
-                      </div>
-                      <div className="mt-3 flex items-center justify-between text-xs">
-                        <span className="text-(--app-foreground-muted)">Total Pool:</span>
-                        <span className="font-medium">
-                          {formatUSDC(selectedMarket.totalPoolYes + selectedMarket.totalPoolNo)} USDC
-                        </span>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label>Select Your Prediction *</Label>
-                      <div className="grid grid-cols-2 gap-2 mt-1">
-                        <Button
-                          variant={selectedSide === "YES" ? "primary" : "outline"}
-                          onClick={() => setSelectedSide("YES")}
-                          className="w-full"
-                          disabled={isPlacingManualBet}
-                        >
-                          <Icon name="check" size="sm" className="mr-1" />
-                          YES
-                        </Button>
-                        <Button
-                          variant={selectedSide === "NO" ? "primary" : "outline"}
-                          onClick={() => setSelectedSide("NO")}
-                          className="w-full"
-                          disabled={isPlacingManualBet}
-                        >
-                          <Icon name="x" size="sm" className="mr-1" />
-                          NO
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="manualBetAmount">Bet Amount (USDC) *</Label>
-                      <input
-                        id="manualBetAmount"
-                        type="number"
-                        placeholder="0.00"
-                        value={manualBetAmount}
-                        onChange={(e) => setManualBetAmount(e.target.value)}
-                        min="0"
-                        step="0.01"
-                        disabled={isPlacingManualBet}
-                        className="w-full px-4 py-3 border border-[rgba(0,0,0,0.1)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0052ff] text-sm mt-1"
-                      />
-                    </div>
-
-                    {selectedSide && manualBetAmount && parseFloat(manualBetAmount) > 0 && Array.isArray(manualBetCalls) && manualBetCalls.length > 0 && (
-                      <Transaction calls={manualBetCalls}>
-                        <TransactionButton
-                          text={`Place ${selectedSide} Bet: ${manualBetAmount} USDC`}
-                          className="w-full bg-[#0052ff] hover:bg-[#0040cc] text-white"
-                        />
-                      </Transaction>
-                    )}
-
-                    {(!selectedSide || !manualBetAmount || parseFloat(manualBetAmount) <= 0) && (
-                      <p className="text-xs text-center text-(--app-foreground-muted)">
-                        Select YES or NO and enter bet amount to place bet
-                      </p>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
           </>
         )}
 
-        {/* Owner-only market creation section (only show for automated markets) */}
-        {bettingType === "automated" && isOwner && (
+        {/* Owner-only market creation section */}
+        {isOwner && (
           <div className="mt-6 pt-6 border-t border-gray-200">
             <details className="cursor-pointer">
               <summary className="text-sm font-medium text-(--app-foreground-muted) mb-3">

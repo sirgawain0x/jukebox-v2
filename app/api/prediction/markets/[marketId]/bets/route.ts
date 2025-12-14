@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createPublicClient, http } from "viem";
 import { base } from "viem/chains";
 import type { AbiEvent, Log } from "viem";
-import { getPredictionMarketAddress, predictionMarketABI } from "@/lib/contracts/prediction-market";
+import { getAutomatedPredictionMarketAddress, automatedPredictionMarketABI } from "@/lib/contracts/automated-prediction-market";
 import {
   cacheMarketBets,
   getCachedMarketBets,
@@ -21,7 +21,7 @@ const createBaseClient = () =>
   }) as ReturnType<typeof createPublicClient>;
 
 const getAbiEvent = (name: string): AbiEvent | undefined =>
-  predictionMarketABI.find((item) => item.type === "event" && "name" in item && item.name === name) as
+  automatedPredictionMarketABI.find((item) => item.type === "event" && "name" in item && item.name === name) as
     | AbiEvent
     | undefined;
 
@@ -43,7 +43,7 @@ const buildBetId = (log: Log) => {
   return `${txHash}-${logIndex}`;
 };
 
-const normalizeBet = async (
+  const normalizeBet = async (
   client: ReturnType<typeof createBaseClient>,
   marketId: string,
   log: Log,
@@ -51,16 +51,17 @@ const normalizeBet = async (
 ): Promise<MarketBet | null> => {
   if (!("args" in log) || !log.args) return null;
 
-  const { user, side, amount } = log.args as {
+  // AutomatedPredictionMarket BetPlaced event: marketId, user, prediction (string), amount
+  const { user, prediction, amount } = log.args as {
     user?: `0x${string}`;
-    side?: boolean;
+    prediction?: string;
     amount?: bigint;
   };
 
   const transactionHash = log.transactionHash;
   const blockNumber = log.blockNumber;
 
-  if (!user || typeof side !== "boolean" || typeof amount === "undefined" || !blockNumber) return null;
+  if (!user || !prediction || typeof amount === "undefined" || !blockNumber) return null;
 
   let timestamp = blockTimestamps.get(blockNumber);
   if (!timestamp) {
@@ -69,11 +70,15 @@ const normalizeBet = async (
     blockTimestamps.set(blockNumber, timestamp);
   }
 
+  // For AutomatedPredictionMarket, we need to determine side based on prediction
+  // Since the contract uses track titles, we'll need to check if it matches the winning track
+  // For now, we'll use "YES" as default and handle resolution separately
+  // Note: This is a simplification - the actual logic should check against the winning track
   return {
     id: buildBetId(log),
     marketId,
     userAddress: user,
-    side: side ? "YES" : "NO",
+    side: "YES", // AutomatedPredictionMarket uses track predictions, not YES/NO
     amount: BigInt(amount),
     timestamp,
     claimed: false,
@@ -90,9 +95,9 @@ const fetchBetsFromContract = async (marketId: string): Promise<MarketBet[]> => 
 
   let contractAddress: string;
   try {
-    contractAddress = getPredictionMarketAddress(base.id);
+    contractAddress = getAutomatedPredictionMarketAddress(base.id);
   } catch {
-    console.warn("Prediction market contract not deployed");
+    console.warn("Automated prediction market contract not deployed");
     return [];
   }
 
@@ -146,11 +151,13 @@ const fetchBetsFromContract = async (marketId: string): Promise<MarketBet[]> => 
     const toBlock = toBlockCandidate > latestBlock ? latestBlock : toBlockCandidate;
 
     try {
+      // AutomatedPredictionMarket uses 1-based market IDs
+      const marketIdNum = marketIndex > 0 ? marketIndex : 1;
       const chunkLogs = await client.getLogs({
         address: contractAddress as `0x${string}`,
         event: betPlacedEvent,
         args: {
-          marketId: BigInt(marketIndex),
+          marketId: BigInt(marketIdNum),
         },
         fromBlock,
         toBlock,

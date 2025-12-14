@@ -138,7 +138,7 @@ export function Jukebox({
 
   const sortOptions = [
     { label: "🔥 Trending", value: "TRENDING" },
-    { label: "🆕 Newest", value: "CREATED_AT_TIME_DESC" },
+    { label: "🔍 Browse", value: "CREATED_AT_TIME_DESC" },
   ];
 
   const handleSortChange = (newSort: string) => {

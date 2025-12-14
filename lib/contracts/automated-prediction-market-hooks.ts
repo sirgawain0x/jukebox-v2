@@ -22,8 +22,8 @@ import {
 export function useGetContractOwner() {
   const chainId = useChainId();
   const contractAddress = tryGetAutomatedPredictionMarketAddress(chainId);
-
-  return useReadContract({
+  
+  const result = useReadContract({
     abi: automatedPredictionMarketABI,
     address: contractAddress || undefined,
     functionName: "owner",
@@ -32,6 +32,15 @@ export function useGetContractOwner() {
       enabled: !!contractAddress,
     },
   });
+  
+  // #region agent log
+  // Log contract owner hook state
+  useEffect(() => {
+    fetch('http://127.0.0.1:7242/ingest/7ffccca1-2c82-49dc-9cbc-405674609eea', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'automated-prediction-market-hooks.ts:useGetContractOwner', message: 'Contract owner hook state', data: { chainId, contractAddress, enabled: !!contractAddress, owner: result.data, isLoading: result.isLoading, isError: result.isError, error: result.error?.message }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'C' }) }).catch(() => { });
+  }, [chainId, contractAddress, result.data, result.isLoading, result.isError, result.error]);
+  // #endregion
+  
+  return result;
 }
 
 /**
@@ -275,8 +284,8 @@ export function usePlaceBetAutomated() {
 export function useGetMarket(marketId: bigint | null) {
   const chainId = useChainId();
   const contractAddress = tryGetAutomatedPredictionMarketAddress(chainId);
-
-  return useReadContract({
+  
+  const result = useReadContract({
     abi: automatedPredictionMarketABI,
     address: contractAddress || undefined,
     functionName: "markets",
@@ -285,6 +294,15 @@ export function useGetMarket(marketId: bigint | null) {
       enabled: !!contractAddress && marketId !== null,
     },
   });
+  
+  // #region agent log
+  // Log market data hook state
+  useEffect(() => {
+    fetch('http://127.0.0.1:7242/ingest/7ffccca1-2c82-49dc-9cbc-405674609eea', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'automated-prediction-market-hooks.ts:useGetMarket', message: 'Market data hook state', data: { chainId, contractAddress, marketId: marketId?.toString(), enabled: !!contractAddress && marketId !== null, isLoading: result.isLoading, isError: result.isError, error: result.error?.message, hasData: !!result.data }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'B' }) }).catch(() => { });
+  }, [chainId, contractAddress, marketId, result.isLoading, result.isError, result.error, result.data]);
+  // #endregion
+  
+  return result;
 }
 
 /**
@@ -293,8 +311,8 @@ export function useGetMarket(marketId: bigint | null) {
 export function useGetMarketCount() {
   const chainId = useChainId();
   const contractAddress = tryGetAutomatedPredictionMarketAddress(chainId);
-
-  return useReadContract({
+  
+  const result = useReadContract({
     abi: automatedPredictionMarketABI,
     address: contractAddress || undefined,
     functionName: "s_marketCount",
@@ -303,6 +321,15 @@ export function useGetMarketCount() {
       enabled: !!contractAddress,
     },
   });
+  
+  // #region agent log
+  // Log market count hook state
+  useEffect(() => {
+    fetch('http://127.0.0.1:7242/ingest/7ffccca1-2c82-49dc-9cbc-405674609eea', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'automated-prediction-market-hooks.ts:useGetMarketCount', message: 'Market count hook state', data: { chainId, contractAddress, enabled: !!contractAddress, data: result.data?.toString(), isLoading: result.isLoading, isError: result.isError, error: result.error?.message }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'pre-fix', hypothesisId: 'A,D' }) }).catch(() => { });
+  }, [chainId, contractAddress, result.data, result.isLoading, result.isError, result.error]);
+  // #endregion
+  
+  return result;
 }
 
 

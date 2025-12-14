@@ -211,7 +211,7 @@ export function AutomatedMarkets() {
     <Card title="🤖 Automated Prediction Markets">
       <div className="mb-6">
         <p className="text-sm text-(--app-foreground-muted) mb-2">
-          Bet on which track will be #1 trending on Spinamp by the resolution time.
+          Bet on which track will be #1 trending on Jukebox by the resolution time.
         </p>
         <p className="text-xs text-(--app-foreground-muted)">
           Markets resolve automatically on Monday 5:00 AM EST. Winners split the pool (minus 10% fee).

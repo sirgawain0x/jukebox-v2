@@ -12,24 +12,24 @@
     "splashImageUrl": "https://jukebox.creativeplatform.xyz/splash.png",
     "splashBackgroundColor": "#000000",
     "webhookUrl": "https://jukebox.creativeplatform.xyz/api/webhook",
-    "subtitle": "Not your parents jukebox.",
-    "description": "On-chain music. Tip artists directly. AI-powered playlists.",
+    "subtitle": "Not your parents jukebox",
+    "description": "On-chain music. Tip artists directly. Predict songs.",
     "screenshotUrls": [
+      "https://jukebox.creativeplatform.xyz/screenshot-2.png",
       "https://jukebox.creativeplatform.xyz/screenshot.png",
-      "https://jukebox.creativeplatform.xyz/screenshot-3.png"
+      "https://jukebox.creativeplatform.xyz/screenshot-4.png"
     ],
     "primaryCategory": "music",
     "tags": [
       "music",
-      "ai",
+      "predict",
       "onchain",
-      "tip",
-      "playlist"
+      "tip"
     ],
     "heroImageUrl": "https://jukebox.creativeplatform.xyz/hero.png",
-    "tagline": "Not your parents jukebox.",
+    "tagline": "Not your parents jukebox",
     "ogTitle": "Jukebox",
-    "ogDescription": "On-chain music. Tip artists directly. AI-powered playlists.",
+    "ogDescription": "On-chain music. Tip artists directly. Predict songs.",
     "ogImageUrl": "https://jukebox.creativeplatform.xyz/hero.png",
     "noindex": false
   }

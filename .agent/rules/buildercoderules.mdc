@@ -1,0 +1,310 @@
+---
+description: Integrate Builder Codes to attribute onchain activity to your app or wallet.
+alwaysApply: false
+---
+# Base Builder Codes
+
+> Integrate Builder Codes to attribute onchain activity to your app or wallet.
+
+## What are Builder Codes
+
+Base Builder Codes are an ERC-721 NFT collection where unique codes (e.g. “abc123”) are minted to help identify builders onchain.
+
+Each code has associated metadata. Onchain metadata primarily includes a “payout address” where each code declares where potential rewards should be sent to. Offchain metadata includes more details about the app including its name and site.
+
+## Automatic Builder-Code Attribution on Base
+
+Once your app is registered on [Base.dev](http://base.dev/), the Base App will auto-append your Base Builder Code to transactions its users make in your app (e.g. via your mini app, or the Base App's browser). This powers your onchain analytics in [Base.dev](http://base.dev/) and qualifies you for potential future rewards.
+
+## For App Developers
+
+<Note>
+  Mini Apps in the Base app will have their builder codes auto-appended to their transactions.
+  Be sure to [register for Base.dev](https://base.dev/)
+</Note>
+
+Integrating Builder Codes requires appending a suffix—provided by Base—to your transaction data.
+
+<Steps>
+  <Step title="Get your Builder Code">
+    When you register on [base.dev](https://base.dev/), you will receive a **Builder Code**—a random string (e.g., `k3p9da`) that you'll use to generate your attribution suffix.
+
+    You can find your code anytime under **Settings** → **Builder Code**.
+  </Step>
+
+  <Step title="Append the Suffix to Transactions">
+    The recommended way to attach your suffix is using `wallet_sendCalls` (ERC-5792). This passes the suffix through a capability, allowing the wallet to handle the attachment automatically for both EOA and Smart Account (ERC-4337) users.
+
+    <Tabs>
+      <Tab title="Wagmi (Recommended)">
+        Use the `useSendCalls` hook from Wagmi's features to pass the `dataSuffix` capability.
+
+        ```typescript lines highlight={14-16} theme={null}
+        import { useSendCalls } from 'wagmi'
+        import { Attribution } from 'ox/erc8021'
+
+        // Your builder code provided by base.dev
+        const builderCode = "abcd1234" 
+        const dataSuffix = Attribution.toDataSuffix({
+            codes: [builderCode]
+        })
+
+        function SendTx() {
+          const { sendCalls } = useSendCalls()
+
+          async function submit() {
+            await sendCalls({
+              calls: [
+                {
+                  to: "0xYourContract",
+                  data: "0xYourCalldata"
+                }
+              ],
+              capabilities: {
+                dataSuffix: dataSuffix
+              }
+            })
+          }
+
+          return <button onClick={submit}>Send</button>
+        }
+        ```
+      </Tab>
+
+      <Tab title="Viem">
+        If you are using Viem directly, pass the `dataSuffix` in the `capabilities` object.
+
+        ```typescript lines highlight={11-13} theme={null}
+        import { walletClient } from './client'
+        import { Attribution } from 'ox/erc8021'
+
+        // Your builder code provided by base.dev
+        const builderCode = "abcd1234" 
+        const dataSuffix = Attribution.toDataSuffix({
+            codes: [builderCode]
+        })
+
+        await walletClient.sendCalls({
+          calls: [
+            {
+              to: "0xYourContract",
+              data: "0xYourCalldata"
+            }
+          ],
+          capabilities: {
+            dataSuffix: dataSuffix
+          }
+        })
+        ```
+      </Tab>
+
+      <Tab title="Legacy (writeContract)">
+        If you are restricted to `writeContract` (EOA only), you must manually append the suffix to the calldata. This is **not recommended** as it does not support Smart Accounts automatically.
+
+        ```typescript lines highlight={15} theme={null}
+        import { encodeFunctionData } from 'viem'
+        import { Attribution } from 'ox/erc8021'
+
+        // Your builder code provided by base.dev
+        const builderCode = "abcd1234" 
+        const dataSuffix = Attribution.toDataSuffix({
+            codes: [builderCode]
+        })
+
+        // 1. Encode your function call
+        const encoded = encodeFunctionData({
+          abi,
+          functionName: "yourFn",
+          args: [a, b, c],
+        })
+
+        // 2. Manually append the suffix (stripping the '0x' prefix from the suffix)
+        const dataWithSuffix = encoded + dataSuffix.slice(2)
+
+        // 3. Send the transaction
+        await sendTransaction({
+          to: "0xYourContract",
+          data: dataWithSuffix,
+        })
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+</Steps>
+
+Once you have added the suffix, your app is fully ERC-8021 compliant.
+
+***
+
+## For Wallet Developers
+
+Wallet providers need to support the `dataSuffix` capability to enable attribution. This involves accepting the capability and appending the suffix to the calldata before signing.
+
+<Steps>
+  <Step title="Support the dataSuffix Capability">
+    Your wallet should accept a `dataSuffix` string in the `capabilities` object of `wallet_sendCalls`.
+
+    ```typescript lines theme={null}
+    interface DataSuffixCapability {
+      dataSuffix: string; // hex-encoded bytes provided by the app
+    }
+    ```
+  </Step>
+
+  <Step title="Append Suffix to Calldata">
+    When constructing the transaction or User Operation, extract the `dataSuffix` and append it to the calldata.
+
+    <Tabs>
+      <Tab title="EOA Transactions">
+        Append to `tx.data`.
+
+        ```typescript lines theme={null}
+        // Minimal example for EOA
+        function applySuffixToEOA(tx, capabilities) {
+          const suffix = capabilities.find(c => c.dataSuffix)?.dataSuffix
+          if (!suffix) return tx
+
+          return {
+            ...tx,
+            // Append suffix bytes (remove 0x prefix from suffix if tx.data has it)
+            data: tx.data + suffix.slice(2) 
+          }
+        }
+        ```
+      </Tab>
+
+      <Tab title="ERC-4337 User Operations">
+        Append to `userOp.callData` (not the transaction-level calldata).
+
+        ```typescript lines theme={null}
+        // Minimal example for ERC-4337
+        function applySuffixToUserOp(userOp, capabilities) {
+          const suffix = capabilities.find(c => c.dataSuffix)?.dataSuffix
+          if (!suffix) return userOp
+
+          return {
+            ...userOp,
+            // Append suffix bytes to the UserOp callData
+            callData: userOp.callData + suffix.slice(2)
+          }
+        }
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="(Optional) Add Wallet Attribution">
+    Wallets may also include their own attribution code (their own ERC-8021 suffix) by simply prepending the wallet’s own suffix before the app’s.
+
+    * **No interaction required with apps:** The wallet handles this independently.
+    * **Multi-code support:** ERC-8021 natively supports multiple attribution codes.
+
+    **Example:**
+
+    ```typescript  theme={null}
+    finalSuffix = walletSuffix + appSuffix
+    ```
+
+    This ensures both the app and the wallet receive onchain attribution.
+  </Step>
+</Steps>
+
+## For Base-Solana Bridge Developers
+
+<Warning>
+  Onchain Builder codes are currently still not live on mainnet.
+</Warning>
+
+Builder codes work with the [Base-Solana bridge](/base-chain/quickstart/base-solana-bridge) via the `hookData` mechanism. Currently available for **Solana → Base** flows only.
+
+<Steps>
+  <Step title="Get your Builder Code">
+    When you register on base.dev, you will receive a Builder Code. This is a random string (e.g., k3p9da) that you will use to generate your attribution suffix.
+  </Step>
+
+  <Step title="Build hookData">
+    ABI-encode the user address, your code, and fee:
+
+    ```solidity  theme={null}
+    bytes memory hookData = abi.encode(
+      0xUSER,           // destination address on Base (NOT the Twin)
+      0xBUILDER_CODE,   // your bytes32 code
+      100               // feeBps (100 = 1%)
+    );
+    ```
+  </Step>
+
+  <Step title="Attach to Bridge Message">
+    Set `to = BRIDGE_CAMPAIGN_ADDRESS` and attach a call to `Flywheel.send`.
+
+    <Tabs>
+      <Tab title="Simple Bridge">
+        For a bridge with no follow-up call:
+
+        ```
+        to:     <BRIDGE_CAMPAIGN_ADDRESS>
+        amount: 100
+        call:
+          ty:    Call
+          to:    <FLYWHEEL_ADDRESS>
+          value: 0
+          data:  abi.encodeWithSelector(
+                   Flywheel.send.selector,
+                   <BRIDGE_CAMPAIGN_ADDRESS>,
+                   <wSOL_ADDRESS>,
+                   hookData
+                 )
+        ```
+      </Tab>
+
+      <Tab title="Bridge + Follow-Up Call">
+        To chain additional calls, use `DelegateCall` with `Multicall`:
+
+        ```solidity  theme={null}
+        Call[] memory calls = new Call[](2);
+
+        // 1) Flywheel attribution (must be first)
+        calls[0] = Call({
+          to:    <FLYWHEEL_ADDRESS>,
+          value: 0,
+          data:  abi.encodeWithSelector(
+                   Flywheel.send.selector,
+                   <BRIDGE_CAMPAIGN_ADDRESS>,
+                   <wSOL_ADDRESS>, // 0x311935Cd80B76769bF2ecC9D8Ab7635b2139cf82 on Base Mainnet
+                   hookData
+                 )
+        });
+
+        // 2) Your follow-up call
+        calls[1] = Call({
+          to:    <YOUR_CONTRACT>,
+          value: 0,
+          data:  abi.encodeWithSelector(YourContract.yourFunction.selector)
+        });
+        ```
+
+        Then set the bridge call to:
+
+        ```
+        call:
+          ty:    DelegateCall
+          to:    <MULTICALL_ADDRESS> // 0xcA11bde05977b3631167028862bE2a173976CA11 on Base Mainnet
+          data:  abi.encodeWithSelector(Multicall.multicall.selector, calls)
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+</Steps>
+
+***
+
+## Give feedback!
+
+<Note>
+  We're constantly working to improve the Builder Codes experience. If you have any feedback, please let us know  [here](https://t.co/zwvtmXXzGz).
+</Note>
+
+
+---
+
+> To find navigation and other pages in this documentation, fetch the llms.txt file at: https://docs.base.org/llms.txt

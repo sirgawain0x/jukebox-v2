@@ -1363,7 +1363,16 @@ export function Jukebox({
                       Tip {selectedSong?.artist} in ETH
                     </p>
                   </div>
-                  <TransactionButton className="w-full bg-white text-[#0052ff] hover:bg-gray-100" text="Tip" />
+                  <div className="relative w-full">
+                    <TransactionButton
+                      className="w-full bg-white hover:bg-gray-100 !text-transparent"
+                      text="Tip"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center gap-2 pointer-events-none text-[#0052ff]" aria-hidden="true">
+                      <Icon name="heart" size="sm" />
+                      <span className="font-medium">Tip</span>
+                    </div>
+                  </div>
                   {/* Playlist functionality commented out */}
                   {/* <div className="text-center mb-2">
                     {!playlist && (

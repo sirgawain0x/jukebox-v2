@@ -1,15 +1,16 @@
 "use client";
 
-import { Address } from "viem";
+import { Address, encodeFunctionData } from "viem";
 import {
   useReadContract,
   useWriteContract,
   useSimulateContract,
   useChainId,
   usePublicClient,
-  useWaitForTransactionReceipt,
+  useSendCalls,
 } from "wagmi";
-import { useRef, useEffect } from "react";
+import { Attribution } from "ox/erc8021";
+
 import { useAccount } from "wagmi";
 import {
   automatedPredictionMarketABI,
@@ -101,75 +102,23 @@ export function useCreateWeeklyMarket() {
  * Hook to place a bet on a market with a track title
  * This hook handles the two-step process: approve USDC, then place bet
  */
+/**
+ * Hook to place a bet on a market with a track title
+ * This hook handles the two-step process: approve USDC, then place bet
+ * Updated to use wallet_sendCalls for batching and builder code attribution
+ */
 export function usePlaceBetAutomated() {
   const chainId = useChainId();
   const publicClient = usePublicClient();
 
-  // Separate hooks for approve and placeBet transactions
   const {
-    writeContract: writeApprove,
-    data: approveHash,
-    isPending: isApprovingPending,
-    isError: isApproveError,
-    error: approveError,
-  } = useWriteContract();
-
-  const {
-    writeContract: writePlaceBet,
-    data: betHash,
-    isPending: isBetPending,
-    isError: isBetError,
-    error: betError,
-    isSuccess: isBetSuccess,
-  } = useWriteContract();
-
-  // Wait for approve transaction to be confirmed on-chain
-  const {
-    isLoading: isWaitingForApprove,
-    isSuccess: isApproveConfirmed,
-    isError: isApproveFailed,
-  } = useWaitForTransactionReceipt({
-    hash: approveHash,
-    query: {
-      enabled: !!approveHash,
-    },
-  });
-
-  // Use refs to track latest values for use in async promises
-  const approveHashRef = useRef(approveHash);
-  const isApproveErrorRef = useRef(isApproveError);
-  const approveErrorRef = useRef(approveError);
-  const isApproveConfirmedRef = useRef(isApproveConfirmed);
-  const isApproveFailedRef = useRef(isApproveFailed);
-  const betHashRef = useRef(betHash);
-  const isBetErrorRef = useRef(isBetError);
-  const betErrorRef = useRef(betError);
-
-  // Update refs when values change
-  useEffect(() => {
-    approveHashRef.current = approveHash;
-  }, [approveHash]);
-  useEffect(() => {
-    isApproveErrorRef.current = isApproveError;
-  }, [isApproveError]);
-  useEffect(() => {
-    approveErrorRef.current = approveError;
-  }, [approveError]);
-  useEffect(() => {
-    isApproveConfirmedRef.current = isApproveConfirmed;
-  }, [isApproveConfirmed]);
-  useEffect(() => {
-    isApproveFailedRef.current = isApproveFailed;
-  }, [isApproveFailed]);
-  useEffect(() => {
-    betHashRef.current = betHash;
-  }, [betHash]);
-  useEffect(() => {
-    isBetErrorRef.current = isBetError;
-  }, [isBetError]);
-  useEffect(() => {
-    betErrorRef.current = betError;
-  }, [betError]);
+    sendCallsAsync, // Use Async version
+    data: callId,
+    isPending,
+    isError,
+    error,
+    isSuccess
+  } = useSendCalls();
 
   const placeBet = async (marketId: bigint, trackTitle: string, amount: bigint) => {
     const contractAddress = tryGetAutomatedPredictionMarketAddress(chainId);
@@ -189,8 +138,8 @@ export function usePlaceBetAutomated() {
       args: [],
     })) as Address;
 
-    // Step 1: Approve USDC
-    writeApprove({
+    // Encode Approve Data
+    const approveData = encodeFunctionData({
       abi: [
         {
           inputs: [
@@ -203,52 +152,53 @@ export function usePlaceBetAutomated() {
           type: "function",
         },
       ],
-      address: usdcAddress,
       functionName: "approve",
       args: [contractAddress, amount],
     });
 
-    // Wait for approve to be confirmed
-    return new Promise<void>((resolve, reject) => {
-      const checkApprove = () => {
-        if (isApproveErrorRef.current) {
-          reject(approveErrorRef.current || new Error("Approve failed"));
-          return;
-        }
-        if (isApproveFailedRef.current) {
-          reject(new Error("Approve transaction failed"));
-          return;
-        }
-        if (isApproveConfirmedRef.current) {
-          // Step 2: Place bet
-          writePlaceBet({
-            abi: automatedPredictionMarketABI,
-            address: contractAddress,
-            functionName: "placeBet",
-            args: [marketId, trackTitle, amount],
-          });
-          resolve();
-          return;
-        }
-        // Check again in 100ms
-        setTimeout(checkApprove, 100);
-      };
-      checkApprove();
+    // Encode PlaceBet Data
+    const placeBetData = encodeFunctionData({
+      abi: automatedPredictionMarketABI,
+      functionName: "placeBet",
+      args: [marketId, trackTitle, amount],
+    });
+
+    const builderCode = process.env.NEXT_PUBLIC_BASE_BUILDER_CODE as string;
+
+    // Send batched calls
+    await sendCallsAsync({
+      calls: [
+        {
+          to: usdcAddress,
+          data: approveData,
+          value: BigInt(0),
+        },
+        {
+          to: contractAddress,
+          data: placeBetData,
+          value: BigInt(0),
+        },
+      ],
+      capabilities: {
+        dataSuffix: Attribution.toDataSuffix({
+          codes: [builderCode],
+        }),
+      },
     });
   };
 
   return {
     placeBet,
-    approveHash,
-    betHash,
-    isApprovingPending,
-    isBetPending,
-    isWaitingForApprove,
-    isApproveError,
-    isBetError,
-    approveError,
-    betError,
-    isBetSuccess,
+    approveHash: callId, // Using callId as hash proxy
+    betHash: callId,
+    isApprovingPending: isPending,
+    isBetPending: isPending,
+    isWaitingForApprove: false, // Batched, no waiting state needed
+    isApproveError: isError,
+    isBetError: isError,
+    approveError: error,
+    betError: error,
+    isBetSuccess: isSuccess,
   };
 }
 

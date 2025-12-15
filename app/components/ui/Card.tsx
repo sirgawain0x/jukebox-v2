@@ -2,7 +2,7 @@
 import { type ReactNode } from "react";
 
 type CardProps = {
-  title?: string;
+  title?: ReactNode;
   children: ReactNode;
   className?: string;
   onClick?: () => void;
@@ -26,9 +26,9 @@ export function Card({ title, children, className = "", onClick }: CardProps) {
     >
       {title && (
         <div className="px-5 py-3 border-b border-[rgba(0,0,0,0.1)]">
-          <h3 className="text-lg font-medium text-[#111111]">
+          <div className="text-lg font-medium text-[#111111]">
             {title}
-          </h3>
+          </div>
         </div>
       )}
       <div className="p-5">{children}</div>

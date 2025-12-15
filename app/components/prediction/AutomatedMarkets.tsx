@@ -4,6 +4,7 @@ import { useAccount, useChainId } from "wagmi";
 import { Card } from "../ui/Card";
 import { Button } from "../ui/Button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { USDCIcon } from "../ui/USDCIcon";
 import { useToast } from "../ui/ToastProvider";
 import { formatUSDC } from "@/lib/usdc-utils";
 import {
@@ -83,26 +84,26 @@ function MarketItem({
   return (
     <div
       className={`border rounded-lg p-4 ${isResolved
-        ? "bg-gray-50 border-gray-200"
-        : "bg-[#f0f4ff] border-[#0052ff]/20"
+        ? "bg-gray-50 dark:bg-white/5 border-gray-200 dark:border-white/10"
+        : "bg-[#f0f4ff] dark:bg-blue-900/10 border-[#0052ff]/20 dark:border-blue-500/20"
         }`}
     >
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
-            <h3 className="font-semibold text-[#111111]">
+            <h3 className="font-semibold text-[#111111] dark:text-white">
               Market #{market.marketIndex || market.id.replace("market-", "")}
             </h3>
             {isResolved ? (
-              <span className="px-2 py-0.5 text-xs bg-gray-200 text-gray-700 rounded">
+              <span className="px-2 py-0.5 text-xs bg-gray-200 text-gray-700 dark:bg-white/20 dark:text-gray-300 rounded">
                 Resolved
               </span>
             ) : isBettingOpen ? (
-              <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded">
+              <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 rounded">
                 Active
               </span>
             ) : (
-              <span className="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-700 rounded">
+              <span className="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300 rounded">
                 Betting Closed
               </span>
             )}
@@ -118,8 +119,9 @@ function MarketItem({
           </div>
         </div>
         <div className="text-right">
-          <p className="font-semibold text-[#0052ff] text-lg">
+          <p className="font-semibold text-[#0052ff] dark:text-blue-400 text-lg flex items-center justify-end">
             {formatUSDC(totalPool)} USDC
+            <USDCIcon className="ml-1" />
           </p>
           <p className="text-xs text-(--app-foreground-muted)">
             {betCount} {betCount === 1 ? "bet" : "bets"}
@@ -128,15 +130,15 @@ function MarketItem({
       </div>
 
       {isResolved && market.songTitle && (
-        <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm font-medium text-blue-900 mb-1">🏆 Winning Track:</p>
-          <p className="text-sm text-blue-800">{market.songTitle}</p>
+        <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <p className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-1">🏆 Winning Track:</p>
+          <p className="text-sm text-blue-800 dark:text-blue-200">{market.songTitle}</p>
         </div>
       )}
 
       {isBettingOpen && (
-        <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-          <p className="text-sm text-green-800 text-center">
+        <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+          <p className="text-sm text-green-800 dark:text-green-300 text-center">
             ✅ Betting is open! Use the betting form above to place your bet.
           </p>
         </div>

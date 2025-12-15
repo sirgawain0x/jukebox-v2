@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { useAccount } from "wagmi";
 import { Song } from "@/types/music";
 // import { Playlist } from "@/types/music"; // Commented out - playlist functionality disabled
@@ -43,7 +44,20 @@ export function Home({ setActiveTab, initialSection = "music" }: HomeProps) {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <Card title="🎵 Jukebox">
+      <Card
+        title={
+          <div className="flex items-center gap-2">
+            <Image
+              src="/JukeboxLogo.svg"
+              alt="Jukebox Logo"
+              width={32}
+              height={32}
+              className="w-8 h-8 object-contain"
+            />
+            <h2 className="font-conthrax text-lg">JUKEBOX</h2>
+          </div>
+        }
+      >
         <p className="text-(--app-foreground-muted) mb-4">
           Discover and support independent
           artists through on-chain music streaming and direct creator tips.
@@ -53,7 +67,7 @@ export function Home({ setActiveTab, initialSection = "music" }: HomeProps) {
             onClick={() => setActiveTab("features")}
             icon={<Icon name="arrow-right" size="sm" />}
           >
-            Explore Features
+            Instructions
           </Button>
           <Button
             onClick={() => setActiveTab("fund")}
@@ -90,12 +104,12 @@ export function Home({ setActiveTab, initialSection = "music" }: HomeProps) {
 
       {activeSection === "music" && (
         <>
-          
+
           <ErrorBoundary>
             <Jukebox
               onSongTipped={handleSongTipped}
               setSelectedSong={setSelectedSong}
-              // playlist={playlist} // Commented out - playlist functionality disabled
+            // playlist={playlist} // Commented out - playlist functionality disabled
             />
           </ErrorBoundary>
           {/* <ErrorBoundary>

@@ -21,40 +21,37 @@ export function Features({ setActiveTab }: FeaturesProps) {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <Card title="Key Features">
-        <ul className="space-y-3 mb-4">
-          <li className="flex items-start">
-            <Icon name="check" className="text-(--app-accent) mt-1 mr-2" />
-            <span className="text-(--app-foreground-muted)">
-              Discover and curate new music.
-            </span>
-          </li>
-          <li className="flex items-start">
-            <Icon name="check" className="text-(--app-accent) mt-1 mr-2" />
-            <span className="text-(--app-foreground-muted)">
-              Tip independent creators.
-            </span>
-          </li>
-          <li className="flex items-start">
-            <Icon name="check" className="text-(--app-accent) mt-1 mr-2" />
-            <span className="text-(--app-foreground-muted)">
-              AI text to image generation.
-            </span>
-          </li>
-          <li className="flex items-start">
-            <Icon name="check" className="text-(--app-accent) mt-1 mr-2" />
-            <span className="text-(--app-foreground-muted)">
-              Onchain music player.
-            </span>
-          </li>
-          <li className="flex items-start">
-            <Icon name="check" className="text-(--app-accent) mt-1 mr-2" />
-            <span className="text-(--app-foreground-muted)">
-              Predict the next #1 song.
-            </span>
-          </li>
-        </ul>
-        <Button variant="outline" onClick={() => setActiveTab("home")}>
+      <Card title="How to Use Jukebox">
+        <div className="space-y-6 mb-6">
+          <section>
+            <h3 className="font-semibold text-(--app-foreground) flex items-center gap-2 mb-2">
+              <Icon name="music" className="text-(--app-accent)" /> Listen
+            </h3>
+            <p className="text-(--app-foreground-muted) text-sm pl-7">
+              Explore the Jukebox to discover independent artists. Click play to start streaming on-chain music directly.
+            </p>
+          </section>
+
+          <section>
+            <h3 className="font-semibold text-(--app-foreground) flex items-center gap-2 mb-2">
+              <Icon name="heart" className="text-(--app-accent)" /> Support
+            </h3>
+            <p className="text-(--app-foreground-muted) text-sm pl-7">
+              Love a track? Send a direct tip to the artist using USDC. Your support goes directly to the creator.
+            </p>
+          </section>
+
+          <section>
+            <h3 className="font-semibold text-(--app-foreground) flex items-center gap-2 mb-2">
+              <Icon name="trending-up" className="text-(--app-accent)" /> Predict
+            </h3>
+            <p className="text-(--app-foreground-muted) text-sm pl-7">
+              Think you know what&apos;s next? Bet on which songs will climb the charts in the Prediction Markets.
+            </p>
+          </section>
+        </div>
+
+        <Button variant="outline" onClick={() => setActiveTab("home")} className="w-full">
           Back to Home
         </Button>
       </Card>

@@ -26,7 +26,7 @@ export function WebsiteBanner() {
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
           <h3 className="text-sm font-semibold text-gray-900 mb-1">
-            🎵 Experience Jukebox Mini-App Features
+            Experience Jukebox Mini-App Features
           </h3>
           <p className="text-xs text-gray-600 mb-3">
             Get the full experience with share links, social features, and more by opening Jukebox in Farcaster or Base app.

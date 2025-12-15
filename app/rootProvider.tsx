@@ -4,6 +4,7 @@ import { base, baseSepolia } from "wagmi/chains";
 import { OnchainKitProvider } from "@coinbase/onchainkit";
 import { MusicProvider } from '@/app/contexts/MusicContext';
 import { WalletProvider } from '@/app/contexts/WalletContext';
+import { ThemeProvider } from '@/app/contexts/ThemeContext';
 import "@coinbase/onchainkit/styles.css";
 
 // Use Base Sepolia for testing, Base Mainnet for production
@@ -28,11 +29,13 @@ export function RootProvider({ children }: { children: ReactNode }) {
         enabled: true
       }}
     >
-      <WalletProvider>
-        <MusicProvider>
-          {children}
-        </MusicProvider>
-      </WalletProvider>
+      <ThemeProvider>
+        <WalletProvider>
+          <MusicProvider>
+            {children}
+          </MusicProvider>
+        </WalletProvider>
+      </ThemeProvider>
     </OnchainKitProvider>
   );
 }

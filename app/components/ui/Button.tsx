@@ -33,7 +33,7 @@ export function Button({
     outline:
       "border border-blue-600 text-blue-600 bg-white hover:bg-blue-50",
     ghost:
-      "hover:bg-gray-100 text-gray-600",
+      "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300",
   };
 
   const sizeClasses = {

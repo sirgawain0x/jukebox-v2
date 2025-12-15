@@ -8,7 +8,7 @@ import { getName, getAvatar, getAttestations } from '@coinbase/onchainkit/identi
 import { base } from 'wagmi/chains';
 import { useBalance } from 'wagmi';
 import { formatUnits } from 'viem';
-import { CheckCircle2, Copy, ChevronDown, LogOut } from 'lucide-react';
+import { CheckCircle2, Copy, ChevronDown, LogOut, Moon, Sun } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
@@ -16,6 +16,8 @@ import { useToast } from '@/app/components/ui/ToastProvider';
 
 const COINBASE_VERIFIED_ACCOUNT_SCHEMA_ID =
   '0xf8b05c79f090979bf4a80270aba232dff11a10d9ca55c4f88de95317970f0de9';
+
+import { useTheme } from '@/app/contexts/ThemeContext';
 
 interface UserProfileData {
   name: string | null;
@@ -27,6 +29,7 @@ interface UserProfileData {
 export function UserProfile() {
   const wallet = useWallet();
   const farcasterContext = useFarcasterContext();
+  const { theme, toggleTheme } = useTheme();
   const { showToast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
@@ -82,7 +85,7 @@ export function UserProfile() {
 
   const handleCopyAddress = async () => {
     if (!wallet.address) return;
-    
+
     try {
       await navigator.clipboard.writeText(wallet.address);
       showToast({
@@ -141,7 +144,7 @@ export function UserProfile() {
           schemas: [COINBASE_VERIFIED_ACCOUNT_SCHEMA_ID],
         }
       );
-      
+
       // Check for non-revoked, non-expired attestations
       return attestations.some(att => !att.revoked && (att.expirationTime === 0 || att.expirationTime > Date.now() / 1000));
     } catch (error) {
@@ -195,7 +198,7 @@ export function UserProfile() {
       const displayName = miniappUser?.displayName ?? farcasterContext.displayName;
       const username = miniappUser?.username ?? farcasterContext.username;
       const pfpUrl = miniappUser?.pfpUrl ?? farcasterContext.pfpUrl;
-      
+
       if ((isInMiniApp || farcasterContext.isMiniapp) && userFid !== undefined) {
         // Still check for attestations even for Farcaster users
         const isVerified = wallet.address ? await fetchAttestationsSafely(wallet.address) : false;
@@ -213,13 +216,13 @@ export function UserProfile() {
       if (wallet.address) {
         // Ensure address is properly formatted
         const formattedAddress = wallet.address.toLowerCase() as `0x${string}`;
-        
+
         try {
           console.log('Fetching ENS name for address:', formattedAddress);
           // Get the name first
           const name = await getName({ address: formattedAddress, chain: base });
           console.log('Resolved ENS name:', name, 'for address:', formattedAddress);
-          
+
           // Try to get avatar if we have an ENS name
           let avatar: string | null = null;
           if (name && name.trim()) {
@@ -267,16 +270,16 @@ export function UserProfile() {
 
     fetchProfile();
   }, [
-    wallet.address, 
-    isInMiniApp, 
-    miniappUser?.fid, 
-    miniappUser?.displayName, 
-    miniappUser?.username, 
+    wallet.address,
+    isInMiniApp,
+    miniappUser?.fid,
+    miniappUser?.displayName,
+    miniappUser?.username,
     miniappUser?.pfpUrl,
-    farcasterContext.isMiniapp, 
-    farcasterContext.userFid, 
-    farcasterContext.displayName, 
-    farcasterContext.username, 
+    farcasterContext.isMiniapp,
+    farcasterContext.userFid,
+    farcasterContext.displayName,
+    farcasterContext.username,
     farcasterContext.pfpUrl
   ]);
 
@@ -298,7 +301,7 @@ export function UserProfile() {
     );
   }
 
-  const displayName = profileData.name || 
+  const displayName = profileData.name ||
     (wallet.address ? `${wallet.address.slice(0, 6)}...${wallet.address.slice(-4)}` : 'User');
   const initials = displayName
     .replace(/\.eth$|\.base\.eth$|\.basetest\.eth$/i, '')
@@ -415,7 +418,7 @@ export function UserProfile() {
                 )}
               </div>
             </div>
-            
+
             {wallet.address && (
               <div className="space-y-2 mt-3">
                 {wallet.chainName && (
@@ -443,10 +446,10 @@ export function UserProfile() {
                   <>
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                        <Image 
-                          src="/tokens/eth-logo.svg" 
-                          alt="ETH" 
-                          width={32} 
+                        <Image
+                          src="/tokens/eth-logo.svg"
+                          alt="ETH"
+                          width={32}
                           height={32}
                           className="w-full h-full object-contain"
                         />
@@ -460,10 +463,10 @@ export function UserProfile() {
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                        <Image 
-                          src="/tokens/usdc-logo.svg" 
-                          alt="USDC" 
-                          width={32} 
+                        <Image
+                          src="/tokens/usdc-logo.svg"
+                          alt="USDC"
+                          width={32}
                           height={32}
                           className="w-full h-full object-contain"
                         />
@@ -480,6 +483,27 @@ export function UserProfile() {
               </div>
             </div>
           )}
+
+          <div className="p-2 border-b border-gray-200 dark:border-gray-700">
+            <Button
+              onClick={toggleTheme}
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start text-gray-700 hover:text-gray-900 dark:text-gray-200 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
+            >
+              {theme === 'dark' ? (
+                <>
+                  <Sun className="w-4 h-4 mr-2" />
+                  Light Mode
+                </>
+              ) : (
+                <>
+                  <Moon className="w-4 h-4 mr-2" />
+                  Dark Mode
+                </>
+              )}
+            </Button>
+          </div>
 
           <div className="p-2">
             <Button

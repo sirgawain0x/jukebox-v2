@@ -2,6 +2,7 @@
 
 import { useAccount, useChainId } from "wagmi";
 import { Card } from "../ui/Card";
+import { USDCIcon } from "../ui/USDCIcon";
 import { useToast } from "../ui/ToastProvider";
 import { useComposeCast } from "@coinbase/onchainkit/minikit";
 import { useFarcasterContext } from "@/app/utils/farcaster-context";
@@ -328,7 +329,7 @@ export function CreateAutomatedMarket() {
 
 
   return (
-    <Card title="🎯 Place Your Bet">
+    <Card title="🎯 PREDICTION">
       <div className="space-y-4">
         {!isContractDeployed ? (
           <div className="text-center py-4 text-(--app-foreground-muted)">
@@ -368,9 +369,9 @@ export function CreateAutomatedMarket() {
           </div>
         ) : (
           <>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm font-medium text-blue-900 mb-2">How it works:</p>
-              <ul className="text-xs text-blue-800 space-y-1 list-disc list-inside">
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+              <p className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-2">How it works:</p>
+              <ul className="text-xs text-blue-800 dark:text-blue-200 space-y-1 list-disc list-inside">
                 <li>Bet on which track will be #1 trending on Jukebox by the resolution time</li>
                 <li>Market resolves on {resolveTime ? formatDate(resolveTime) : "Monday 5:00 AM EST"}</li>
                 <li>Winners split the pool (minus 10% protocol fee)</li>
@@ -381,7 +382,10 @@ export function CreateAutomatedMarket() {
             <div className="space-y-2 mb-4">
               <div className="flex justify-between items-center text-sm">
                 <span className="text-(--app-foreground-muted)">Current Pool:</span>
-                <span className="font-medium">{formatUSDC(totalPool ?? BigInt(0), 6)} USDC</span>
+                <span className="font-medium flex items-center">
+                  {formatUSDC(totalPool ?? BigInt(0), 6)} USDC
+                  <USDCIcon className="ml-1" size={14} />
+                </span>
               </div>
               {endTime && (
                 <div className="flex justify-between items-center text-sm">
@@ -422,7 +426,7 @@ export function CreateAutomatedMarket() {
                               }
                             }}
                             disabled={isPlacingBet || isLoadingSongs}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0052ff] text-sm"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0052ff] dark:bg-gray-800 dark:text-white text-sm"
                           >
                             <option value="">-- Select a trending artist --</option>
                             {artists.map((artist) => (
@@ -466,7 +470,7 @@ export function CreateAutomatedMarket() {
                             placeholder="-- Select a song --"
                           />
                           {selectedSong && (
-                            <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                            <div className="flex items-center gap-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-3">
                               {selectedSong.cover && (
                                 <Image
                                   src={selectedSong.cover}
@@ -478,8 +482,8 @@ export function CreateAutomatedMarket() {
                                 />
                               )}
                               <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-medium">{selectedSong.title}</p>
-                                <p className="truncate text-xs text-(--app-foreground-muted)">{selectedSong.artist}</p>
+                                <p className="truncate text-sm font-medium dark:text-white">{selectedSong.title}</p>
+                                <p className="truncate text-xs text-(--app-foreground-muted) dark:text-gray-400">{selectedSong.artist}</p>
                               </div>
                             </div>
                           )}
@@ -494,7 +498,7 @@ export function CreateAutomatedMarket() {
                         value={trackTitle}
                         onChange={(e) => setTrackTitle(e.target.value)}
                         disabled={isPlacingBet}
-                        className="w-full px-4 py-3 border border-[rgba(0,0,0,0.1)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0052ff] text-sm"
+                        className="w-full px-4 py-3 border border-[rgba(0,0,0,0.1)] dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0052ff] dark:bg-gray-800 dark:text-white text-sm"
                       />
                       <button
                         type="button"
@@ -527,7 +531,7 @@ export function CreateAutomatedMarket() {
                     min="0"
                     step="0.01"
                     max={maxBetAmount ? Number(maxBetAmount) / 1e6 : undefined}
-                    className="w-full px-4 py-3 border border-[rgba(0,0,0,0.1)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0052ff] text-sm"
+                    className="w-full px-4 py-3 border border-[rgba(0,0,0,0.1)] dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0052ff] dark:bg-gray-800 dark:text-white text-sm"
                   />
                   {maxBetAmount && (
                     <p className="text-xs text-(--app-foreground-muted) mt-1">

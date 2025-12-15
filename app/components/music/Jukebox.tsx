@@ -927,7 +927,7 @@ export function Jukebox({
   };
 
   return (
-    <Card title="🎵 Discover Music">
+    <Card className="font-conthrax text-lg" title="🎵 MUSIC">
       {/* Dynamic meta tags for song sharing */}
       {selectedSong && (
         <SongShareMetaTags
@@ -1011,8 +1011,8 @@ export function Jukebox({
                 <div
                   key={song.id}
                   className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all ${selectedSong?.id === song.id
-                    ? "border-[#0052ff] bg-[#e6edff]"
-                    : "border-[rgba(0,0,0,0.1)] bg-[rgba(255,255,255,0.4)] hover:bg-[#e6edff]"
+                    ? "border-[#0052ff] bg-[#e6edff] dark:bg-blue-900/30 dark:border-blue-500"
+                    : "border-[rgba(0,0,0,0.1)] dark:border-white/10 bg-[rgba(255,255,255,0.4)] dark:bg-white/5 hover:bg-[#e6edff] dark:hover:bg-blue-900/20"
                     }`}
                   onClick={() => handleSelectSong(song)}
                 >
@@ -1041,7 +1041,7 @@ export function Jukebox({
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-(--app-foreground) truncate">
+                    <div className="font-medium text-(--app-foreground) dark:text-white truncate">
                       {song.title}
                     </div>
                     <div className="flex items-center gap-2 mt-1">
@@ -1122,7 +1122,7 @@ export function Jukebox({
             {sortBy === "CREATED_AT_TIME_DESC" && searchQuery.trim() && filteredSongs.length > ITEMS_PER_PAGE && (
               <div className="flex justify-between items-center mt-4">
                 <button
-                  className="px-4 py-2 rounded bg-gray-200 text-(--app-foreground-muted) cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-800 text-(--app-foreground-muted) dark:text-gray-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 dark:hover:bg-gray-700"
                   onClick={() => {
                     setSearchPage((prev) => Math.max(1, prev - 1));
                   }}
@@ -1135,7 +1135,7 @@ export function Jukebox({
                   Page {searchPage} of {totalSearchPages}
                 </span>
                 <button
-                  className="px-4 py-2 rounded bg-gray-200 text-(--app-foreground-muted) cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-800 text-(--app-foreground-muted) dark:text-gray-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 dark:hover:bg-gray-700"
                   onClick={() => {
                     setSearchPage((prev) => Math.min(totalSearchPages, prev + 1));
                   }}
@@ -1150,7 +1150,7 @@ export function Jukebox({
             {!(sortBy === "CREATED_AT_TIME_DESC" && searchQuery.trim()) && (
               <div className="flex justify-between mt-4">
                 <button
-                  className="px-4 py-2 rounded bg-gray-200 text-(--app-foreground-muted) cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-800 text-(--app-foreground-muted) dark:text-gray-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 dark:hover:bg-gray-700"
                   onClick={() => {
                     setBefore(pageInfo.startCursor);
                     setAfter(null);
@@ -1161,7 +1161,7 @@ export function Jukebox({
                   Previous
                 </button>
                 <button
-                  className="px-4 py-2 rounded bg-gray-200 text-(--app-foreground-muted) cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-800 text-(--app-foreground-muted) dark:text-gray-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 dark:hover:bg-gray-700"
                   onClick={() => {
                     setAfter(pageInfo.endCursor);
                     setBefore(null);

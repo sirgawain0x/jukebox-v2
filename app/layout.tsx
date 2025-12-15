@@ -1,10 +1,17 @@
 import type { Metadata } from "next";
+import localFont from "next/font/local";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import { RootProvider } from "./rootProvider";
 import { ToastProvider } from "./components/ui/ToastProvider";
 import { PWAInitializer } from "./components/pwa/PWAInitializer";
 import "./globals.css";
+
+const conthrax = localFont({
+  src: "../public/fonts/ConthraxSb-Regular.otf",
+  variable: "--font-conthrax",
+  display: "swap",
+});
 
 const ROOT_URL =
   process.env.NEXT_PUBLIC_URL ||
@@ -87,7 +94,7 @@ export default function RootLayout({
     <RootProvider>
       <ToastProvider>
         <html lang="en" suppressHydrationWarning>
-          <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
+          <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} ${conthrax.variable}`} suppressHydrationWarning>
             <PWAInitializer />
             {children}
           </body>

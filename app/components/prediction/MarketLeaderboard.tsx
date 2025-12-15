@@ -24,7 +24,7 @@ export function MarketLeaderboard() {
     return (
       <Card title="🏆 Leaderboard">
         <div className="text-center py-8 text-[var(--app-foreground-muted)]">
-          <p>No markets available yet</p>
+          <p className="dark:text-gray-400">No markets available yet</p>
         </div>
       </Card>
     );
@@ -55,14 +55,14 @@ export function MarketLeaderboard() {
           return (
             <div
               key={market.id}
-              className="flex items-center justify-between p-3 bg-[#f9fafb] rounded-lg border border-gray-200"
+              className="flex items-center justify-between p-3 bg-[#f9fafb] dark:bg-white/5 rounded-lg border border-gray-200 dark:border-white/10"
             >
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#0052ff] to-[#7c3aed] flex items-center justify-center text-white font-bold text-sm">
                   {index + 1}
                 </div>
                 <div>
-                  <p className="font-medium text-[#111111] truncate max-w-[200px]">
+                  <p className="font-medium text-[#111111] dark:text-white truncate max-w-[200px]">
                     {displayTitle}
                   </p>
                   {!isGenericMarket && (
@@ -78,7 +78,7 @@ export function MarketLeaderboard() {
                 </div>
               </div>
               <div className="text-right">
-                <p className="font-semibold text-[#0052ff]">
+                <p className="font-semibold text-[#0052ff] dark:text-blue-400">
                   {formatUSDC(totalPool)} USDC
                 </p>
                 <p className="text-xs text-[var(--app-foreground-muted)]">

@@ -96,11 +96,11 @@ export function FullScreenPlayer() {
         temp.style.cssText = 'position: absolute; visibility: hidden; white-space: nowrap; font-size: 1.5rem; font-weight: 700;';
         temp.textContent = selectedSong.title;
         document.body.appendChild(temp);
-        
+
         const textWidth = temp.offsetWidth;
         const containerWidth = titleContainerRef.current.clientWidth;
         const isOverflowing = textWidth > containerWidth;
-        
+
         document.body.removeChild(temp);
         setShouldScroll(isOverflowing);
       }
@@ -109,7 +109,7 @@ export function FullScreenPlayer() {
     // Small delay to ensure accurate measurements after render and fonts load
     const timeout = setTimeout(checkOverflow, 100);
     window.addEventListener('resize', checkOverflow);
-    
+
     return () => {
       clearTimeout(timeout);
       window.removeEventListener('resize', checkOverflow);
@@ -123,24 +123,24 @@ export function FullScreenPlayer() {
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div className="fixed inset-0 z-40 bg-linear-to-b from-blue-50 to-white flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 animate-scale-in border border-gray-100">
+    <div className="fixed inset-0 z-40 bg-linear-to-b from-blue-50 to-white dark:from-gray-900 dark:to-black flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full p-6 animate-scale-in border border-gray-100 dark:border-gray-800">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-gray-800">Now Playing</h2>
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Now Playing</h2>
           <button
             onClick={() => setIsMinimized(true)}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
+            className="w-11 h-11 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors cursor-pointer dark:text-white"
             title="Minimize player"
             aria-label="Minimize player"
           >
-            <svg 
-              xmlns="http://www.w3.org/2000/svg" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
               strokeLinejoin="round"
               className="w-5 h-5"
             >
@@ -164,8 +164,8 @@ export function FullScreenPlayer() {
               unoptimized
             />
           ) : (
-            <div className="w-60 h-60 rounded-2xl bg-linear-to-br from-gray-200 to-gray-300 flex items-center justify-center shadow-xl">
-              <Icon name="star" size="lg" className="text-gray-400" />
+            <div className="w-60 h-60 rounded-2xl bg-linear-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800 flex items-center justify-center shadow-xl">
+              <Icon name="star" size="lg" className="text-gray-400 dark:text-gray-500" />
             </div>
           )}
         </div>
@@ -174,17 +174,17 @@ export function FullScreenPlayer() {
         <div className="text-center mb-6">
           <div ref={titleContainerRef} className={`overflow-hidden mb-2 ${shouldScroll ? '' : 'mx-auto'}`}>
             {shouldScroll ? (
-              <h3 className="text-2xl font-bold text-gray-800 animate-marquee text-left">
+              <h3 className="text-2xl font-bold text-gray-800 dark:text-white animate-marquee text-left">
                 <span className="inline-block pr-8">{selectedSong.title}</span>
                 <span className="inline-block pr-8">{selectedSong.title}</span>
               </h3>
             ) : (
-              <h3 className="text-2xl font-bold text-gray-800 truncate">
+              <h3 className="text-2xl font-bold text-gray-800 dark:text-white truncate">
                 {selectedSong.title}
               </h3>
             )}
           </div>
-          <p className="text-gray-600 truncate">{selectedSong.artist}</p>
+          <p className="text-gray-600 dark:text-gray-400 truncate">{selectedSong.artist}</p>
           {selectedSong.platformName && (
             <span className="inline-block mt-2 px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-600">
               {selectedSong.platformName}
@@ -194,16 +194,16 @@ export function FullScreenPlayer() {
 
         {/* Progress Bar */}
         <div className="mb-4">
-          <div 
-            className="h-2 bg-gray-200 rounded-full cursor-pointer overflow-hidden"
+          <div
+            className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full cursor-pointer overflow-hidden"
             onClick={handleSeek}
           >
-            <div 
+            <div
               className="h-full bg-blue-500 rounded-full transition-all duration-100"
               style={{ width: `${progress}%` }}
             />
           </div>
-          <div className="flex justify-between text-xs text-gray-500 mt-1">
+          <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
             <span>{formatTime(currentTime)}</span>
             <span>{formatTime(duration)}</span>
           </div>
@@ -212,31 +212,31 @@ export function FullScreenPlayer() {
         {/* Audio indicator */}
         {isPlaying && (
           <div className="flex justify-center mb-4">
-            <AnimatedAudioIndicator 
+            <AnimatedAudioIndicator
               isPlaying={isPlaying}
               size="md"
-              className="text-blue-500"
+              className="text-blue-500 dark:text-blue-400"
               variant="bars"
             />
           </div>
         )}
 
         {/* Controls */}
-        <div className="flex items-center justify-center gap-4 mb-6">
+        <div className="flex items-center justify-center gap-4 mb-6 text-gray-800 dark:text-white">
           <button
             onClick={handlePreviousSong}
             disabled={playQueue.length <= 1}
-            className="p-3 hover:bg-gray-100 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            className="p-3 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             title="Previous song"
             aria-label="Previous song"
           >
-            <svg 
-              xmlns="http://www.w3.org/2000/svg" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
               strokeLinejoin="round"
               className="w-6 h-6"
             >
@@ -248,25 +248,25 @@ export function FullScreenPlayer() {
           {/* 15-second rewind button */}
           <button
             onClick={handleRewind}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
+            className="w-11 h-11 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors cursor-pointer"
             title="Rewind 15 seconds"
             aria-label="Rewind 15 seconds"
           >
             <div className="relative w-6 h-6">
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
                 strokeLinejoin="round"
                 className="w-6 h-6"
               >
                 <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
                 <path d="M3 3v5h5" />
               </svg>
-              <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-gray-700 mt-0.5">
+              <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-gray-700 dark:text-gray-300 mt-0.5">
                 15
               </span>
             </div>
@@ -281,9 +281,9 @@ export function FullScreenPlayer() {
             {audioLoading ? (
               <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : isPlaying ? (
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                viewBox="0 0 24 24" 
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
                 fill="currentColor"
                 className="w-6 h-6"
               >
@@ -291,9 +291,9 @@ export function FullScreenPlayer() {
                 <rect x="14" y="4" width="4" height="16" />
               </svg>
             ) : (
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                viewBox="0 0 24 24" 
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
                 fill="currentColor"
                 className="w-6 h-6"
               >
@@ -305,25 +305,25 @@ export function FullScreenPlayer() {
           {/* 30-second fast forward button */}
           <button
             onClick={handleFastForward}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
+            className="w-11 h-11 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors cursor-pointer"
             title="Fast forward 30 seconds"
             aria-label="Fast forward 30 seconds"
           >
             <div className="relative w-6 h-6">
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
                 strokeLinejoin="round"
                 className="w-6 h-6"
               >
                 <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
                 <path d="M21 3v5h-5" />
               </svg>
-              <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-gray-700 mt-0.5">
+              <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-gray-700 dark:text-gray-300 mt-0.5">
                 30
               </span>
             </div>
@@ -332,17 +332,17 @@ export function FullScreenPlayer() {
           <button
             onClick={handleNextSong}
             disabled={playQueue.length <= 1}
-            className="p-3 hover:bg-gray-100 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            className="p-3 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             title="Next song"
             aria-label="Next song"
           >
-            <svg 
-              xmlns="http://www.w3.org/2000/svg" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
               strokeLinejoin="round"
               className="w-6 h-6"
             >
@@ -354,7 +354,7 @@ export function FullScreenPlayer() {
 
         {/* Queue info */}
         {playQueue.length > 1 && (
-          <div className="text-center text-sm text-gray-500 mb-4">
+          <div className="text-center text-sm text-gray-500 dark:text-gray-400 mb-4">
             {currentQueueIndex + 1} of {playQueue.length} songs in queue
           </div>
         )}
@@ -364,7 +364,7 @@ export function FullScreenPlayer() {
           <div className="flex items-center gap-3">
             <button
               onClick={toggleMute}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
+              className="w-11 h-11 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors cursor-pointer dark:text-white"
               title={isMuted ? "Unmute" : "Mute"}
               aria-label={isMuted ? "Unmute" : "Mute"}
             >
@@ -386,12 +386,12 @@ export function FullScreenPlayer() {
                 aria-label="Volume slider"
               />
             </div>
-            <span className="text-xs text-gray-500 w-10 text-right">{Math.round(volume * 100)}%</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400 w-10 text-right">{Math.round(volume * 100)}%</span>
           </div>
         </div>
 
         {/* Auto-play toggle */}
-        <div className="flex items-center justify-center gap-2 text-sm text-gray-700">
+        <div className="flex items-center justify-center gap-2 text-sm text-gray-700 dark:text-gray-300">
           <input
             type="checkbox"
             id="autoplay-full"

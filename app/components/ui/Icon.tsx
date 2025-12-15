@@ -2,7 +2,7 @@
 import { FC } from "react";
 
 type IconProps = {
-  name: "heart" | "star" | "check" | "plus" | "arrow-right" | "chevron-down" | "share" | "music" | "chevron-left" | "chevron-right" | "x" | "play" | "pause" | "volume" | "volume-x" | "volume-1" | "volume-2" | "trending-up" | "search";
+  name: "heart" | "star" | "check" | "plus" | "arrow-right" | "chevron-down" | "share" | "music" | "chevron-left" | "chevron-right" | "x" | "play" | "pause" | "volume" | "volume-x" | "volume-1" | "volume-2" | "trending-up" | "search" | "fast-forward";
   size?: "sm" | "md" | "lg";
   className?: string;
 };
@@ -315,6 +315,22 @@ export const Icon: FC<IconProps> = ({ name, size = "md", className = "" }) => {
         <title>Search</title>
         <circle cx="11" cy="11" r="8" />
         <path d="m21 21-4.35-4.35" />
+      </svg>
+    ),
+    "fast-forward": (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <title>Fast Forward</title>
+        <polygon points="13 19 22 12 13 5 13 19" />
+        <polygon points="2 19 11 12 2 5 2 19" />
       </svg>
     ),
   };

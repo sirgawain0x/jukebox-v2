@@ -44,7 +44,10 @@
     "viem": "^2.31.6",
     "wagmi": "^2.16.3",
     "web-push": "^3.6.7",
-    "web3": "^4.16.0"
+    "web3": "^4.16.0",
+    "@superfluid-finance/sdk-core": "^0.7.0",
+    "@superfluid-finance/ethereum-contracts": "^1.7.0",
+    "ethers": "^5.7.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

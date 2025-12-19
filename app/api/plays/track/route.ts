@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { redis } from '@/lib/redis';
 import { updateDailySession } from '@/lib/session-tracking';
+import { updatePlayDuration } from '@/lib/superfluid-play-oracle';
 
 // Rate limiting: max 10 play events per minute per user
 const RATE_LIMIT_WINDOW = 60; // seconds
@@ -97,6 +98,13 @@ async function storePlayEvent(event: PlayEventRequest): Promise<void> {
     }
 
     await pipeline.exec();
+
+    // Update play duration for Superfluid play rate oracle (async)
+    if (event.duration >= 30) {
+      updatePlayDuration(event.trackId, event.duration).catch((error) => {
+        console.error('Failed to update play duration for Superfluid:', error);
+      });
+    }
 
     // Update daily session for play-to-earn (qualified play = full play)
     if (event.userId) {

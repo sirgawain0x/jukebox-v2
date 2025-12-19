@@ -576,7 +576,7 @@ The `cast` command can also be used to call the `getMessage()` function on the `
 To call the `getMessage()` function of the `Receiver` smart contract, run:
 
 ```bash  theme={null}
-cast send `RECEIVER_CONTRACT_ADDRESS` --rpc-url $OPTIMISM_GOERLI_RPC "getMessage()" --account deployer
+cast call `RECEIVER_CONTRACT_ADDRESS` --rpc-url $OPTIMISM_GOERLI_RPC "getMessage()"
 ```
 
 <Info>

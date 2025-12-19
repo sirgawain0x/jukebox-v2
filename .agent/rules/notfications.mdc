@@ -250,11 +250,13 @@ Different client apps handle webhook responses differently:
       appFid,
       title,
       body,
+      appUrl,
     }: {
       fid: number;
       appFid: number;
       title: string;
       body: string;
+      appUrl: string;
     }): Promise<sendMiniAppNotificationResult> {
       const notificationDetails = await getUserNotificationDetails(fid, appFid);
       if (!notificationDetails) {

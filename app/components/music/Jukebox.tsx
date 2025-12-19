@@ -43,7 +43,7 @@ import { Input } from '@/components/ui/input';
 import { getPlayCounts, getCachedPlayCount, setCachedPlayCount } from '@/lib/play-counts';
 import { getWebsiteTypeFromUrl } from '@/lib/spinamp-utils';
 import { EngagementMetrics } from './EngagementMetrics';
-import { recordShareEvent, recordTipEvent } from '@/lib/engagement-scoring';
+// Note: Engagement events are recorded via API endpoints, not direct server function calls
 // Helper function to filter curated songs via API
 async function filterCuratedSongs(songs: Song[]): Promise<Song[]> {
   try {
@@ -168,7 +168,18 @@ export function Jukebox({
 
     // Track share event using external link utilities
     const shareUrl = window.location.href;
-    await recordShareEvent(selectedSong.id, shareUrl);
+    try {
+      await fetch('/api/engagement/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trackId: selectedSong.id,
+          shareUrl,
+        }),
+      });
+    } catch (error) {
+      console.error('Failed to record share event:', error);
+    }
   }, [selectedSong, composeCast, sortBy]);
 
   const handleShareTip = useCallback(() => {
@@ -727,7 +738,18 @@ export function Jukebox({
 
       // Record tip event for engagement scoring
       if (selectedSong) {
-        await recordTipEvent(selectedSong.id, Number(minTipEth) / 1e18);
+        try {
+          await fetch('/api/engagement/tip', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              trackId: selectedSong.id,
+              amount: Number(minTipEth) / 1e18,
+            }),
+          });
+        } catch (error) {
+          console.error('Failed to record tip event:', error);
+        }
       }
 
       onSongTipped(selectedSong);

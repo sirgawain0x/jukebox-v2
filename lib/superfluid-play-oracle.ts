@@ -150,8 +150,9 @@ export async function updatePlayDuration(
   }
 
   try {
-    // Increment total duration
-    await redis.incrby(`play:track:${trackId}:totalDuration`, duration);
+    // Increment total duration (round to integer - Redis INCRBY requires integer)
+    const durationInt = Math.round(duration);
+    await redis.incrby(`play:track:${trackId}:totalDuration`, durationInt);
     
     // Set expiration (keep for 90 days)
     await redis.expire(`play:track:${trackId}:totalDuration`, 90 * 24 * 60 * 60);

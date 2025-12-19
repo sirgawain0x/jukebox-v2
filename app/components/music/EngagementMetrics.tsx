@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useState } from 'react';
 import { Song } from '@/types/music';
-import { getEngagementData, calculateEngagementScore } from '@/lib/engagement-scoring';
 import { SupportedWebsites } from '@/lib/spinamp-utils';
 import { Icon } from '../ui/Icon';
 
@@ -21,28 +20,45 @@ export function EngagementMetrics({ song }: EngagementMetricsProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getEngagementData(song.id).then(data => {
-      const score = calculateEngagementScore({
-        ...song,
-        playCount: data.playCount,
-        tipCount: data.tipCount,
-        shareCount: data.shareCount,
-        predictionCount: data.predictionCount,
-      });
-      
-      setMetrics({
-        playCount: data.playCount,
-        tipCount: data.tipCount,
-        shareCount: data.shareCount,
-        predictionCount: data.predictionCount,
-        engagementScore: score,
-        shareByPlatform: data.shareByPlatform,
-      });
-      setLoading(false);
-    }).catch(err => {
-      console.error('Error fetching engagement metrics:', err);
-      setLoading(false);
-    });
+    let mounted = true;
+
+    const fetchMetrics = async () => {
+      try {
+        const res = await fetch(`/api/engagement?trackId=${encodeURIComponent(song.id)}`);
+        if (!res.ok) {
+          throw new Error('Failed to fetch engagement data');
+        }
+        const data = await res.json();
+        
+        if (mounted) {
+          setMetrics({
+            playCount: data.playCount || 0,
+            tipCount: data.tipCount || 0,
+            shareCount: data.shareCount || 0,
+            predictionCount: data.predictionCount || 0,
+            engagementScore: data.engagementScore || 0,
+            shareByPlatform: data.shareByPlatform || {},
+          });
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('Error fetching engagement metrics:', err);
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    // Fetch immediately
+    fetchMetrics();
+
+    // Poll every 5 seconds to update metrics in real-time
+    const interval = setInterval(fetchMetrics, 5000);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
   }, [song.id]);
 
   if (loading) {

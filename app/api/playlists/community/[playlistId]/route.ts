@@ -59,6 +59,16 @@ export async function PATCH(
   try {
     const { playlistId } = await params;
     const body = await request.json();
+    const { creator } = body;
+
+    // Validate creator is a string
+    if (!creator || typeof creator !== 'string') {
+      return NextResponse.json(
+        { error: 'Creator address is required and must be a string' },
+        { status: 400 }
+      );
+    }
+
     const playlist = await redis.get<CommunityPlaylist>(
       `playlist:community:${playlistId}`
     );
@@ -70,12 +80,41 @@ export async function PATCH(
       );
     }
 
+    // Check if requester is the creator
+    if (playlist.creator.toLowerCase() !== creator.toLowerCase()) {
+      return NextResponse.json(
+        { error: 'Only the playlist creator can modify this playlist' },
+        { status: 403 }
+      );
+    }
+
     // Update playlist fields
     if (body.name !== undefined) {
+      // Validate name is a string
+      if (typeof body.name !== 'string') {
+        return NextResponse.json(
+          { error: 'Playlist name must be a string' },
+          { status: 400 }
+        );
+      }
       playlist.name = body.name.trim();
     }
 
     if (body.songIds !== undefined) {
+      // Validate songIds is an array
+      if (!Array.isArray(body.songIds)) {
+        return NextResponse.json(
+          { error: 'songIds must be an array' },
+          { status: 400 }
+        );
+      }
+      // Validate all songIds are strings
+      if (!body.songIds.every((id: unknown) => typeof id === 'string')) {
+        return NextResponse.json(
+          { error: 'All songIds must be strings' },
+          { status: 400 }
+        );
+      }
       playlist.songIds = body.songIds;
     }
 
@@ -105,6 +144,41 @@ export async function DELETE(
 
   try {
     const { playlistId } = await params;
+    let body: { creator?: unknown } = {};
+    try {
+      body = await request.json();
+    } catch {
+      // Body might be empty for DELETE requests
+    }
+    const { creator } = body;
+
+    // Validate creator is a string
+    if (!creator || typeof creator !== 'string') {
+      return NextResponse.json(
+        { error: 'Creator address is required and must be a string' },
+        { status: 400 }
+      );
+    }
+
+    const playlist = await redis.get<CommunityPlaylist>(
+      `playlist:community:${playlistId}`
+    );
+
+    if (!playlist) {
+      return NextResponse.json(
+        { error: 'Playlist not found' },
+        { status: 404 }
+      );
+    }
+
+    // Check if requester is the creator
+    if (playlist.creator.toLowerCase() !== creator.toLowerCase()) {
+      return NextResponse.json(
+        { error: 'Only the playlist creator can delete this playlist' },
+        { status: 403 }
+      );
+    }
+
     await redis.del(`playlist:community:${playlistId}`);
     return NextResponse.json({ success: true });
   } catch (error) {

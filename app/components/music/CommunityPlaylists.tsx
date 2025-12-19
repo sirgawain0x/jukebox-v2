@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import { Card } from '../ui/Card';
 import { Icon } from '../ui/Icon';
+import { PlaylistDetailView } from './PlaylistDetailView';
 
 type CommunityPlaylist = {
   id: string;
@@ -22,6 +23,7 @@ export function CommunityPlaylists({ onPlaylistSelect }: CommunityPlaylistsProps
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState('');
+  const [selectedPlaylist, setSelectedPlaylist] = useState<CommunityPlaylist | null>(null);
 
   useEffect(() => {
     loadPlaylists();
@@ -67,12 +69,44 @@ export function CommunityPlaylists({ onPlaylistSelect }: CommunityPlaylistsProps
       const data = await response.json();
       setPlaylists(prev => [data.playlist, ...prev]);
       setNewPlaylistName('');
+      // Optionally open the new playlist
+      setSelectedPlaylist(data.playlist);
     } catch (error) {
       console.error('Error creating playlist:', error);
     } finally {
       setCreating(false);
     }
   };
+
+  const handlePlaylistSelect = (playlist: CommunityPlaylist) => {
+    setSelectedPlaylist(playlist);
+    onPlaylistSelect?.(playlist);
+  };
+
+  const handlePlaylistUpdated = () => {
+    loadPlaylists();
+    if (selectedPlaylist) {
+      // Reload the selected playlist
+      fetch(`/api/playlists/community/${selectedPlaylist.id}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.playlist) {
+            setSelectedPlaylist(data.playlist);
+          }
+        })
+        .catch(err => console.error('Error reloading playlist:', err));
+    }
+  };
+
+  if (selectedPlaylist) {
+    return (
+      <PlaylistDetailView
+        playlist={selectedPlaylist}
+        onBack={() => setSelectedPlaylist(null)}
+        onPlaylistUpdated={handlePlaylistUpdated}
+      />
+    );
+  }
 
   if (loading) {
     return (
@@ -124,7 +158,7 @@ export function CommunityPlaylists({ onPlaylistSelect }: CommunityPlaylistsProps
             {playlists.map((playlist) => (
               <div
                 key={playlist.id}
-                onClick={() => onPlaylistSelect?.(playlist)}
+                onClick={() => handlePlaylistSelect(playlist)}
                 className="p-3 border border-[var(--app-card-border)] rounded-lg hover:bg-[var(--app-card-bg)] cursor-pointer transition-colors"
               >
                 <div className="flex items-center justify-between">

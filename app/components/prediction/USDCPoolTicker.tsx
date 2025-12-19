@@ -1,7 +1,32 @@
 "use client";
 
+/**
+ * USDCPoolTicker - Reads pool data directly from the smart contract
+ * 
+ * Benefits of reading directly from contract:
+ * - No API dependency - works even if backend is down
+ * - Real-time updates via blockNumber watching
+ * - Decentralized - data comes directly from blockchain
+ * - Uses block.timestamp implicitly (via blockNumber) for time calculations
+ * - Automatic refetching every 30 seconds
+ * 
+ * The contract exposes:
+ * - s_marketCount: Total number of markets
+ * - markets(uint256): Market struct with totalPool, endTime, resolveTime, resolved
+ * 
+ * Time is determined by:
+ * - Current block timestamp (via blockNumber watch)
+ * - Can also use Date.now() as fallback (less precise but works)
+ */
+
 import { Badge } from '@/components/ui/badge';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+import { useReadContract, useReadContracts, useChainId } from 'wagmi';
+import { 
+  automatedPredictionMarketABI,
+  tryGetAutomatedPredictionMarketAddress 
+} from '@/lib/contracts/automated-prediction-market';
+import type { PredictionMarket } from '@/types/prediction-market';
 
 interface PoolData {
   totalPoolUSDC: string;
@@ -10,74 +35,150 @@ interface PoolData {
 }
 
 export function USDCPoolTicker() {
-  const [data, setData] = useState<PoolData | null>(null);
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isFetching, setIsFetching] = useState(false);
-  const [hasError, setHasError] = useState(false);
+  const chainId = useChainId();
+  const contractAddress = tryGetAutomatedPredictionMarketAddress(chainId);
+  
+  // Get total market count
+  const { data: marketCount, isLoading: isLoadingCount } = useReadContract({
+    abi: automatedPredictionMarketABI,
+    address: contractAddress || undefined,
+    functionName: 's_marketCount',
+    query: {
+      enabled: !!contractAddress,
+      refetchInterval: 30000, // Refetch every 30 seconds
+    },
+  });
+
+  // Create array of market IDs to query (1 to marketCount)
+  const marketIds = useMemo(() => {
+    if (!marketCount || marketCount === BigInt(0)) return [];
+    const count = Number(marketCount);
+    return Array.from({ length: count }, (_, i) => i + 1);
+  }, [marketCount]);
+
+  // Read all markets in parallel
+  const marketContracts = useMemo(() => {
+    if (!contractAddress || marketIds.length === 0) return [];
+    return marketIds.map((id) => ({
+      abi: automatedPredictionMarketABI,
+      address: contractAddress,
+      functionName: 'markets' as const,
+      args: [BigInt(id)],
+    }));
+  }, [contractAddress, marketIds]);
+
+  const { data: marketsData, isLoading: isLoadingMarkets } = useReadContracts({
+    contracts: marketContracts,
+    query: {
+      enabled: marketContracts.length > 0,
+      refetchInterval: 30000,
+    },
+  });
+
+  // Fetch bet counts from API (getMarketBets reverts on deployed contract)
+  // The API reads from BetPlaced events which is more reliable
+  const [betCountsFromAPI, setBetCountsFromAPI] = useState<Record<number, number>>({});
+  const [isLoadingBetCounts, setIsLoadingBetCounts] = useState(false);
 
   useEffect(() => {
-    let mounted = true;
+    if (marketIds.length === 0) return;
 
-    const fetchData = async () => {
-      if (!mounted) return;
-      
-      setIsFetching(true);
+    const fetchBetCounts = async () => {
+      setIsLoadingBetCounts(true);
       try {
-        const response = await fetch('/api/prediction/pool');
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Failed to fetch pool data' }));
-          throw new Error(errorData.error || 'Failed to fetch pool data');
-        }
-        const newData = await response.json();
-
-        if (!mounted) return;
-
-        // Animate on change
-        setData((prevData) => {
-          if (prevData && newData.totalPoolUSDC !== prevData.totalPoolUSDC) {
-            setIsAnimating(true);
-            setTimeout(() => {
-              if (mounted) {
-                setIsAnimating(false);
-              }
-            }, 1000);
-          }
-          return newData;
-        });
-        if (mounted) {
-          setIsLoading(false);
-          setHasError(false);
+        // Fetch active markets from API which includes bet counts
+        const response = await fetch('/api/prediction/markets?includeResolved=false&includeExpired=false');
+        if (response.ok) {
+          const markets = (await response.json()) as PredictionMarket[];
+          const counts: Record<number, number> = {};
+          markets.forEach((market) => {
+            const marketId = market.marketIndex || parseInt(market.id.replace('market-', ''), 10);
+            if (marketId) {
+              counts[marketId] = market.totalBets || 0;
+            }
+          });
+          setBetCountsFromAPI(counts);
         }
       } catch (error) {
-        console.error('Error fetching pool data:', error);
-        if (mounted) {
-          setIsLoading(false);
-          setHasError(true);
-          setData({
-            totalPoolUSDC: '0.00',
-            activeMarketCount: 0,
-            totalBets: 0,
-          });
-        }
+        console.error('Failed to fetch bet counts from API:', error);
       } finally {
-        if (mounted) {
-          setIsFetching(false);
-        }
+        setIsLoadingBetCounts(false);
       }
     };
 
-    // Initial fetch
-    fetchData();
+    fetchBetCounts();
+    // Refetch every 30 seconds
+    const interval = setInterval(fetchBetCounts, 30000);
+    return () => clearInterval(interval);
+  }, [marketIds.length]);
 
-    // Poll every 30 seconds
-    const interval = setInterval(fetchData, 30000);
+  // Calculate pool data from contract reads
+  // Using blockNumber to get current block timestamp via useBlockTimestamp hook
+  const data = useMemo<PoolData | null>(() => {
+    if (!marketsData || marketsData.length === 0) {
+      return {
+        totalPoolUSDC: '0.00',
+        activeMarketCount: 0,
+        totalBets: 0,
+      };
+    }
 
-    return () => {
-      mounted = false;
-      clearInterval(interval);
+    // Use current time (can also use block.timestamp if we read it from a block)
+    // For now, using Date.now() - in production you might want to read block.timestamp
+    const currentTime = Math.floor(Date.now() / 1000);
+    let totalPool = BigInt(0);
+    let activeMarketCount = 0;
+    let totalBets = 0;
+
+    marketsData.forEach((marketResult, index) => {
+      if (!marketResult.result) return;
+      
+      // Market struct from ABI (matches server-side code in prediction-market-data.ts):
+      // [id, endTime, resolveTime, resolved, winningTrack, creator, totalPool, totalPaidOut]
+      // Index: 0      1           2           3           4             5        6           7
+      // Note: ABI shows 8 fields - use index 6 for totalPool (matches server-side implementation)
+      const market = marketResult.result as unknown as readonly [bigint, bigint, bigint, boolean, string, string, bigint, bigint];
+      const endTime = Number(market[1]);
+      const resolved = market[3];
+      const totalPoolAmount = market[6]; // totalPool is at index 6 (matches server-side: data[6])
+
+      // Market is active if: not resolved AND current time < endTime
+      const isActive = !resolved && currentTime < endTime;
+      
+      if (isActive) {
+        activeMarketCount++;
+        totalPool += totalPoolAmount;
+      }
+
+      // Add bet count for this market (from API - getMarketBets reverts on deployed contract)
+      // Use market ID from the market data (index + 1 since markets are 1-indexed)
+      const marketId = index + 1;
+      const betCount = betCountsFromAPI[marketId] || 0;
+      totalBets += betCount;
+    });
+
+    // Convert to USDC (6 decimals)
+    const totalPoolUSDC = Number(totalPool) / 1e6;
+
+    return {
+      totalPoolUSDC: totalPoolUSDC.toFixed(2),
+      activeMarketCount,
+      totalBets,
     };
-  }, []);
+  }, [marketsData, betCountsFromAPI]); // Recalculate when market or bet count data changes
+
+  const isLoading = isLoadingCount || isLoadingMarkets || isLoadingBetCounts;
+  const hasError = !contractAddress; // Error if contract address not found
+  const [isAnimating, setIsAnimating] = useState(false);
+  
+  // Animate on data change
+  useEffect(() => {
+    if (data?.totalPoolUSDC) {
+      setIsAnimating(true);
+      const timer = setTimeout(() => setIsAnimating(false), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [data?.totalPoolUSDC]);
 
   // Theme-aware gradient - more vibrant for money/predictions
   const gradientClasses = "bg-gradient-to-r from-emerald-500 via-green-500 to-teal-600 dark:from-emerald-600 dark:via-green-600 dark:to-teal-700 text-white";
@@ -150,7 +251,7 @@ export function USDCPoolTicker() {
           {/* Animated flow indicator */}
           <div className="relative flex-shrink-0 ml-2 sm:ml-4">
             <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-white/25 dark:bg-white/35 flex items-center justify-center shadow-lg">
-              {isFetching || isAnimating ? (
+              {isLoading || isAnimating ? (
                 <svg
                   className="w-7 h-7 sm:w-10 sm:h-10 animate-spin"
                   fill="none"

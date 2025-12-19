@@ -112,7 +112,7 @@ Different client apps handle webhook responses differently:
         case "miniapp_added":
           if (event.notificationDetails) {
            setUserNotificationDetails(fid, appFid, event.notificationDetails);
-           sendMiniAppNotification(fid, appFid, "Welcome to Base Mini Apps", "Mini app is now added to your client");
+           sendMiniAppNotification({
               fid,
               appFid,
               title: "Welcome to Base Mini Apps",

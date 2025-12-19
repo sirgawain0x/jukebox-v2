@@ -67,7 +67,7 @@ export function startPlayTracking(
 // Update play progress
 export function updatePlayProgress(
   state: PlayTrackingState,
-  currentTime: number // current playback time in seconds
+  _currentTime: number // current playback time in seconds
 ): { state: PlayTrackingState; shouldReport: boolean } {
   if (!state.currentTrackId || state.startTime === null) {
     return { state, shouldReport: false };

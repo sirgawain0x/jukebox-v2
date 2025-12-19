@@ -212,7 +212,7 @@ export type MintError =
 
 export type Error = {
   reason: MintError;
-  metadata?: any;
+  metadata?: unknown;
 };
 
 export type MintPreconditionError = Error;

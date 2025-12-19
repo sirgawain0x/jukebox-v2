@@ -30,7 +30,7 @@ export interface MacroParams {
 export async function executeRewardsMacro(
   signer: ethers.Signer,
   params: MacroParams
-): Promise<ethers.ContractTransactionResponse> {
+): Promise<ethers.ContractTransaction> {
   if (!REWARDS_MACRO_ADDRESS) {
     throw new Error('REWARDS_MACRO_ADDRESS not configured');
   }
@@ -89,7 +89,7 @@ export async function executeRewardsMacroWithFlow(
   superTokenAddress: string,
   flowRatePerDay: string,
   decimals: number = 6
-): Promise<ethers.ContractTransactionResponse> {
+): Promise<ethers.ContractTransaction> {
   if (!REWARDS_MACRO_ADDRESS) {
     throw new Error('REWARDS_MACRO_ADDRESS not configured');
   }
@@ -125,7 +125,7 @@ export async function executeRewardsMacroWithFlow(
  * Estimate gas for macro execution
  */
 export async function estimateMacroGas(
-  provider: ethers.Provider,
+  provider: ethers.providers.Provider,
   params: MacroParams,
   fromAddress: string
 ): Promise<bigint> {

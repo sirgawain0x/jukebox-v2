@@ -17,7 +17,6 @@ import { MarketLeaderboard } from "../prediction/MarketLeaderboard";
 import { CreateAutomatedMarket } from "../prediction/CreateAutomatedMarket";
 import { AutomatedMarkets } from "../prediction/AutomatedMarkets";
 import { PlayToEarn } from "./PlayToEarn";
-import { CuratedPlaylist } from "./CuratedPlaylist";
 import { CommunityPlaylists } from "./CommunityPlaylists";
 
 type HomeProps = {

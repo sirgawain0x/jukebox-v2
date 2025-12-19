@@ -17,7 +17,7 @@ interface LiveRoyaltyData {
 }
 
 export function LiveRoyaltiesTicker() {
-  const { address } = useAccount();
+  useAccount();
   const [data, setData] = useState<LiveRoyaltyData | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);

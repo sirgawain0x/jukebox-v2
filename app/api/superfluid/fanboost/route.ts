@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     const activeBoost = await getActiveBoost(artistAddress);
     const response: {
       activeBoost: typeof activeBoost;
-      history?: any[];
+      history?: unknown[];
       totalBoosted?: string;
     } = {
       activeBoost,

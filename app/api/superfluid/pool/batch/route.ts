@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { validatePoolAndBalance } from '@/lib/superfluid-pool-validation';
 import { storePool, getPool } from '@/lib/superfluid-pool';
 import type { MacroRecipient } from '@/lib/superfluid-macro';
 
@@ -17,8 +16,6 @@ export async function POST(request: NextRequest) {
       poolAddress,
       recipients,
       flowRatePerDay,
-      userAddress,
-      network,
     } = body;
 
     // Validate required fields
@@ -48,7 +45,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Convert recipients to MacroRecipient format
-    const macroRecipients: MacroRecipient[] = recipients.map((r: any) => ({
+    const macroRecipients: MacroRecipient[] = recipients.map((r: { address: string; units: string | number }) => ({
       address: r.address,
       units: BigInt(r.units),
     }));
@@ -61,7 +58,7 @@ export async function POST(request: NextRequest) {
         poolAddress,
         tokenAddress: '', // Will be set after validation
         createdAt: Date.now(),
-        totalFlowRate: 0n,
+        totalFlowRate: BigInt('0'),
         totalMembers: recipients.length,
         isActive: true,
       });
@@ -99,7 +96,6 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const poolAddress = searchParams.get('poolAddress');
     const userAddress = searchParams.get('userAddress');
-    const rpcUrl = searchParams.get('rpcUrl');
 
     if (!poolAddress || !userAddress) {
       return NextResponse.json(

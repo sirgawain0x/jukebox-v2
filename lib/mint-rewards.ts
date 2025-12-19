@@ -2,7 +2,6 @@
 // Handles minting achievement NFTs for rewards
 
 import {
-  MintDetails,
   MintType,
   BaseMintDetails,
   MintError,
@@ -18,8 +17,8 @@ export type AchievementNFT = {
 
 // Get mint details for achievement NFT
 export async function getAchievementMintDetails(
-  achievementType: 'streak' | 'listening' | 'prediction',
-  trackId?: string
+  _achievementType: 'streak' | 'listening' | 'prediction',
+  _trackId?: string
 ): Promise<BaseMintDetails> {
   // In production, this would query Spinamp API or contract for mint details
   // For now, return mock data

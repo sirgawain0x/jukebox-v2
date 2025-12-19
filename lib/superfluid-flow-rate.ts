@@ -1,8 +1,6 @@
 // Flow rate conversion utilities for Superfluid
 // Handles conversion between different time periods and formats
 
-import { ethers } from 'ethers';
-
 /**
  * Convert flow rate from tokens/day to wei/second
  * @param tokensPerDay Amount of tokens per day (as string, e.g., "100")
@@ -16,7 +14,7 @@ export function convertDailyToPerSecond(
   // Use BigInt arithmetic to avoid precision loss
   // Parse the input as a string to handle decimals, then convert to BigInt
   const tokensPerDayBigInt = parseToBigInt(tokensPerDay, decimals);
-  const secondsPerDay = 86400n;
+  const secondsPerDay = BigInt(86400);
   // Calculate: (tokensPerDay * 10^decimals) / secondsPerDay
   return tokensPerDayBigInt / secondsPerDay;
 }
@@ -30,7 +28,7 @@ export function convertHourlyToPerSecond(
 ): bigint {
   // Use BigInt arithmetic to avoid precision loss
   const tokensPerHourBigInt = parseToBigInt(tokensPerHour, decimals);
-  const secondsPerHour = 3600n;
+  const secondsPerHour = BigInt(3600);
   return tokensPerHourBigInt / secondsPerHour;
 }
 
@@ -43,7 +41,7 @@ export function convertMinuteToPerSecond(
 ): bigint {
   // Use BigInt arithmetic to avoid precision loss
   const tokensPerMinuteBigInt = parseToBigInt(tokensPerMinute, decimals);
-  const secondsPerMinute = 60n;
+  const secondsPerMinute = BigInt(60);
   return tokensPerMinuteBigInt / secondsPerMinute;
 }
 
@@ -56,10 +54,10 @@ export function convertFlowRateToWeiPerSecond(
   period: 'day' | 'hour' | 'minute' | 'second' = 'day'
 ): bigint {
   const periodSeconds: Record<string, bigint> = {
-    day: 86400n,
-    hour: 3600n,
-    minute: 60n,
-    second: 1n,
+    day: BigInt(86400),
+    hour: BigInt(3600),
+    minute: BigInt(60),
+    second: BigInt(1),
   };
 
   // Use BigInt arithmetic to avoid precision loss
@@ -79,7 +77,7 @@ function parseToBigInt(value: string, decimals: number): bigint {
   const decimalPart = parts[1] || '';
 
   // Pad or truncate decimal part to match decimals
-  let paddedDecimal = decimalPart.padEnd(decimals, '0').slice(0, decimals);
+  const paddedDecimal = decimalPart.padEnd(decimals, '0').slice(0, decimals);
 
   // Combine: integerPart + paddedDecimal
   const fullValue = integerPart + paddedDecimal;

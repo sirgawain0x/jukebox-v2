@@ -89,7 +89,7 @@ export async function addPoolMember(
 
   try {
     const key = `${POOL_MEMBERS_KEY_PREFIX}${marketId}`;
-    await redis.hset(key, memberAddress, units.toString());
+    await redis.hset(key, { [memberAddress]: units.toString() });
     
     // Update pool member count
     const pool = await getPool(marketId);
@@ -123,7 +123,7 @@ export async function updateMemberUnits(
       await addPoolMember(marketId, memberAddress, units);
     } else {
       // Update existing
-      await redis.hset(key, memberAddress, units.toString());
+      await redis.hset(key, { [memberAddress]: units.toString() });
     }
   } catch (error) {
     console.error(`Error updating member units:`, error);
@@ -138,16 +138,16 @@ export async function getMemberUnits(
   memberAddress: string
 ): Promise<bigint> {
   if (!redis) {
-    return 0n;
+    return BigInt(0);
   }
 
   try {
     const key = `${POOL_MEMBERS_KEY_PREFIX}${marketId}`;
     const units = await redis.hget<string>(key, memberAddress);
-    return units ? BigInt(units) : 0n;
+    return units ? BigInt(units) : BigInt(0);
   } catch (error) {
     console.error(`Error fetching member units:`, error);
-    return 0n;
+    return BigInt(0);
   }
 }
 
@@ -242,6 +242,6 @@ export async function calculateTotalFlowRate(marketId: number): Promise<bigint> 
   // This would integrate with Superfluid SDK to get actual flow rate
   // For now, return stored value
   const pool = await getPool(marketId);
-  return pool?.totalFlowRate || 0n;
+  return pool?.totalFlowRate || BigInt(0);
 }
 

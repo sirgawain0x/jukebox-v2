@@ -33,7 +33,7 @@ export async function calculateJackpotStreamOptions(
   const streamRate = totalWinnings / BigInt(duration);
   
   // Daily amount for display
-  const dailyAmount = (totalWinnings * 86400n) / BigInt(duration);
+  const dailyAmount = (totalWinnings * BigInt(86400)) / BigInt(duration);
 
   return {
     marketId,
@@ -147,7 +147,7 @@ export async function getJackpotStream(
  * Get all active jackpot streams for a user
  */
 export async function getUserJackpotStreams(
-  winnerAddress: string
+  _winnerAddress: string
 ): Promise<JackpotStreamOption[]> {
   if (!redis) {
     return [];
@@ -179,7 +179,7 @@ export function calculateRemainingStreamAmount(
   const streamed = streamOption.streamRate * BigInt(elapsedSeconds);
   const remaining = streamOption.totalWinnings - streamed;
 
-  return remaining > 0n ? remaining : 0n;
+  return remaining > BigInt(0) ? remaining : BigInt(0);
 }
 
 /**

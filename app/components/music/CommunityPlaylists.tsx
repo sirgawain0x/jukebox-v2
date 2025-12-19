@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
-import { Song } from '@/types/music';
 import { Card } from '../ui/Card';
 import { Icon } from '../ui/Icon';
 

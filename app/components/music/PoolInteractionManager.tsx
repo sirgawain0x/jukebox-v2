@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 // Note: Using ethers here because the underlying superfluid-pool-claiming library
 // expects ethers.Signer and ethers.Provider types. We use wagmi hooks to check
@@ -13,7 +13,6 @@ import {
   claimAllFromPool,
   isConnectedToPool,
   getClaimableAmount,
-  GDA_FORWARDER_ADDRESS,
 } from '@/lib/superfluid-pool-claiming';
 import { useToast } from '../ui/ToastProvider';
 import { Card } from '../ui/Card';
@@ -50,26 +49,19 @@ export function PoolInteractionManager({
     }
   }, [address, memberAddress]);
 
-  // Check connection status and claimable amount
-  useEffect(() => {
-    if (poolAddress && memberAddress && isWalletConnected && publicClient) {
-      checkPoolStatus();
-    }
-  }, [poolAddress, memberAddress, isWalletConnected, publicClient]);
-
-  const checkPoolStatus = async () => {
+  const checkPoolStatus = useCallback(async () => {
     if (!poolAddress || !memberAddress || !publicClient) return;
 
     setLoadingStatus(true);
     try {
       // Use window.ethereum for ethers provider (required by superfluid-pool-claiming library)
       // We check publicClient to ensure wallet is connected via wagmi
-      if (typeof window === 'undefined' || !(window as any).ethereum) {
+      if (typeof window === 'undefined' || !(window as { ethereum?: unknown }).ethereum) {
         return;
       }
 
       // ethers v5 uses Web3Provider instead of BrowserProvider
-      const ethersProvider = new ethers.providers.Web3Provider((window as any).ethereum);
+      const ethersProvider = new ethers.providers.Web3Provider((window as { ethereum: unknown }).ethereum as ethers.providers.ExternalProvider);
 
       const connected = await isConnectedToPool(
         ethersProvider,
@@ -89,7 +81,14 @@ export function PoolInteractionManager({
     } finally {
       setLoadingStatus(false);
     }
-  };
+  }, [poolAddress, memberAddress, publicClient]);
+
+  // Check connection status and claimable amount
+  useEffect(() => {
+    if (poolAddress && memberAddress && isWalletConnected && publicClient) {
+      checkPoolStatus();
+    }
+  }, [poolAddress, memberAddress, isWalletConnected, publicClient, checkPoolStatus]);
 
   const handleConnect = async () => {
     if (!isWalletConnected || !walletClient) {
@@ -106,13 +105,13 @@ export function PoolInteractionManager({
     try {
       // Use window.ethereum for ethers provider (required by superfluid-pool-claiming library)
       // We check walletClient to ensure wallet is connected via wagmi
-      if (typeof window === 'undefined' || !(window as any).ethereum) {
+      if (typeof window === 'undefined' || !(window as { ethereum?: unknown }).ethereum) {
         showToast('Wallet not available');
         return;
       }
 
       // ethers v5 uses Web3Provider instead of BrowserProvider
-      const ethersProvider = new ethers.providers.Web3Provider((window as any).ethereum);
+      const ethersProvider = new ethers.providers.Web3Provider((window as { ethereum: unknown }).ethereum as ethers.providers.ExternalProvider);
       const signer = await ethersProvider.getSigner();
       const result = await connectToPool(signer, poolAddress);
 
@@ -149,13 +148,13 @@ export function PoolInteractionManager({
     try {
       // Use window.ethereum for ethers provider (required by superfluid-pool-claiming library)
       // We check walletClient to ensure wallet is connected via wagmi
-      if (typeof window === 'undefined' || !(window as any).ethereum) {
+      if (typeof window === 'undefined' || !(window as { ethereum?: unknown }).ethereum) {
         showToast('Wallet not available');
         return;
       }
 
       // ethers v5 uses Web3Provider instead of BrowserProvider
-      const ethersProvider = new ethers.providers.Web3Provider((window as any).ethereum);
+      const ethersProvider = new ethers.providers.Web3Provider((window as { ethereum: unknown }).ethereum as ethers.providers.ExternalProvider);
       const signer = await ethersProvider.getSigner();
       const result = await disconnectFromPool(signer, poolAddress);
 
@@ -196,13 +195,13 @@ export function PoolInteractionManager({
     try {
       // Use window.ethereum for ethers provider (required by superfluid-pool-claiming library)
       // We check walletClient to ensure wallet is connected via wagmi
-      if (typeof window === 'undefined' || !(window as any).ethereum) {
+      if (typeof window === 'undefined' || !(window as { ethereum?: unknown }).ethereum) {
         showToast('Wallet not available');
         return;
       }
 
       // ethers v5 uses Web3Provider instead of BrowserProvider
-      const ethersProvider = new ethers.providers.Web3Provider((window as any).ethereum);
+      const ethersProvider = new ethers.providers.Web3Provider((window as { ethereum: unknown }).ethereum as ethers.providers.ExternalProvider);
       const signer = await ethersProvider.getSigner();
       const result = await claimAllFromPool(signer, poolAddress, addressToClaim);
 
@@ -366,7 +365,7 @@ export function PoolInteractionManager({
         <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
           <p className="text-xs text-blue-800 dark:text-blue-200">
             <strong>Note:</strong> Connecting to a pool automatically claims all
-            previously available tokens. You'll start receiving streams in
+            previously available tokens. You&apos;ll start receiving streams in
             real-time once connected.
           </p>
         </div>

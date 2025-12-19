@@ -47,7 +47,7 @@ export async function applyFanBoost(
     duration,
     expiresAt,
     boostedBy,
-    totalBoosted: boostAmount || 0n,
+    totalBoosted: boostAmount || BigInt(0),
   };
 
   // Store active boost
@@ -59,7 +59,7 @@ export async function applyFanBoost(
 
   // Store in history
   const historyKey = `${BOOST_HISTORY_KEY_PREFIX}${artistAddress}`;
-  const history = await redis.lpush(historyKey, JSON.stringify(boost));
+  await redis.lpush(historyKey, JSON.stringify(boost));
   await redis.expire(historyKey, 30 * 24 * 60 * 60); // Keep history for 30 days
   await redis.ltrim(historyKey, 0, 99); // Keep last 100 boosts
 
@@ -117,7 +117,7 @@ export async function getBoostedFlowRate(
 
   // Apply multiplier
   const multiplier = boost.multiplier;
-  const boostedFlowRate = (baseFlowRate * BigInt(Math.floor(multiplier * 10000))) / 10000n;
+  const boostedFlowRate = (baseFlowRate * BigInt(Math.floor(multiplier * 10000))) / BigInt(10000);
 
   return {
     flowRate: boostedFlowRate,
@@ -167,7 +167,7 @@ export async function getBoostHistory(
 
   try {
     const historyKey = `${BOOST_HISTORY_KEY_PREFIX}${artistAddress}`;
-    const data = await redis.lrange<string[]>(historyKey, 0, limit - 1);
+    const data = await redis.lrange<string>(historyKey, 0, limit - 1);
 
     return data.map((item) => JSON.parse(item));
   } catch (error) {
@@ -181,7 +181,7 @@ export async function getBoostHistory(
  */
 export async function getTotalBoosted(artistAddress: string): Promise<bigint> {
   const history = await getBoostHistory(artistAddress, 100);
-  return history.reduce((total, boost) => total + boost.totalBoosted, 0n);
+  return history.reduce((total, boost) => total + boost.totalBoosted, BigInt(0));
 }
 
 /**

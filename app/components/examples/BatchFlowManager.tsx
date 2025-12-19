@@ -123,7 +123,7 @@ export function BatchFlowManager() {
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <p className="mt-1 text-sm text-gray-500">
-            Enter flow rates in tokens per day (e.g., "100" means 100 tokens/day)
+            Enter flow rates in tokens per day (e.g., &quot;100&quot; means 100 tokens/day)
           </p>
         </div>
 

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useAccount, useChainId, useWalletClient } from 'wagmi'
-import { BrowserProvider } from 'ethers'
+import { ethers } from 'ethers'
 import {
   executeBatchCall,
   batchUpgradeAndFlow,
@@ -39,13 +39,17 @@ export function useBatchCall(options?: UseBatchCallOptions) {
     setError(null)
 
     try {
-      const provider = new BrowserProvider(walletClient as any)
+      // ethers v5 uses Web3Provider, need to access window.ethereum
+      if (typeof window === 'undefined' || !(window as { ethereum?: unknown }).ethereum) {
+        throw new Error('Wallet not available')
+      }
+      const provider = new ethers.providers.Web3Provider((window as { ethereum: unknown }).ethereum as ethers.providers.ExternalProvider)
       const signer = await provider.getSigner()
 
       const tx = await executeBatchCall(signer, operations, chainId)
       const receipt = await tx.wait()
 
-      options?.onSuccess?.(receipt?.hash || '')
+      options?.onSuccess?.(tx.hash || receipt?.transactionHash || '')
       return receipt
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Batch call failed')
@@ -89,7 +93,11 @@ export function useUpgradeAndFlow(options?: UseBatchCallOptions) {
     setError(null)
 
     try {
-      const provider = new BrowserProvider(walletClient as any)
+      // ethers v5 uses Web3Provider, need to access window.ethereum
+      if (typeof window === 'undefined' || !(window as { ethereum?: unknown }).ethereum) {
+        throw new Error('Wallet not available')
+      }
+      const provider = new ethers.providers.Web3Provider((window as { ethereum: unknown }).ethereum as ethers.providers.ExternalProvider)
       const signer = await provider.getSigner()
 
       const tx = await batchUpgradeAndFlow(
@@ -103,7 +111,7 @@ export function useUpgradeAndFlow(options?: UseBatchCallOptions) {
       )
       const receipt = await tx.wait()
 
-      options?.onSuccess?.(receipt?.hash || '')
+      options?.onSuccess?.(tx.hash || receipt?.transactionHash || '')
       return receipt
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Upgrade and flow failed')
@@ -145,13 +153,17 @@ export function useBatchCreateFlows(options?: UseBatchCallOptions) {
     setError(null)
 
     try {
-      const provider = new BrowserProvider(walletClient as any)
+      // ethers v5 uses Web3Provider, need to access window.ethereum
+      if (typeof window === 'undefined' || !(window as { ethereum?: unknown }).ethereum) {
+        throw new Error('Wallet not available')
+      }
+      const provider = new ethers.providers.Web3Provider((window as { ethereum: unknown }).ethereum as ethers.providers.ExternalProvider)
       const signer = await provider.getSigner()
 
       const tx = await batchCreateFlows(signer, superTokenAddress, flows, chainId, decimals)
       const receipt = await tx.wait()
 
-      options?.onSuccess?.(receipt?.hash || '')
+      options?.onSuccess?.(tx.hash || receipt?.transactionHash || '')
       return receipt
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Batch create flows failed')
@@ -193,13 +205,17 @@ export function useBatchUpdateFlows(options?: UseBatchCallOptions) {
     setError(null)
 
     try {
-      const provider = new BrowserProvider(walletClient as any)
+      // ethers v5 uses Web3Provider, need to access window.ethereum
+      if (typeof window === 'undefined' || !(window as { ethereum?: unknown }).ethereum) {
+        throw new Error('Wallet not available')
+      }
+      const provider = new ethers.providers.Web3Provider((window as { ethereum: unknown }).ethereum as ethers.providers.ExternalProvider)
       const signer = await provider.getSigner()
 
       const tx = await batchUpdateFlows(signer, superTokenAddress, flows, chainId, decimals)
       const receipt = await tx.wait()
 
-      options?.onSuccess?.(receipt?.hash || '')
+      options?.onSuccess?.(tx.hash || receipt?.transactionHash || '')
       return receipt
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Batch update flows failed')
@@ -237,13 +253,17 @@ export function useBatchDeleteFlows(options?: UseBatchCallOptions) {
     setError(null)
 
     try {
-      const provider = new BrowserProvider(walletClient as any)
+      // ethers v5 uses Web3Provider, need to access window.ethereum
+      if (typeof window === 'undefined' || !(window as { ethereum?: unknown }).ethereum) {
+        throw new Error('Wallet not available')
+      }
+      const provider = new ethers.providers.Web3Provider((window as { ethereum: unknown }).ethereum as ethers.providers.ExternalProvider)
       const signer = await provider.getSigner()
 
       const tx = await batchDeleteFlows(signer, superTokenAddress, receivers, chainId)
       const receipt = await tx.wait()
 
-      options?.onSuccess?.(receipt?.hash || '')
+      options?.onSuccess?.(tx.hash || receipt?.transactionHash || '')
       return receipt
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Batch delete flows failed')
@@ -281,13 +301,17 @@ export function useBatchPoolUpdate(options?: UseBatchCallOptions) {
     setError(null)
 
     try {
-      const provider = new BrowserProvider(walletClient as any)
+      // ethers v5 uses Web3Provider, need to access window.ethereum
+      if (typeof window === 'undefined' || !(window as { ethereum?: unknown }).ethereum) {
+        throw new Error('Wallet not available')
+      }
+      const provider = new ethers.providers.Web3Provider((window as { ethereum: unknown }).ethereum as ethers.providers.ExternalProvider)
       const signer = await provider.getSigner()
 
       const tx = await batchPoolUpdateAndFlow(signer, params, chainId)
       const receipt = await tx.wait()
 
-      options?.onSuccess?.(receipt?.hash || '')
+      options?.onSuccess?.(tx.hash || receipt?.transactionHash || '')
       return receipt
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Pool batch update failed')
@@ -325,7 +349,11 @@ export function useEstimateBatchGas() {
     setError(null)
 
     try {
-      const provider = new BrowserProvider(walletClient as any)
+      // ethers v5 uses Web3Provider, need to access window.ethereum
+      if (typeof window === 'undefined' || !(window as { ethereum?: unknown }).ethereum) {
+        throw new Error('Wallet not available')
+      }
+      const provider = new ethers.providers.Web3Provider((window as { ethereum: unknown }).ethereum as ethers.providers.ExternalProvider)
       const gasEstimate = await estimateBatchCallGas(provider, operations, chainId, address)
       return gasEstimate
     } catch (err) {

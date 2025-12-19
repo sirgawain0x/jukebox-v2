@@ -27,9 +27,9 @@ export async function switchToBaseMainnet(): Promise<boolean> {
       params: [{ chainId: BASE_MAINNET_CHAIN_ID }],
     });
     return true;
-  } catch (switchError: any) {
+  } catch (switchError: unknown) {
     // This error code indicates that the chain has not been added to MetaMask
-    if (switchError.code === 4902) {
+    if ((switchError as { code?: number })?.code === 4902) {
       try {
         await window.ethereum.request({
           method: 'wallet_addEthereumChain',
@@ -72,8 +72,8 @@ export async function switchToBaseSepolia(): Promise<boolean> {
       params: [{ chainId: BASE_SEPOLIA_CHAIN_ID }],
     });
     return true;
-  } catch (switchError: any) {
-    if (switchError.code === 4902) {
+  } catch (switchError: unknown) {
+    if ((switchError as { code?: number })?.code === 4902) {
       try {
         await window.ethereum.request({
           method: 'wallet_addEthereumChain',

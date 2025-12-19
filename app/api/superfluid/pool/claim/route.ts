@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { claimAllFromPool, connectToPool, disconnectFromPool } from '@/lib/superfluid-pool-claiming';
-import { getProvider } from '@/lib/utils'; // You'll need to implement this
 
 /**
  * POST /api/superfluid/pool/claim
@@ -9,7 +7,7 @@ import { getProvider } from '@/lib/utils'; // You'll need to implement this
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { action, poolAddress, memberAddress, userAddress, userData } = body;
+    const { action, poolAddress, memberAddress, userAddress } = body;
 
     if (!action || !poolAddress) {
       return NextResponse.json(
@@ -47,7 +45,6 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const poolAddress = searchParams.get('poolAddress');
     const memberAddress = searchParams.get('memberAddress');
-    const rpcUrl = searchParams.get('rpcUrl');
 
     if (!poolAddress || !memberAddress) {
       return NextResponse.json(

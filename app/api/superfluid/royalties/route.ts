@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getActivePools, getPoolMembers, calculateTotalFlowRate } from '@/lib/superfluid-pool';
+import { getActivePools, getPoolMembers } from '@/lib/superfluid-pool';
 import { getActiveBoost } from '@/lib/superfluid-fan-boost';
 
 /**
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
 async function getLiveRoyalties() {
   const pools = await getActivePools();
   
-  let totalFlowRate = 0n;
+  let totalFlowRate = BigInt('0');
   let totalArtists = 0;
   const topArtists: Array<{
     address: string;
@@ -61,8 +61,8 @@ async function getLiveRoyalties() {
       .slice(0, 10);
 
     // Calculate flow rate per artist (simplified - assumes equal distribution per unit)
-    const totalUnits = Array.from(members.values()).reduce((sum, units) => sum + units, 0n);
-    if (totalUnits > 0n) {
+    const totalUnits = Array.from(members.values()).reduce((sum, units) => sum + units, BigInt('0'));
+    if (totalUnits > BigInt('0')) {
       sortedMembers.forEach(([address, units]) => {
         const artistFlowRate = (pool.totalFlowRate * units) / totalUnits;
         const dailyEarnings = Number(artistFlowRate) * 86400 / 1e6; // USDC has 6 decimals
@@ -106,10 +106,10 @@ async function getMarketRoyalties(marketId: number) {
   }
 
   const members = await getPoolMembers(marketId);
-  const totalUnits = Array.from(members.values()).reduce((sum, units) => sum + units, 0n);
+  const totalUnits = Array.from(members.values()).reduce((sum, units) => sum + units, BigInt('0'));
 
   const artists = Array.from(members.entries()).map(([address, units]) => {
-    const flowRate = totalUnits > 0n ? (pool.totalFlowRate * units) / totalUnits : 0n;
+    const flowRate = totalUnits > BigInt('0') ? (pool.totalFlowRate * units) / totalUnits : BigInt('0');
     const dailyEarnings = Number(flowRate) * 86400 / 1e6;
 
     return {
@@ -117,7 +117,7 @@ async function getMarketRoyalties(marketId: number) {
       units: units.toString(),
       flowRate: Number(flowRate) / 1e6,
       dailyEarnings: dailyEarnings.toFixed(4),
-      share: totalUnits > 0n ? Number((units * 10000n) / totalUnits) / 100 : 0,
+      share: totalUnits > BigInt('0') ? Number((units * BigInt('10000')) / totalUnits) / 100 : 0,
     };
   });
 
@@ -138,21 +138,21 @@ async function getArtistRoyalties(artistAddress: string) {
   const pools = await getActivePools();
   
   const artistData = [];
-  let totalFlowRate = 0n;
+  let totalFlowRate = BigInt('0');
 
   for (const pool of pools) {
     const members = await getPoolMembers(pool.marketId);
     const units = members.get(artistAddress);
     
-    if (units && units > 0n) {
-      const totalUnits = Array.from(members.values()).reduce((sum, u) => sum + u, 0n);
-      const flowRate = totalUnits > 0n ? (pool.totalFlowRate * units) / totalUnits : 0n;
+    if (units && units > BigInt('0')) {
+      const totalUnits = Array.from(members.values()).reduce((sum, u) => sum + u, BigInt('0'));
+      const flowRate = totalUnits > BigInt('0') ? (pool.totalFlowRate * units) / totalUnits : BigInt('0');
       totalFlowRate += flowRate;
 
       // Check for active boost
       const boost = await getActiveBoost(artistAddress);
       const boostedFlowRate = boost 
-        ? (flowRate * BigInt(Math.floor(boost.multiplier * 10000))) / 10000n
+        ? (flowRate * BigInt(Math.floor(boost.multiplier * 10000))) / BigInt('10000')
         : flowRate;
 
       artistData.push({

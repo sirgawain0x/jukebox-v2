@@ -123,22 +123,19 @@ export async function getArtistUploadFrequency(
 
   try {
     const thisWeek = new Date().toISOString().split('T')[0];
-    const lastWeek = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .split('T')[0];
     const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)
       .toISOString()
       .split('T')[0];
 
     const [thisWeekCount, lastWeekCount] = await Promise.all([
-      redis.get<number>(`curation:artist:${artistId}:week:${thisWeek}`) || 0,
-      redis.get<number>(`curation:artist:${artistId}:week:${twoWeeksAgo}`) || 0,
+      redis.get<number>(`curation:artist:${artistId}:week:${thisWeek}`),
+      redis.get<number>(`curation:artist:${artistId}:week:${twoWeeksAgo}`),
     ]);
 
     // Total would require a different data structure, for now return 0
     return {
-      thisWeek: thisWeekCount,
-      lastWeek: lastWeekCount,
+      thisWeek: thisWeekCount ?? 0,
+      lastWeek: lastWeekCount ?? 0,
       total: 0,
     };
   } catch (error) {

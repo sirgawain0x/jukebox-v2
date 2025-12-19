@@ -76,26 +76,27 @@ export async function getEngagementData(trackId: string): Promise<{
 
   try {
     const [playCount, tipCount, shareCount, predictionCount] = await Promise.all([
-      redis.get<number>(`play:track:${trackId}:total`) || 0,
-      redis.get<number>(`tip:track:${trackId}:total`) || 0,
-      redis.get<number>(`share:track:${trackId}:total`) || 0,
-      redis.get<number>(`prediction:track:${trackId}:total`) || 0,
+      redis.get<number>(`play:track:${trackId}:total`),
+      redis.get<number>(`tip:track:${trackId}:total`),
+      redis.get<number>(`share:track:${trackId}:total`),
+      redis.get<number>(`prediction:track:${trackId}:total`),
     ]);
 
     // Get share counts by platform
     const shareByPlatform: Record<string, number> = {};
     for (const website of SupportedWebsites) {
-      const count = await redis.get<number>(`share:track:${trackId}:platform:${website.id}`) || 0;
-      if (count > 0) {
-        shareByPlatform[website.id] = count;
+      const count = await redis.get<number>(`share:track:${trackId}:platform:${website.id}`);
+      const countValue = count ?? 0;
+      if (countValue > 0) {
+        shareByPlatform[website.id] = countValue;
       }
     }
 
     return {
-      playCount,
-      tipCount,
-      shareCount,
-      predictionCount,
+      playCount: playCount ?? 0,
+      tipCount: tipCount ?? 0,
+      shareCount: shareCount ?? 0,
+      predictionCount: predictionCount ?? 0,
       shareByPlatform,
     };
   } catch (error) {

@@ -144,7 +144,7 @@ export async function claimAllFromPool(
  * Note: This requires querying the pool contract directly
  */
 export async function isConnectedToPool(
-  provider: ethers.Provider,
+  provider: ethers.providers.Provider,
   poolAddress: string,
   memberAddress: string
 ): Promise<boolean> {
@@ -159,7 +159,7 @@ export async function isConnectedToPool(
     
     // Try to get member flow rate - if > 0, they're connected
     const flowRate = await poolContract.getMemberFlowRate(memberAddress);
-    return flowRate > 0n;
+    return flowRate > BigInt(0);
   } catch (error) {
     console.error('Error checking pool connection:', error);
     return false;
@@ -171,7 +171,7 @@ export async function isConnectedToPool(
  * Returns the amount of tokens available to claim
  */
 export async function getClaimableAmount(
-  provider: ethers.Provider,
+  provider: ethers.providers.Provider,
   poolAddress: string,
   memberAddress: string
 ): Promise<bigint> {
@@ -185,7 +185,7 @@ export async function getClaimableAmount(
     return claimable;
   } catch (error) {
     console.error('Error getting claimable amount:', error);
-    return 0n;
+    return BigInt(0);
   }
 }
 
@@ -200,7 +200,7 @@ export async function batchConnectToPool(
 ): Promise<PoolConnectionResult[]> {
   const results: PoolConnectionResult[] = [];
 
-  for (const memberAddress of memberAddresses) {
+  for (const _memberAddress of memberAddresses) {
     // Each member needs to connect themselves (can't connect others)
     // So this would need to be called by each member
     // For now, return instructions

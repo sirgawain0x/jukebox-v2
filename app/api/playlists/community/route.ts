@@ -11,7 +11,7 @@ type CommunityPlaylist = {
 };
 
 // GET - List all community playlists
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   if (!redis) {
     return NextResponse.json(
       { error: 'Redis not available' },
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     // Fetch all playlists
     const playlistData = await Promise.all(
       keys.map(async (key) => {
-        const data = await redis.get<CommunityPlaylist>(key);
+        const data = await redis!.get<CommunityPlaylist>(key);
         return data;
       })
     );
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
       createdAt: Date.now(),
     };
 
-    await redis.set(`playlist:community:${playlistId}`, playlist);
+    await redis!.set(`playlist:community:${playlistId}`, playlist);
 
     return NextResponse.json({ playlist });
   } catch (error) {

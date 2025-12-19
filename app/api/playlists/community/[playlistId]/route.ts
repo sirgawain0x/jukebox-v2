@@ -12,7 +12,7 @@ type CommunityPlaylist = {
 // GET - Get a specific playlist
 export async function GET(
   request: NextRequest,
-  { params }: { params: { playlistId: string } }
+  { params }: { params: Promise<{ playlistId: string }> }
 ) {
   if (!redis) {
     return NextResponse.json(
@@ -22,8 +22,9 @@ export async function GET(
   }
 
   try {
+    const { playlistId } = await params;
     const playlist = await redis.get<CommunityPlaylist>(
-      `playlist:community:${params.playlistId}`
+      `playlist:community:${playlistId}`
     );
 
     if (!playlist) {
@@ -46,7 +47,7 @@ export async function GET(
 // PATCH - Update a playlist (add/remove songs, rename)
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { playlistId: string } }
+  { params }: { params: Promise<{ playlistId: string }> }
 ) {
   if (!redis) {
     return NextResponse.json(
@@ -56,9 +57,10 @@ export async function PATCH(
   }
 
   try {
+    const { playlistId } = await params;
     const body = await request.json();
     const playlist = await redis.get<CommunityPlaylist>(
-      `playlist:community:${params.playlistId}`
+      `playlist:community:${playlistId}`
     );
 
     if (!playlist) {
@@ -77,7 +79,7 @@ export async function PATCH(
       playlist.songIds = body.songIds;
     }
 
-    await redis.set(`playlist:community:${params.playlistId}`, playlist);
+    await redis.set(`playlist:community:${playlistId}`, playlist);
 
     return NextResponse.json({ playlist });
   } catch (error) {
@@ -92,7 +94,7 @@ export async function PATCH(
 // DELETE - Delete a playlist
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { playlistId: string } }
+  { params }: { params: Promise<{ playlistId: string }> }
 ) {
   if (!redis) {
     return NextResponse.json(
@@ -102,7 +104,8 @@ export async function DELETE(
   }
 
   try {
-    await redis.del(`playlist:community:${params.playlistId}`);
+    const { playlistId } = await params;
+    await redis.del(`playlist:community:${playlistId}`);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting playlist:', error);

@@ -57,6 +57,7 @@ export function PlayToEarn() {
     songsPlayed: 0,
     songsNeeded: 10,
     rewardAmount: undefined as string | undefined,
+    rewardType: 'USDC' as const,
   });
   const [loading, setLoading] = useState(true);
   const [claiming, setClaiming] = useState(false);

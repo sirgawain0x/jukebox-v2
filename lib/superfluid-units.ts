@@ -1,7 +1,7 @@
 // Superfluid units calculation and management
 // Calculates artist units based on verified play counts
 
-import { calculateVerifiedPlays, type PlayRateData } from './superfluid-play-oracle';
+import { calculateVerifiedPlays } from './superfluid-play-oracle';
 import { updateMemberUnits, getMemberUnits } from './superfluid-pool';
 
 export interface UnitUpdate {
@@ -106,7 +106,7 @@ export async function updateUnitsForMarket(
 export async function shouldUpdateUnits(
   trackId: string,
   artistAddress: string,
-  minIntervalSeconds: number = 300 // 5 minutes default
+  _minIntervalSeconds: number = 300 // 5 minutes default
 ): Promise<boolean> {
   // This would check last update time from Redis
   // For now, always return true (can be enhanced with caching)
@@ -120,7 +120,7 @@ export async function getTotalPoolUnits(marketId: number): Promise<bigint> {
   const { getPoolMembers } = await import('./superfluid-pool');
   const members = await getPoolMembers(marketId);
   
-  let total = 0n;
+  let total = BigInt(0);
   members.forEach((units) => {
     total += units;
   });
@@ -138,11 +138,11 @@ export async function calculateArtistShare(
   const artistUnits = await getArtistUnits(marketId, artistAddress);
   const totalUnits = await getTotalPoolUnits(marketId);
   
-  if (totalUnits === 0n) {
+  if (totalUnits === BigInt(0)) {
     return 0;
   }
   
   // Return as percentage (0-100)
-  return Number((artistUnits * 10000n) / totalUnits) / 100;
+  return Number((artistUnits * BigInt(10000)) / totalUnits) / 100;
 }
 

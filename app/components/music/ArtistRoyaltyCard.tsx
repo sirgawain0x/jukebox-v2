@@ -28,7 +28,7 @@ interface ArtistRoyaltyCardProps {
 }
 
 export function ArtistRoyaltyCard({ artistAddress, artistName }: ArtistRoyaltyCardProps) {
-  const { address } = useAccount();
+  useAccount();
   const [data, setData] = useState<ArtistRoyaltyData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

@@ -26,7 +26,7 @@ export interface PoolValidationResult {
  * Validate pool address and get super token
  */
 export async function validatePool(
-  provider: ethers.Provider,
+  provider: ethers.providers.Provider,
   poolAddress: string
 ): Promise<{ isValid: boolean; superTokenAddress?: string; error?: string }> {
   try {
@@ -49,7 +49,7 @@ export async function validatePool(
  * Check user's balance of super token
  */
 export async function checkSuperTokenBalance(
-  provider: ethers.Provider,
+  provider: ethers.providers.Provider,
   superTokenAddress: string,
   userAddress: string
 ): Promise<{ balance: bigint; balanceFormatted: string; decimals: number }> {
@@ -66,7 +66,7 @@ export async function checkSuperTokenBalance(
       tokenContract.symbol(),
     ]);
 
-    const balanceFormatted = ethers.formatUnits(balance, decimals);
+    const balanceFormatted = ethers.utils.formatUnits(balance, decimals);
 
     return {
       balance,
@@ -84,7 +84,7 @@ export async function checkSuperTokenBalance(
  * Validate pool and check user balance
  */
 export async function validatePoolAndBalance(
-  provider: ethers.Provider,
+  provider: ethers.providers.Provider,
   poolAddress: string,
   userAddress: string
 ): Promise<PoolValidationResult> {

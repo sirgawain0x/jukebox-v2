@@ -2,7 +2,7 @@
 // Awards USDC for daily listening goals (ETH used for tipping, not rewards)
 
 import { isEligibleForRewards, getDailyStats } from './session-tracking';
-import { formatUSDC, parseUSDC } from './usdc-utils';
+import { parseUSDC } from './usdc-utils';
 
 export type RewardEligibility = {
   eligible: boolean;

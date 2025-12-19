@@ -145,7 +145,8 @@ const GDA_FORWARDER_ABI = [
   },
 ] as const;
 
-// Super Token ABI (minimal)
+// Super Token ABI (minimal) - kept for reference but not currently used
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const SUPER_TOKEN_ABI = [
   {
     inputs: [{ internalType: 'uint256', name: 'amount', type: 'uint256' }],
@@ -209,7 +210,7 @@ export function createUpgradeOperation(
   superTokenAddress: string,
   amount: bigint
 ): BatchOperation {
-  const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+  const abiCoder = ethers.utils.defaultAbiCoder;
   return {
     operationType: OPERATION_TYPE.SUPERTOKEN_UPGRADE,
     target: superTokenAddress,
@@ -228,7 +229,7 @@ export function createFlowOperation(
   flowRate: bigint
 ): BatchOperation {
   // Encode CFA createFlow call
-  const cfaInterface = new ethers.Interface(CFA_FORWARDER_ABI);
+  const cfaInterface = new ethers.utils.Interface(CFA_FORWARDER_ABI);
   const callData = cfaInterface.encodeFunctionData('createFlow', [
     superTokenAddress,
     senderAddress,
@@ -237,7 +238,7 @@ export function createFlowOperation(
     '0x',
   ]);
 
-  const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+  const abiCoder = ethers.utils.defaultAbiCoder;
   return {
     operationType: OPERATION_TYPE.SUPERFLUID_CALL_AGREEMENT,
     target: cfaForwarderAddress,
@@ -258,7 +259,7 @@ export function createUpdateFlowOperation(
   receiverAddress: string,
   flowRate: bigint
 ): BatchOperation {
-  const cfaInterface = new ethers.Interface(CFA_FORWARDER_ABI);
+  const cfaInterface = new ethers.utils.Interface(CFA_FORWARDER_ABI);
   const callData = cfaInterface.encodeFunctionData('updateFlow', [
     superTokenAddress,
     senderAddress,
@@ -267,7 +268,7 @@ export function createUpdateFlowOperation(
     '0x',
   ]);
 
-  const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+  const abiCoder = ethers.utils.defaultAbiCoder;
   return {
     operationType: OPERATION_TYPE.SUPERFLUID_CALL_AGREEMENT,
     target: cfaForwarderAddress,
@@ -287,7 +288,7 @@ export function createDeleteFlowOperation(
   senderAddress: string,
   receiverAddress: string
 ): BatchOperation {
-  const cfaInterface = new ethers.Interface(CFA_FORWARDER_ABI);
+  const cfaInterface = new ethers.utils.Interface(CFA_FORWARDER_ABI);
   const callData = cfaInterface.encodeFunctionData('deleteFlow', [
     superTokenAddress,
     senderAddress,
@@ -295,7 +296,7 @@ export function createDeleteFlowOperation(
     '0x',
   ]);
 
-  const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+  const abiCoder = ethers.utils.defaultAbiCoder;
   return {
     operationType: OPERATION_TYPE.SUPERFLUID_CALL_AGREEMENT,
     target: cfaForwarderAddress,
@@ -313,7 +314,7 @@ export function createDowngradeOperation(
   superTokenAddress: string,
   amount: bigint
 ): BatchOperation {
-  const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+  const abiCoder = ethers.utils.defaultAbiCoder;
   return {
     operationType: OPERATION_TYPE.SUPERTOKEN_DOWNGRADE,
     target: superTokenAddress,
@@ -328,7 +329,7 @@ export function createUpdateMemberUnitsOperation(
   poolAddress: string,
   recipients: Array<{ address: string; units: bigint }>
 ): BatchOperation {
-  const gdaInterface = new ethers.Interface(GDA_FORWARDER_ABI);
+  const gdaInterface = new ethers.utils.Interface(GDA_FORWARDER_ABI);
   const receivers = recipients.map((r) => r.address);
   const units = recipients.map((r) => BigInt(r.units));
 
@@ -338,7 +339,7 @@ export function createUpdateMemberUnitsOperation(
     units,
   ]);
 
-  const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+  const abiCoder = ethers.utils.defaultAbiCoder;
   return {
     operationType: OPERATION_TYPE.SUPERFLUID_CALL_AGREEMENT,
     target: GDA_FORWARDER_ADDRESS,
@@ -358,7 +359,7 @@ export function createDistributeFlowOperation(
   poolAddress: string,
   flowRate: bigint
 ): BatchOperation {
-  const gdaInterface = new ethers.Interface(GDA_FORWARDER_ABI);
+  const gdaInterface = new ethers.utils.Interface(GDA_FORWARDER_ABI);
   const callData = gdaInterface.encodeFunctionData('distributeFlow', [
     superTokenAddress,
     senderAddress,
@@ -367,7 +368,7 @@ export function createDistributeFlowOperation(
     '0x',
   ]);
 
-  const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+  const abiCoder = ethers.utils.defaultAbiCoder;
   return {
     operationType: OPERATION_TYPE.SUPERFLUID_CALL_AGREEMENT,
     target: GDA_FORWARDER_ADDRESS,
@@ -389,14 +390,14 @@ export function createPoolOperation(
     distributionFromAnyAddress: boolean;
   }
 ): BatchOperation {
-  const gdaInterface = new ethers.Interface(GDA_FORWARDER_ABI);
+  const gdaInterface = new ethers.utils.Interface(GDA_FORWARDER_ABI);
   const callData = gdaInterface.encodeFunctionData('createPool', [
     superTokenAddress,
     adminAddress,
     [config.transferabilityForUnitsOwner, config.distributionFromAnyAddress],
   ]);
 
-  const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+  const abiCoder = ethers.utils.defaultAbiCoder;
   return {
     operationType: OPERATION_TYPE.SUPERFLUID_CALL_AGREEMENT,
     target: GDA_FORWARDER_ADDRESS,
@@ -416,7 +417,7 @@ export function createDistributeOperation(
   poolAddress: string,
   amount: bigint
 ): BatchOperation {
-  const gdaInterface = new ethers.Interface(GDA_FORWARDER_ABI);
+  const gdaInterface = new ethers.utils.Interface(GDA_FORWARDER_ABI);
   const callData = gdaInterface.encodeFunctionData('distribute', [
     superTokenAddress,
     senderAddress,
@@ -425,7 +426,7 @@ export function createDistributeOperation(
     '0x',
   ]);
 
-  const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+  const abiCoder = ethers.utils.defaultAbiCoder;
   return {
     operationType: OPERATION_TYPE.SUPERFLUID_CALL_AGREEMENT,
     target: GDA_FORWARDER_ADDRESS,
@@ -443,7 +444,7 @@ export async function executeBatchCall(
   signer: ethers.Signer,
   operations: BatchOperation[],
   chainId: number
-): Promise<ethers.ContractTransactionResponse> {
+): Promise<ethers.ContractTransaction> {
   const hostAddress = getHostAddress(chainId);
   const hostContract = new ethers.Contract(hostAddress, HOST_ABI, signer);
 
@@ -468,12 +469,12 @@ export async function batchUpgradeAndFlow(
   flowRatePerDay: string,
   chainId: number,
   decimals: number = 6
-): Promise<ethers.ContractTransactionResponse> {
+): Promise<ethers.ContractTransaction> {
   const senderAddress = await signer.getAddress();
   const cfaForwarderAddress = getCFAForwarderAddress(chainId);
 
   // Convert amounts
-  const upgradeAmount = ethers.parseUnits(amount, decimals);
+  const upgradeAmount = ethers.utils.parseUnits(amount, decimals).toBigInt();
   const flowRate = convertFlowRateToWeiPerSecond(flowRatePerDay, decimals, 'day');
   const flowRateInt96 = toInt96(flowRate);
 
@@ -500,7 +501,7 @@ export async function batchPoolUpdateAndFlow(
   signer: ethers.Signer,
   params: PoolBatchParams,
   chainId: number
-): Promise<ethers.ContractTransactionResponse> {
+): Promise<ethers.ContractTransaction> {
   const senderAddress = await signer.getAddress();
   const operations: BatchOperation[] = [];
 
@@ -540,7 +541,7 @@ export async function batchCreateFlows(
   flows: Array<{ receiver: string; flowRatePerDay: string }>,
   chainId: number,
   decimals: number = 6
-): Promise<ethers.ContractTransactionResponse> {
+): Promise<ethers.ContractTransaction> {
   const senderAddress = await signer.getAddress();
   const cfaForwarderAddress = getCFAForwarderAddress(chainId);
 
@@ -568,7 +569,7 @@ export async function batchCreateFlows(
  * Estimate gas for batch call
  */
 export async function estimateBatchCallGas(
-  provider: ethers.Provider,
+  provider: ethers.providers.Provider,
   operations: BatchOperation[],
   chainId: number,
   fromAddress: string
@@ -670,7 +671,7 @@ export async function batchUpdateFlows(
   flows: Array<{ receiver: string; flowRatePerDay: string }>,
   chainId: number,
   decimals: number = 6
-): Promise<ethers.ContractTransactionResponse> {
+): Promise<ethers.ContractTransaction> {
   const senderAddress = await signer.getAddress();
   const cfaForwarderAddress = getCFAForwarderAddress(chainId);
 
@@ -702,7 +703,7 @@ export async function batchDeleteFlows(
   superTokenAddress: string,
   receivers: string[],
   chainId: number
-): Promise<ethers.ContractTransactionResponse> {
+): Promise<ethers.ContractTransaction> {
   const senderAddress = await signer.getAddress();
   const cfaForwarderAddress = getCFAForwarderAddress(chainId);
 

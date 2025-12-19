@@ -2,7 +2,7 @@
 // Tracks consecutive correct predictions and awards rewards
 
 import { redis } from './redis';
-import { getPredictionStreak, updatePredictionStreak, qualifiesForStreakReward } from './session-tracking';
+import { getPredictionStreak, qualifiesForStreakReward } from './session-tracking';
 
 export type StreakReward = {
   type: 'NFT' | 'Token' | 'Badge';

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { storePool, getPool, getActivePools, deactivatePool } from '@/lib/superfluid-pool';
-import { validatePoolAndBalance } from '@/lib/superfluid-pool-validation';
 
 /**
  * GET /api/superfluid/pool

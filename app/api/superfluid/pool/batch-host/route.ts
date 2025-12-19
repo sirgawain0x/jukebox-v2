@@ -1,8 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  batchPoolUpdateAndFlow,
-  type PoolBatchParams,
-} from '@/lib/superfluid-batch-call';
 import { storePool, getPool } from '@/lib/superfluid-pool';
 
 /**
@@ -56,7 +52,7 @@ export async function POST(request: NextRequest) {
         poolAddress,
         tokenAddress: superTokenAddress,
         createdAt: Date.now(),
-        totalFlowRate: 0n,
+        totalFlowRate: BigInt(0),
         totalMembers: recipients.length,
         isActive: true,
       });
@@ -67,7 +63,7 @@ export async function POST(request: NextRequest) {
       success: true,
       batchParams: {
         poolAddress,
-        recipients: recipients.map((r: any) => ({
+        recipients: recipients.map((r: { address: string; units: string | number }) => ({
           address: r.address,
           units: r.units.toString(),
         })),

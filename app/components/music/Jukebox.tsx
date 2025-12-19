@@ -40,8 +40,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useFarcasterContext } from '@/app/utils/farcaster-context';
 import { SongShareMetaTags } from '../ui/SongShareMetaTags';
 import { Input } from '@/components/ui/input';
-import { getPlayCounts, getCachedPlayCount, setCachedPlayCount } from '@/lib/play-counts';
-import { getWebsiteTypeFromUrl } from '@/lib/spinamp-utils';
+import { getPlayCounts, setCachedPlayCount } from '@/lib/play-counts';
 import { EngagementMetrics } from './EngagementMetrics';
 // Note: Engagement events are recorded via API endpoints, not direct server function calls
 // Helper function to filter curated songs via API
@@ -513,7 +512,9 @@ export function Jukebox({
 
         if (result.errors) {
           console.error("GraphQL errors:", JSON.stringify(result.errors, null, 2));
-          const errorMessages = result.errors.map((err: any) => err.message || String(err)).join(", ");
+          const errorMessages = result.errors.map((err: { message?: string } | string) => 
+            typeof err === 'string' ? err : err.message || String(err)
+          ).join(", ");
           setError(`Failed to fetch tracks: ${errorMessages}`);
           return;
         }
@@ -639,7 +640,7 @@ export function Jukebox({
         clearTimeout(fetchTimeoutRef.current);
       }
     };
-  }, [sortBy, after, before, direction, searchQuery]);
+  }, [sortBy, after, before, direction, searchQuery, showCuratedOnly]);
 
   const calls = useMemo(() => {
     if (!selectedSong || !address) {

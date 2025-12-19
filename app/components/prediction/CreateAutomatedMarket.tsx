@@ -404,13 +404,13 @@ export function CreateAutomatedMarket() {
               </div>
               {endTime && (
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-(--app-foreground-muted)">Betting Closes:</span>
+                  <span className="text-(--app-foreground-muted)">Bets End:</span>
                   <span className="font-medium">{formatDate(endTime)}</span>
                 </div>
               )}
               {resolveTime && (
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-(--app-foreground-muted)">Resolution:</span>
+                  <span className="text-(--app-foreground-muted)">Resolves:</span>
                   <span className="font-medium">{formatDate(resolveTime)}</span>
                 </div>
               )}

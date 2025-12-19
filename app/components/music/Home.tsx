@@ -16,8 +16,8 @@ import { MyBets } from "../prediction/MyBets";
 import { MarketLeaderboard } from "../prediction/MarketLeaderboard";
 import { CreateAutomatedMarket } from "../prediction/CreateAutomatedMarket";
 import { AutomatedMarkets } from "../prediction/AutomatedMarkets";
-import { PlayToEarn } from "./PlayToEarn";
 import { CommunityPlaylists } from "./CommunityPlaylists";
+import { LiveRoyaltiesTicker } from "./LiveRoyaltiesTicker";
 
 type HomeProps = {
   setActiveTab: (tab: string) => void;
@@ -107,7 +107,7 @@ export function Home({ setActiveTab, initialSection = "music" }: HomeProps) {
       {activeSection === "music" && (
         <>
           <ErrorBoundary>
-            <PlayToEarn />
+            <LiveRoyaltiesTicker />
           </ErrorBoundary>
           <ErrorBoundary>
             <Jukebox

@@ -39,13 +39,15 @@ contract SpinampUSDC is FunctionsClient, AutomationCompatibleInterface, Confirme
 
     // The JavaScript Source (Updated to use Chainlink Functions APIs)
     // Fetches Title + Artist Address and encodes them.
+    // Note: artistByArtistId.id is in format "base/0x1234..." so we split to get the address
     string constant SOURCE = 
         "const q = `query T($f: Int!) { allTrendingTracks(first: $f) { edges { node { processedTrackByTrackId { title artistByArtistId { id } } } } } }`;"
         "const r = await Functions.makeHttpRequest({ url: 'https://api.spinamp.xyz/v3/graphql', method: 'POST', headers: {'Content-Type': 'application/json'}, data: { query: q, variables: { f: 1 } } });"
         "if (r.error) throw Error('Request failed');"
         "const n = r.data.data.allTrendingTracks.edges[0].node.processedTrackByTrackId;"
         "const t = n.title;"
-        "const a = n.artistByArtistId.id;"
+        "const artistId = n.artistByArtistId.id;"
+        "const a = artistId && artistId.includes('/') ? artistId.split('/')[1] : '0x0000000000000000000000000000000000000000';"
         "const e = ethers.utils.defaultAbiCoder.encode(['string', 'address'], [t, a]);"
         "return ethers.utils.arrayify(e);";
 

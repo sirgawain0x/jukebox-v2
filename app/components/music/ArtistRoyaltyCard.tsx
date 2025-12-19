@@ -60,7 +60,8 @@ export function ArtistRoyaltyCard({ artistAddress, artistName }: ArtistRoyaltyCa
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 10000); // Poll every 10 seconds
+    // Poll every 30 seconds (reduced from 10 seconds to save resources)
+    const interval = setInterval(fetchData, 30000);
 
     return () => {
       mounted = false;

@@ -10,7 +10,7 @@ import { formatUSDC } from "@/lib/usdc-utils";
 import {
   useClaimWinnings,
 } from "@/lib/contracts/automated-prediction-market-hooks";
-import { useActiveMarkets } from "@/app/hooks/usePredictionMarket";
+import { useActiveMarkets, useUserBets } from "@/app/hooks/usePredictionMarket";
 import { isAutomatedPredictionMarketDeployed } from "@/lib/contracts/automated-prediction-market";
 import type { PredictionMarket } from "@/types/prediction-market";
 
@@ -21,9 +21,22 @@ interface MarketItemProps {
 function MarketItem({
   market,
 }: MarketItemProps) {
-  const { isConnected } = useAccount();
+  const { isConnected, address } = useAccount();
   const { showToast } = useToast();
   const { claimWinnings, isPending: isClaimingPending } = useClaimWinnings();
+  const { data: userBetsData, isLoading: isLoadingUserBets } = useUserBets();
+  
+  // Check if user has unclaimed winning bets for this market
+  const userBets = userBetsData?.bets || [];
+  const marketId = market.marketIndex?.toString() || market.id.replace("market-", "");
+  const hasUnclaimedWinnings = userBets.some((bet) => {
+    const betMarketId = bet.marketId.replace("market-", "");
+    const isResolved = market.status === "RESOLVED";
+    const isWinningBet = bet.predictedTrack && market.songTitle && 
+      bet.predictedTrack.toLowerCase() === market.songTitle.toLowerCase();
+    const isUnclaimed = !bet.claimed;
+    return betMarketId === marketId && isResolved && isWinningBet && isUnclaimed;
+  });
 
   const formatDate = (timestamp: number) => {
     const date = new Date(timestamp * 1000);
@@ -144,7 +157,7 @@ function MarketItem({
         </div>
       )}
 
-      {isResolved && isConnected && (
+      {isResolved && isConnected && hasUnclaimedWinnings && (
         <div className="mt-3">
           <Button
             variant="primary"
@@ -155,6 +168,13 @@ function MarketItem({
           >
             {isClaimingPending ? "Claiming..." : "Claim Winnings"}
           </Button>
+        </div>
+      )}
+      {isResolved && isConnected && !hasUnclaimedWinnings && address && !isLoadingUserBets && (
+        <div className="mt-3 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs text-center text-gray-600 dark:text-gray-400">
+          {userBets.some(bet => bet.marketId.replace("market-", "") === marketId) 
+            ? "No winnings to claim" 
+            : "You didn't bet on this market"}
         </div>
       )}
     </div>

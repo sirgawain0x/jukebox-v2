@@ -16,6 +16,9 @@ import { MyBets } from "../prediction/MyBets";
 import { MarketLeaderboard } from "../prediction/MarketLeaderboard";
 import { CreateAutomatedMarket } from "../prediction/CreateAutomatedMarket";
 import { AutomatedMarkets } from "../prediction/AutomatedMarkets";
+import { PlayToEarn } from "./PlayToEarn";
+import { CuratedPlaylist } from "./CuratedPlaylist";
+import { CommunityPlaylists } from "./CommunityPlaylists";
 
 type HomeProps = {
   setActiveTab: (tab: string) => void;
@@ -104,13 +107,18 @@ export function Home({ setActiveTab, initialSection = "music" }: HomeProps) {
 
       {activeSection === "music" && (
         <>
-
+          <ErrorBoundary>
+            <PlayToEarn />
+          </ErrorBoundary>
           <ErrorBoundary>
             <Jukebox
               onSongTipped={handleSongTipped}
               setSelectedSong={setSelectedSong}
             // playlist={playlist} // Commented out - playlist functionality disabled
             />
+          </ErrorBoundary>
+          <ErrorBoundary>
+            <CommunityPlaylists />
           </ErrorBoundary>
           {/* <ErrorBoundary>
             <PlaylistSection onCreate={handlePlaylistCreate} created={!!playlist} />

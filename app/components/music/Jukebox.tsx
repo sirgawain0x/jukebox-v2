@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import { useAccount, useChainId } from "wagmi";
 import {
@@ -40,6 +40,32 @@ import { CSS } from '@dnd-kit/utilities';
 import { useFarcasterContext } from '@/app/utils/farcaster-context';
 import { SongShareMetaTags } from '../ui/SongShareMetaTags';
 import { Input } from '@/components/ui/input';
+import { getPlayCounts, getCachedPlayCount, setCachedPlayCount } from '@/lib/play-counts';
+import { getWebsiteTypeFromUrl } from '@/lib/spinamp-utils';
+import { EngagementMetrics } from './EngagementMetrics';
+import { recordShareEvent, recordTipEvent } from '@/lib/engagement-scoring';
+// Helper function to filter curated songs via API
+async function filterCuratedSongs(songs: Song[]): Promise<Song[]> {
+  try {
+    const response = await fetch('/api/curated/filter', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ songs }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to filter curated songs');
+    }
+
+    const data = await response.json();
+    return data.curatedSongs || [];
+  } catch (error) {
+    console.error('Error filtering curated songs:', error);
+    return [];
+  }
+}
 
 type JukeboxProps = {
   onSongTipped: (song: Song) => void;
@@ -61,6 +87,8 @@ export function Jukebox({
   const [sortBy, setSortBy] = useState("TRENDING");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchPage, setSearchPage] = useState(1); // Pagination for filtered search results
+  const [showCuratedOnly, setShowCuratedOnly] = useState(false);
+  const [curatedSongs, setCuratedSongs] = useState<Song[]>([]);
   const [after, setAfter] = useState<string | null>(null);
   const [before, setBefore] = useState<string | null>(null);
   const [direction, setDirection] = useState<"forward" | "backward">("forward");
@@ -94,6 +122,7 @@ export function Jukebox({
     {}
   );
   const [tipCount, setTipCount] = useState(0);
+  const playCountCache = useRef<Map<string, { count: number; timestamp: number }>>(new Map());
   // const [hasSeenPlaylistPrompt, setHasSeenPlaylistPrompt] = useState(false); // Commented out - playlist functionality disabled
   const errorHandledRef = useRef(false);
   const successHandledRef = useRef(false);
@@ -123,7 +152,7 @@ export function Jukebox({
   }, []);
 
   // Sharing functions with context-aware messages
-  const _handleShareSong = useCallback(() => {
+  const _handleShareSong = useCallback(async () => {
     if (!selectedSong) return;
 
     // Different message for trending vs browse
@@ -136,6 +165,10 @@ export function Jukebox({
       text: shareText,
       embeds: [window.location.href]
     });
+
+    // Track share event using external link utilities
+    const shareUrl = window.location.href;
+    await recordShareEvent(selectedSong.id, shareUrl);
   }, [selectedSong, composeCast, sortBy]);
 
   const handleShareTip = useCallback(() => {
@@ -146,7 +179,7 @@ export function Jukebox({
       embeds: [window.location.href]
     });
   }, [selectedSong, composeCast, minTipEth]);
-  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const sortOptions = [
     { label: "🔥 Trending", value: "TRENDING" },
@@ -164,6 +197,20 @@ export function Jukebox({
     }
   };
 
+  // Handle curated filter toggle
+  useEffect(() => {
+    if (showCuratedOnly && songs.length > 0) {
+      filterCuratedSongs(songs).then(curated => {
+        setCuratedSongs(curated);
+      }).catch(err => {
+        console.error('Error filtering curated songs:', err);
+        setCuratedSongs([]);
+      });
+    } else {
+      setCuratedSongs([]);
+    }
+  }, [showCuratedOnly, songs]);
+
   // Reset pagination when switching to Newest tab with search or when search query changes
   useEffect(() => {
     if (sortBy === "CREATED_AT_TIME_DESC") {
@@ -174,29 +221,35 @@ export function Jukebox({
     }
   }, [searchQuery, sortBy]);
 
-  // Filter songs based on search query (for Newest tab)
+  // Filter songs based on search query and curation (for Newest tab)
   const filteredSongs = useMemo(() => {
-    if (sortBy !== "CREATED_AT_TIME_DESC" || !searchQuery.trim()) {
-      return songs;
+    let result = songs;
+
+    // Apply curated filter if enabled
+    if (showCuratedOnly && curatedSongs.length > 0) {
+      result = curatedSongs;
     }
 
-    const query = searchQuery.toLowerCase().trim();
-    if (!query) {
-      return songs;
+    // Apply search filter (for Newest tab)
+    if (sortBy === "CREATED_AT_TIME_DESC" && searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      if (query) {
+        result = result.filter((song: Song) => {
+          const title = (song.title || "").toLowerCase();
+          const artist = (song.artist || "").toLowerCase();
+          const platform = (song.platformName || "").toLowerCase();
+
+          const titleMatch = title.includes(query);
+          const artistMatch = artist.includes(query);
+          const platformMatch = platform.includes(query);
+
+          return titleMatch || artistMatch || platformMatch;
+        });
+      }
     }
 
-    return songs.filter((song) => {
-      const title = (song.title || "").toLowerCase();
-      const artist = (song.artist || "").toLowerCase();
-      const platform = (song.platformName || "").toLowerCase();
-
-      const titleMatch = title.includes(query);
-      const artistMatch = artist.includes(query);
-      const platformMatch = platform.includes(query);
-
-      return titleMatch || artistMatch || platformMatch;
-    });
-  }, [songs, searchQuery, sortBy]);
+    return result;
+  }, [songs, searchQuery, sortBy, showCuratedOnly, curatedSongs]);
 
   // Paginate filtered search results (10 songs per page)
   const ITEMS_PER_PAGE = 10;
@@ -448,8 +501,9 @@ export function Jukebox({
         const result = await response.json();
 
         if (result.errors) {
-          console.error(result.errors);
-          setError("Failed to fetch tracks.");
+          console.error("GraphQL errors:", JSON.stringify(result.errors, null, 2));
+          const errorMessages = result.errors.map((err: any) => err.message || String(err)).join(", ");
+          setError(`Failed to fetch tracks: ${errorMessages}`);
           return;
         }
 
@@ -495,8 +549,72 @@ export function Jukebox({
           })
           .filter(Boolean) as Song[];
 
-        setSongs(mappedSongs);
-        setLoading(false);
+        // Fetch play counts and engagement scores for all songs
+        const trackIds = mappedSongs.map(s => s.id);
+        getPlayCounts(trackIds).then(async counts => {
+          // Fetch engagement data for each song
+          const { getEngagementData, calculateEngagementScore } = await import('@/lib/engagement-scoring');
+          
+          const updatedSongs = await Promise.all(
+            mappedSongs.map(async (song) => {
+              const count = counts.get(song.id) || 0;
+              // Cache the count
+              setCachedPlayCount(song.id, count, playCountCache.current);
+              
+              // Get engagement data
+              try {
+                const engagement = await getEngagementData(song.id);
+                const score = calculateEngagementScore({
+                  ...song,
+                  playCount: count,
+                  tipCount: engagement.tipCount,
+                  shareCount: engagement.shareCount,
+                  predictionCount: engagement.predictionCount,
+                });
+                
+                return {
+                  ...song,
+                  playCount: count,
+                  engagementScore: score,
+                  tipCount: engagement.tipCount,
+                  shareCount: engagement.shareCount,
+                  predictionCount: engagement.predictionCount,
+                };
+              } catch (err) {
+                console.error(`Error fetching engagement for ${song.id}:`, err);
+                return {
+                  ...song,
+                  playCount: count,
+                  engagementScore: 0,
+                };
+              }
+            })
+          );
+          
+          // Sort by engagement score if trending
+          if (sortBy === "TRENDING") {
+            updatedSongs.sort((a, b) => (b.engagementScore || 0) - (a.engagementScore || 0));
+          }
+          
+          setSongs(updatedSongs);
+          
+          // Filter curated songs if needed
+          if (showCuratedOnly) {
+            filterCuratedSongs(updatedSongs).then(curated => {
+              setCuratedSongs(curated);
+            }).catch(err => {
+              console.error('Error filtering curated songs:', err);
+            });
+          }
+          
+          // Set loading to false only after all async operations complete
+          setLoading(false);
+        }).catch(err => {
+          console.error('Failed to fetch play counts:', err);
+          setSongs(mappedSongs);
+          // Set loading to false even on error
+          setLoading(false);
+        });
       } catch (error) {
         console.error("Failed to load songs from Spinamp:", error);
         setError("Failed to load songs from Spinamp.");
@@ -607,11 +725,16 @@ export function Jukebox({
       //   }
       // }
 
+      // Record tip event for engagement scoring
+      if (selectedSong) {
+        await recordTipEvent(selectedSong.id, Number(minTipEth) / 1e18);
+      }
+
       onSongTipped(selectedSong);
       setHasTippedCurrentSong(true);
       handleShareTip();
     },
-    [selectedSong, onSongTipped, showToast, handleShareTip, tipCount] // Removed playlist, showInteractiveToast, hasSeenPlaylistPrompt from dependencies
+    [selectedSong, onSongTipped, showToast, handleShareTip, tipCount, minTipEth] // Removed playlist, showInteractiveToast, hasSeenPlaylistPrompt from dependencies
   );
 
   // Custom transaction handler for Farcaster and regular wallets
@@ -775,8 +898,8 @@ export function Jukebox({
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
-      const oldIndex = playQueue.findIndex((item) => item.id === active.id);
-      const newIndex = playQueue.findIndex((item) => item.id === over.id);
+      const oldIndex = playQueue.findIndex((item: Song) => item.id === active.id);
+      const newIndex = playQueue.findIndex((item: Song) => item.id === over.id);
 
       globalMusic.reorderQueue(oldIndex, newIndex);
     }
@@ -837,7 +960,7 @@ export function Jukebox({
         {/* Mobile reorder buttons - visible on mobile only */}
         <div className="flex flex-col mr-1 md:hidden">
           <button
-            onClick={(e) => {
+            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
               e.stopPropagation();
               handleMoveUp(index);
             }}
@@ -860,7 +983,7 @@ export function Jukebox({
             </svg>
           </button>
           <button
-            onClick={(e) => {
+            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
               e.stopPropagation();
               handleMoveDown(index);
             }}
@@ -895,7 +1018,7 @@ export function Jukebox({
             height={32}
             className="w-8 h-8 rounded object-cover ml-2"
             unoptimized
-            onError={(e) => {
+            onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
               e.currentTarget.style.display = 'none';
             }}
           />
@@ -911,7 +1034,7 @@ export function Jukebox({
             <Icon name="music" className="text-[#0052ff]" />
           )}
           <button
-            onClick={(e) => {
+            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
               e.stopPropagation();
               handleRemoveFromQueue(song, index);
             }}
@@ -938,7 +1061,7 @@ export function Jukebox({
       )}
       <div className="space-y-4">
         {/* Debug info for Farcaster context */}
-        {process.env.NODE_ENV === 'development' && (
+        {typeof window !== 'undefined' && (process as { env?: { NODE_ENV?: string } })?.env?.NODE_ENV === 'development' && (
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs">
             <div className="font-medium text-blue-800 mb-2">🔧 Debug Info:</div>
             <div className="space-y-1 text-blue-700">
@@ -952,15 +1075,21 @@ export function Jukebox({
           </div>
         )}
         <div className="space-y-3">
-          <div className="flex items-center gap-4">
-            {/* <div className="text-sm font-medium text-(--app-foreground-muted)">
-              Sort by:
-            </div> */}
+          <div className="flex items-center justify-between gap-4">
             <Pills
               options={sortOptions}
               value={sortBy}
               onChange={handleSortChange}
             />
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showCuratedOnly}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShowCuratedOnly(e.target.checked)}
+                className="rounded cursor-pointer"
+              />
+              <span className="text-xs text-[var(--app-foreground-muted)]">Curated</span>
+            </label>
           </div>
           {sortBy === "CREATED_AT_TIME_DESC" && (
             <div className="relative">
@@ -968,7 +1097,7 @@ export function Jukebox({
                 type="text"
                 placeholder="Search songs by title, artist, or platform..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4"
                 aria-label="Search songs"
               />
@@ -1007,7 +1136,7 @@ export function Jukebox({
               </div>
             )}
             <div className="grid grid-cols-1 gap-4">
-              {(sortBy === "CREATED_AT_TIME_DESC" && searchQuery.trim() ? paginatedFilteredSongs : filteredSongs).map((song) => (
+              {(sortBy === "CREATED_AT_TIME_DESC" && searchQuery.trim() ? paginatedFilteredSongs : filteredSongs).map((song: Song) => (
                 <div
                   key={song.id}
                   className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all ${selectedSong?.id === song.id
@@ -1025,7 +1154,7 @@ export function Jukebox({
                       className="w-12 h-12 rounded-lg object-cover mr-4"
                       unoptimized
                       onError={() =>
-                        setFailedImages((prev) => ({
+                        setFailedImages((prev: { [id: string]: boolean }) => ({
                           ...prev,
                           [song.id]: true,
                         }))
@@ -1053,6 +1182,16 @@ export function Jukebox({
                           {song.platformName}
                         </span>
                       )}
+                      {typeof song.playCount === 'number' && song.playCount > 0 && (
+                        <span className="text-xs text-(--app-foreground-muted) flex items-center gap-1 shrink-0">
+                          <span>🔥</span>
+                          <span>
+                            {song.playCount >= 1000
+                              ? `${(song.playCount / 1000).toFixed(1)}k`
+                              : song.playCount}
+                          </span>
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
@@ -1066,21 +1205,21 @@ export function Jukebox({
                     )}
                     {/* Quick share button - context-aware messaging */}
                     {isMiniapp && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // Different message for trending vs browse
-                          const isTrending = sortBy === "TRENDING";
-                          const shareText = isTrending
-                            ? `🔥 This track "${song.title}" by ${song.artist} is trending on Jukebox! Currently on the trending list 🎵`
-                            : `🎵 Found "${song.title}" by ${song.artist} while browsing new music on Jukebox! Discover amazing tracks 🎶`;
+                    <button
+                      onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                        e.stopPropagation();
+                        // Different message for trending vs browse
+                        const isTrending = sortBy === "TRENDING";
+                        const shareText = isTrending
+                          ? `🔥 This track "${song.title}" by ${song.artist} is trending on Jukebox! Currently on the trending list 🎵`
+                          : `🎵 Found "${song.title}" by ${song.artist} while browsing new music on Jukebox! Discover amazing tracks 🎶`;
 
-                          composeCast({
-                            text: shareText,
-                            embeds: [window.location.href]
-                          });
-                          showToast(`Shared "${song.title}" to Farcaster!`);
-                        }}
+                        composeCast({
+                          text: shareText,
+                          embeds: [window.location.href]
+                        });
+                        showToast(`Shared "${song.title}" to Farcaster!`);
+                      }}
                         className="p-1 hover:bg-blue-100 rounded transition-all duration-200 cursor-pointer hover:scale-110"
                         title={sortBy === "TRENDING" ? "Share trending track" : "Share discovered track"}
                         aria-label={`Share ${song.title} to Farcaster`}
@@ -1089,12 +1228,12 @@ export function Jukebox({
                       </button>
                     )}
                     <button
-                      onClick={(e) => {
+                      onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                         e.stopPropagation();
-                        const isInQueue = playQueue.some(queueSong => queueSong.id === song.id);
+                        const isInQueue = playQueue.some((queueSong: Song) => queueSong.id === song.id);
                         if (isInQueue) {
                           // Remove from queue - find the index
-                          const index = playQueue.findIndex(queueSong => queueSong.id === song.id);
+                          const index = playQueue.findIndex((queueSong: Song) => queueSong.id === song.id);
                           if (index >= 0) {
                             globalMusic.removeFromQueue(song.id, index);
                             showToast(`Removed "${song.title}" from queue`);
@@ -1106,11 +1245,11 @@ export function Jukebox({
                         }
                       }}
                       className="p-1 hover:bg-(--app-card-border) rounded transition-all duration-200 cursor-pointer hover:scale-150"
-                      title={playQueue.some(queueSong => queueSong.id === song.id) ? "Remove from queue" : "Add to queue"}
-                      aria-label={playQueue.some(queueSong => queueSong.id === song.id) ? `Remove ${song.title} from queue` : `Add ${song.title} to queue`}
+                      title={playQueue.some((queueSong: Song) => queueSong.id === song.id) ? "Remove from queue" : "Add to queue"}
+                      aria-label={playQueue.some((queueSong: Song) => queueSong.id === song.id) ? `Remove ${song.title} from queue` : `Add ${song.title} to queue`}
                     >
                       <Icon
-                        name={playQueue.some(queueSong => queueSong.id === song.id) ? "check" : "plus"}
+                        name={playQueue.some((queueSong: Song) => queueSong.id === song.id) ? "check" : "plus"}
                         size="sm"
                       />
                     </button>
@@ -1124,7 +1263,7 @@ export function Jukebox({
                 <button
                   className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-800 text-(--app-foreground-muted) dark:text-gray-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 dark:hover:bg-gray-700"
                   onClick={() => {
-                    setSearchPage((prev) => Math.max(1, prev - 1));
+                    setSearchPage((prev: number) => Math.max(1, prev - 1));
                   }}
                   disabled={searchPage === 1 || loading}
                   aria-label="Previous page"
@@ -1137,7 +1276,7 @@ export function Jukebox({
                 <button
                   className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-800 text-(--app-foreground-muted) dark:text-gray-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 dark:hover:bg-gray-700"
                   onClick={() => {
-                    setSearchPage((prev) => Math.min(totalSearchPages, prev + 1));
+                    setSearchPage((prev: number) => Math.min(totalSearchPages, prev + 1));
                   }}
                   disabled={searchPage >= totalSearchPages || loading}
                   aria-label="Next page"
@@ -1189,7 +1328,7 @@ export function Jukebox({
                     className="w-16 h-16 rounded-lg object-cover"
                     unoptimized
                     onError={() =>
-                      setFailedImages((prev) => ({
+                      setFailedImages((prev: { [id: string]: boolean }) => ({
                         ...prev,
                         [selectedSong.id]: true,
                       }))
@@ -1398,6 +1537,11 @@ export function Jukebox({
                   {hasTippedCurrentSong ? "Share My Tip" : "Tip First to Share"}
                 </button>
               )}
+
+              {/* Engagement Metrics */}
+              <div className="mt-4 pt-4 border-t border-white/20">
+                <EngagementMetrics song={selectedSong} />
+              </div>
             </div>
           </div>
         )}
@@ -1418,7 +1562,7 @@ export function Jukebox({
                   <input
                     type="checkbox"
                     checked={isAutoPlayEnabled}
-                    onChange={(e) => globalMusic.setAutoPlayEnabled(e.target.checked)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => globalMusic.setAutoPlayEnabled(e.target.checked)}
                     className="rounded cursor-pointer"
                   />
                   Auto-play next
@@ -1441,11 +1585,11 @@ export function Jukebox({
               onDragEnd={handleDragEnd}
             >
               <SortableContext
-                items={playQueue.map(song => song.id)}
+                items={playQueue.map((song: Song) => song.id)}
                 strategy={verticalListSortingStrategy}
               >
                 <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {playQueue.map((song, index) => (
+                  {playQueue.map((song: Song, index: number) => (
                     <SortableQueueItem
                       key={song.id}
                       song={song}

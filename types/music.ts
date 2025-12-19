@@ -7,6 +7,19 @@ export type Song = {
   audioUrl: string;
   playCount: number | bigint;
   platformName?: string;
+  // Engagement metrics
+  engagementScore?: number;
+  tipCount?: number;
+  shareCount?: number;
+  predictionCount?: number;
+  // Social links
+  socialLinks?: Array<{
+    type: string;
+    url: string;
+  }>;
+  // Curation
+  isCurated?: boolean;
+  verified?: boolean;
 };
 
 export type Playlist = {

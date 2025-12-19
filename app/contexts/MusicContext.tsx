@@ -1,6 +1,17 @@
 "use client";
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback, ReactNode } from 'react';
 import { Song } from '@/types/music';
+import {
+  createPlayTrackingState,
+  startPlayTracking,
+  updatePlayProgress,
+  pausePlayTracking,
+  endPlayTracking,
+  reportPlayEvent,
+  resetIfExpired,
+  type PlayTrackingState,
+} from '@/lib/play-tracking';
+import { useAccount } from 'wagmi';
 
 interface MusicContextType {
   // Player state
@@ -55,6 +66,20 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const [previousVolume, setPreviousVolume] = useState(1);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const playTrackingStateRef = useRef<PlayTrackingState>(createPlayTrackingState());
+  const timeUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const selectedSongRef = useRef<Song | null>(null);
+  const addressRef = useRef<string | undefined>(undefined);
+  const { address } = useAccount();
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    selectedSongRef.current = selectedSong;
+  }, [selectedSong]);
+
+  useEffect(() => {
+    addressRef.current = address;
+  }, [address]);
 
   // Initialize audio element
   useEffect(() => {
@@ -62,36 +87,72 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       audioRef.current = new Audio();
       audioRef.current.preload = 'auto';
       audioRef.current.volume = 1; // Default volume
-      
-      // Set up event listeners
-      const audio = audioRef.current;
-      const handlePlay = () => setIsPlaying(true);
-      const handlePause = () => setIsPlaying(false);
-      const handleEnded = () => {
-        setIsPlaying(false);
-      };
-      const handleLoadStart = () => setAudioLoading(true);
-      const handleCanPlay = () => setAudioLoading(false);
-      const handleError = () => setAudioLoading(false);
-
-      audio.addEventListener('play', handlePlay);
-      audio.addEventListener('pause', handlePause);
-      audio.addEventListener('ended', handleEnded);
-      audio.addEventListener('loadstart', handleLoadStart);
-      audio.addEventListener('canplay', handleCanPlay);
-      audio.addEventListener('error', handleError);
-
-      return () => {
-        audio.removeEventListener('play', handlePlay);
-        audio.removeEventListener('pause', handlePause);
-        audio.removeEventListener('ended', handleEnded);
-        audio.removeEventListener('loadstart', handleLoadStart);
-        audio.removeEventListener('canplay', handleCanPlay);
-        audio.removeEventListener('error', handleError);
-        audio.pause();
-      };
     }
   }, []);
+
+  // Set up event listeners (only once, using refs for latest values)
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const handlePlay = () => {
+      setIsPlaying(true);
+      // Start play tracking - use ref to get latest value
+      const currentSong = selectedSongRef.current;
+      if (currentSong) {
+        playTrackingStateRef.current = startPlayTracking(
+          resetIfExpired(playTrackingStateRef.current),
+          currentSong.id
+        );
+      }
+    };
+    
+    const handlePause = () => {
+      setIsPlaying(false);
+      // Pause play tracking
+      playTrackingStateRef.current = pausePlayTracking(playTrackingStateRef.current);
+    };
+    
+    const handleEnded = async () => {
+      setIsPlaying(false);
+      // End play tracking and report - use refs to get latest values
+      const currentSong = selectedSongRef.current;
+      const currentAddress = addressRef.current;
+      if (currentSong) {
+        const currentState = playTrackingStateRef.current;
+        const finalEvent = endPlayTracking(currentState);
+        
+        // Only report if we haven't already reported a qualified play for this song
+        // This prevents double-counting when the 30s threshold was already reached in handleTimeUpdate
+        if (finalEvent && finalEvent.duration >= 30 && !currentState.qualifiedPlayReported) {
+          finalEvent.userId = currentAddress || null;
+          // Report play event (daily session is updated in the API route)
+          await reportPlayEvent(finalEvent, currentAddress || null);
+        }
+        playTrackingStateRef.current = createPlayTrackingState();
+      }
+    };
+    
+    const handleLoadStart = () => setAudioLoading(true);
+    const handleCanPlay = () => setAudioLoading(false);
+    const handleError = () => setAudioLoading(false);
+
+    audio.addEventListener('play', handlePlay);
+    audio.addEventListener('pause', handlePause);
+    audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('loadstart', handleLoadStart);
+    audio.addEventListener('canplay', handleCanPlay);
+    audio.addEventListener('error', handleError);
+
+    return () => {
+      audio.removeEventListener('play', handlePlay);
+      audio.removeEventListener('pause', handlePause);
+      audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('loadstart', handleLoadStart);
+      audio.removeEventListener('canplay', handleCanPlay);
+      audio.removeEventListener('error', handleError);
+    };
+  }, []); // Empty deps - listeners only set up once, refs provide latest values
 
   // Sync volume with audio element
   useEffect(() => {
@@ -99,6 +160,61 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       audioRef.current.volume = volume;
     }
   }, [volume]);
+
+  // Track play progress and report qualified plays
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !selectedSong) {
+      return;
+    }
+
+    // Reset tracking state when song changes
+    playTrackingStateRef.current = startPlayTracking(
+      createPlayTrackingState(),
+      selectedSong.id
+    );
+
+    // Set up timeupdate listener for play tracking
+    const handleTimeUpdate = async () => {
+      if (!isPlaying || !selectedSong) {
+        return;
+      }
+
+      const currentTime = audio.currentTime;
+      const { state: newState, shouldReport } = updatePlayProgress(
+        playTrackingStateRef.current,
+        currentTime
+      );
+
+      playTrackingStateRef.current = newState;
+
+      // Report qualified play if threshold reached
+      // Note: We don't update daily session here to avoid double-counting
+      // Daily session is updated in handleEnded when the song finishes
+      if (shouldReport) {
+        const event = {
+          trackId: selectedSong.id,
+          userId: address || null,
+          duration: newState.totalPlayed,
+          timestamp: Date.now(),
+          sessionId: newState.sessionId,
+          state: 'pending' as const,
+        };
+        await reportPlayEvent(event, address || null);
+      }
+    };
+
+    // Check every 5 seconds for qualified plays
+    timeUpdateIntervalRef.current = setInterval(handleTimeUpdate, 5000);
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+
+    return () => {
+      if (timeUpdateIntervalRef.current) {
+        clearInterval(timeUpdateIntervalRef.current);
+      }
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+    };
+  }, [selectedSong, isPlaying, address]);
 
   // Auto-play next song when current song ends
   useEffect(() => {

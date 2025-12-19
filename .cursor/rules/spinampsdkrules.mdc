@@ -1,0 +1,462 @@
+---
+description: Spinamp-SDK is a javascript client sdk for the growing web3 music ecosystem.
+alwaysApply: false
+---
+# About
+
+### @spinamp/spinamp-sdk
+
+Spinamp-SDK is a javascript client sdk for the growing web3 music ecosystem. It provides access to Spinamp's Spindexer API, which includes music nft activity, music content and metadata, including:
+
+* Music NFT mints, transfers (sales/bids coming soon)
+* Artist data and profiles, which are aggregated across all their cross-platform activity into cohesive, discographic views.
+* Track data and metadata, including optimized audio and images with a fast CDN for great UX
+
+Additionally, it has early support for the Playlisting API for viewing and creating users playlists
+
+# Installation
+
+Package can be installed using `yarn` or `npm`:
+
+{% tabs %}
+{% tab title="yarn" %}
+
+```
+yarn add @spinamp/spinamp-sdk
+```
+
+{% endtab %}
+
+{% tab title="npm" %}
+
+```
+npm i @spinamp/spinamp-sdk
+```
+
+{% endtab %}
+{% endtabs %}
+
+# Usage
+
+#### Usage
+
+To use any function (or type) from the SDK just simply use named imports:
+
+```
+import {fetchTrackBySlug, ITrack} from '@spinamp/spinamp-sdk';
+
+fetchTrackBySlug('loaded').then((track: ITrack | null) => {
+    console.log(track);
+});
+```
+
+The SDK pulls artist, track, nft and metadata from the Spindex API. You can explore this API using the GraphQL playground as well: <https://spindex-api.spinamp.xyz/graphiql>
+
+It's worth taking a few minutes to get familiar with this, as it help make using the SDK a lot more intuitive.
+
+**Querying for Artists , Tracks**
+
+Each list query accepts a [IApiListQueryParams](https://spinamp.gitbook.io/spinamp-sdk/reference/api-reference/types#iapilistqueryparams) which is used for pagination, sorting and filtering. The exact shape of the `filter` and `orderBy` params depends on the query - you can use the [GraphQL playground](https://spindex-api.spinamp.xyz/graphiql) to discover how the params should look.
+
+To query for artists, see the [Artists](https://spinamp.gitbook.io/spinamp-sdk/reference/api-reference/artists) API Reference.
+
+To query for tracks, see [Tracks](https://spinamp.gitbook.io/spinamp-sdk/reference/api-reference/tracks) API Reference.
+
+Run through the API Reference section for further query examples.
+
+**NFTs**
+
+To query for tracks from a collector's collection, see [Collection](https://spinamp.gitbook.io/spinamp-sdk/reference/api-reference/collection) API Reference.
+
+Queries specifically for NFTs and transfer activity are still in progress, but they're already available from the underlying API and you can explore the [GraphQL playground](https://spindex-api.spinamp.xyz/graphiql) meanwhile to see how to query them.
+
+**Playlists**
+
+Playlists come from a separate API that is not part of the Spindexer. This is because they are not indexed on-chain - they're part of Spinamp's own stack. Playlists are created and controlled by users via their Ethereum address.
+
+For querying playlists, see the Playlists API Reference.
+
+APIs for updating playlists are coming soon - they'll require an ethereum signer from a connected user in order to sign their updates.
+
+#### Custom Initialization (optional)
+
+By default, spinamp-sdk works on predefined config values and it doesn't require initialization. However, it is possible to override specific properties of [**IConfig**](https://spinamp.gitbook.io/spinamp-sdk/reference/api-reference/types#iconfig) by calling `initialize` method before using sdk functions.
+
+```
+import {initialize} from '@spinamp/spinamp-sdk';
+
+initialize({
+    SPINDEX_NODE_URL: 'https://spindex-api.spinamp.xyz/graphql',
+});
+```
+
+# API Reference
+
+## Types
+
+List of all typescript interfaces and types used for describing data and parameters for communication with spianmp database.
+
+{% content-ref url="api-reference/types" %}
+[types](https://spinamp.gitbook.io/spinamp-sdk/reference/api-reference/types)
+{% endcontent-ref %}
+
+## Tracks
+
+{% content-ref url="api-reference/tracks" %}
+[tracks](https://spinamp.gitbook.io/spinamp-sdk/reference/api-reference/tracks)
+{% endcontent-ref %}
+
+## Artists
+
+{% content-ref url="api-reference/artists" %}
+[artists](https://spinamp.gitbook.io/spinamp-sdk/reference/api-reference/artists)
+{% endcontent-ref %}
+
+## Collection
+
+{% content-ref url="api-reference/collection" %}
+[collection](https://spinamp.gitbook.io/spinamp-sdk/reference/api-reference/collection)
+{% endcontent-ref %}
+
+## NFTs
+
+{% content-ref url="api-reference/nfts" %}
+[nfts](https://spinamp.gitbook.io/spinamp-sdk/reference/api-reference/nfts)
+{% endcontent-ref %}
+
+## Platforms
+
+{% content-ref url="api-reference/platforms" %}
+[platforms](https://spinamp.gitbook.io/spinamp-sdk/reference/api-reference/platforms)
+{% endcontent-ref %}
+
+## Playlists
+
+{% content-ref url="api-reference/playlists" %}
+[playlists](https://spinamp.gitbook.io/spinamp-sdk/reference/api-reference/playlists)
+{% endcontent-ref %}
+
+## Utilities
+
+{% content-ref url="api-reference/utilities" %}
+[utilities](https://spinamp.gitbook.io/spinamp-sdk/reference/api-reference/utilities)
+{% endcontent-ref %}
+
+# Types
+
+### IConfig
+
+Configuration object defining set of endpoints used by SDK.&#x20;
+
+```markup
+interface IConfig {
+    SPINDEX_NODE_URL: string;
+    PLAYLIST_NODE_URL: string;
+    IPFS_GATEWAY_URL_IMAGE: string;
+    IPFS_GATEWAY_URL_AUDIO: string;
+}
+```
+
+### IArtist
+
+Object describing artist entity.
+
+```markup
+interface IArtist {
+    id: string;
+    name: string;
+    createdAtTime: string;
+    slug: string;
+    profiles: {
+        [platformId: string]: IArtistProfile;
+    };
+}
+```
+
+### IArtistProfile
+
+Object containing information about artist profile based on data from particular platform. One artist can own multiples profiles assigned if he uploaded tracks for multiple platforms.
+
+```
+interface IArtistProfile {
+    platformId: string;
+    platformInternalId: string;
+    name: string;
+    createdAtTime: string;
+    avatarUrl?: string;
+    websiteUrl?: string;
+}
+```
+
+### ITrack
+
+Object describing track entity.
+
+```
+interface ITrack {
+    id: string;
+    platformInternalId: string;
+    title: string;
+    slug: string;
+    platformId: string;
+    artistId: string;
+    artist: IArtist;
+    lossyAudioUrl: string;
+    lossyArtworkUrl?: string;
+    description?: string;
+    createdAtTime?: string;
+    websiteUrl?: string;
+}
+```
+
+### ICollectionTrack
+
+Object describing track from nft collection of particular address owner. It's the same as `ITrack` but extended with `quantity` property.
+
+```
+interface ICollectionTrack extends ITrack {
+    quantity: number;
+}
+```
+
+### INft
+
+Object describing NFT entity minted for the track
+
+```
+interface INft {
+    id: string;
+    createdAtTime: string;
+    createdAtBlockNumber: string;
+    chainId: string;
+    tokenId: string;
+    contractAddress: string;
+    platformId: string;
+    owners: string[];
+    // deprecated - used only for backward compability and always points to first item of `owners` array
+    owner: string;
+    metadata: unknown;
+}
+```
+
+### ITrackNft
+
+INft object extended with corresponding track id
+
+```
+interface ITrackNft extends INft {
+  trackId: string;
+}
+```
+
+### IMusicPlatformData
+
+Object containing information about platform id and it's corresponding name.
+
+```
+interface IMusicPlatformData {
+    id: string;
+    name: string;
+}
+```
+
+### IPlaylist
+
+Object describing playlist entity.
+
+```
+interface IPlaylist {
+    id: string;
+    title: string;
+    trackIds: string[];
+    collector?: string; // address of user who created playlist
+}
+```
+
+### IApiListQueryParams
+
+Set of parameters which can be passed to queries which return list of objects (`fetchAllArtists`, `fetchAllTracks`). It can be used for pagination, sorting and filtering.
+
+Exact shape of `filter` and `orderBy` params depends on query and it can be found in API documentation of spinamp pipeline: <https://open-api.spinamp.xyz/graphiql>.
+
+```
+interface IApiListQueryParams {
+    after?: string;
+    before?: string;
+    first?: number;
+    last?: number;
+    offset?: number;
+    filter?: unknown;
+    orderBy?: string[];
+}
+```
+
+### IApiListQueryResponse
+
+Object returned from queries returning list of items. It contains data which can be used for pagination.
+
+```
+interface IApiListQueryResponse<ListItem> {
+  totalCount: number;
+  pageInfo: {
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+    startCursor: string;
+    endCursor: string;
+  };
+  items: ListItem[];
+}
+```
+
+# Tracks
+
+#### fetchAllTracks(params: [IApiListQueryParams](https://spinamp.gitbook.io/spinamp-sdk/reference/types#iapilistqueryparams)): Promise<[IApiListQueryResponse](https://spinamp.gitbook.io/spinamp-sdk/reference/types#iapilistqueryresponse)<[ITrack](https://spinamp.gitbook.io/spinamp-sdk/reference/types#itrack)>>
+
+If no params are provided, returns list of all tracks existing in the database. Params can be used for pagination, filtering and sorting.
+
+Allowed properties for `filter` and `orderBy` params can be found under `allProcessedTracks` query on spinamp pipeline API documentation: <https://spindex-api.spinamp.xyz/v1/graphiql>.
+
+#### fetchTrackById(trackId: string): Promise<[ITrack](https://spinamp.gitbook.io/spinamp-sdk/reference/types#itrack) | null>
+
+Returns full track object based on track id or `null` if such id doesn't exist.
+
+#### fetchTrackBySlug(slug: string): Promise<[ITrack](https://spinamp.gitbook.io/spinamp-sdk/reference/types#itrack) | null>
+
+Returns full track object based on track slug or `null` if such slug doesn't exist.
+
+#### fetchTrackBySlugOrId(slugOrId: string): Promise<[ITrack](https://spinamp.gitbook.io/spinamp-sdk/reference/types#itrack) | null>
+
+It first tries to find a track using provided param as slug. If not found, then it tries to find by id.
+
+#### fetchTrackByIdOrSlug(idOrSlug: string): Promise<[ITrack](https://spinamp.gitbook.io/spinamp-sdk/reference/types#itrack) | null>
+
+The same as above, but it first tries to find track by id.
+
+#### fetchTracksByIds(trackIds: string\[]): Promise<[ITrack](https://spinamp.gitbook.io/spinamp-sdk/reference/types#itrack)\[]>
+
+Returns list of full track objects based on provided list of track ids.
+
+# Artists
+
+#### fetchAllArtists(params: [IApiListQueryParams](https://spinamp.gitbook.io/spinamp-sdk/reference/types#iapilistqueryparams)): Promise<[IApiListQueryResponse](https://spinamp.gitbook.io/spinamp-sdk/reference/types#iapilistqueryresponse)<[IArtist](https://spinamp.gitbook.io/spinamp-sdk/reference/types#iartist)>>
+
+If no params are provided, returns list of all artists existing in the database. Params can be used for pagination, filtering and sorting
+
+Allowed properties for `filter` and `orderBy` params can be found under `allTracks` query on spinamp pipeline API documentation: <https://spindex-api.spinamp.xyz/v1/graphiql>.
+
+#### fetchArtistById(artistId: string): Promise<[IArtist](https://spinamp.gitbook.io/spinamp-sdk/reference/types#iartist) | null>
+
+Returns full artist object based on artist id or `null` if such id doesn't exist.
+
+#### fetchArtistBySlug(slug: string): Promise<[IArtist](https://spinamp.gitbook.io/spinamp-sdk/reference/types#iartist) | null>
+
+Returns full artist object based on track slug or `null` if such slug doesn't exist.
+
+#### fetchArtistBySlugOrId(slugOrId: string): Promise<[IArtist](https://spinamp.gitbook.io/spinamp-sdk/reference/types#iartist) | null>
+
+It first tries to find an artist using provided param as slug. If not found, then it tries to find by id.
+
+#### fetchArtistByIdOrSlug(idOrSlug: string): Promise<[IArtist](https://spinamp.gitbook.io/spinamp-sdk/reference/types#iartist) | null>
+
+The same as above, but it first tries to find artist by id.
+
+#### fetchArtistTracks(artistId): Promise<[ITrack](https://spinamp.gitbook.io/spinamp-sdk/reference/types#itrack)\[]>
+
+Returns list of full tracks objects created by provided artist.
+
+#### fetchArtistWithTracks(idOrSlug: string): Promise<{artist: [IArtist](https://spinamp.gitbook.io/spinamp-sdk/reference/types#iartist) | null, tracks: [ITrack](https://spinamp.gitbook.io/spinamp-sdk/reference/types#itrack)\[]}>
+
+Returns both full artist object and artist tracks list based on provided slug or id.
+
+# Collection
+
+#### fetchCollectionForAddress(ethAddress: string): Promise<[ICollectionTrack](https://spinamp.gitbook.io/spinamp-sdk/reference/types#icollectiontrack)\[]>
+
+Returns list of full collection track objects (including quantity) owned by provided ethereum address.
+
+# NFTs
+
+#### fetchTrackNfts(trackId: string): Promise<[INft](https://spinamp.gitbook.io/spinamp-sdk/reference/types#inft)\[]>
+
+Returns list of all NFTs objects minted for provided track id.
+
+#### fetchTrackNftsOwners(trackId: string): Promise\<string\[]>
+
+Returns list of addresses of all owners of provided track.
+
+#### fetchArtistNfts(artistId: string): Promise<[ITrackNft](https://spinamp.gitbook.io/spinamp-sdk/reference/types#itracknft)\[]>
+
+Returns list of NFTs of all tracks created by provided artist.
+
+#### fetchArtistNftsOwners(artistId: string): Promise\<string\[]>
+
+Returns list of addresses of all owners of tracks created by provided artist.
+
+# Platforms
+
+#### fetchAllPlatforms(): Promise<[IMusicPlatformData](https://spinamp.gitbook.io/spinamp-sdk/reference/types#imusicplatformdata)\[]>
+
+Returns list of all music nft platforms existing in spinamp database.
+
+#### fetchPlatformById(platformId: string): Promise<[IMusicPlatformData](https://spinamp.gitbook.io/spinamp-sdk/reference/types#imusicplatformdata) | null>
+
+Returns information about particular platform based on provided platform id.
+
+# Playlists
+
+#### fetchFeaturedPlaylists(): Promise<[IPlaylist](https://spinamp.gitbook.io/spinamp-sdk/reference/types#iplaylist)\[]>
+
+Returns list of playlists, which are currently marked as featured on spinamp.
+
+#### fetchPlaylistById(playlistId: string): Promise<{playlist: [IPlaylist](https://spinamp.gitbook.io/spinamp-sdk/reference/types#iplaylist)\[], playlistTracks: [ITrack](https://spinamp.gitbook.io/spinamp-sdk/reference/types#itrack)\[]}>
+
+Gets playlist by provided playlist id. Returns `playlist` object and list of full tracks belonging to this playlist.
+
+#### fetchCollectorPlaylists(collectorAddress: string): Promise<[IPlaylist](https://spinamp.gitbook.io/spinamp-sdk/reference/types#iplaylist)\[]>
+
+Returns list of playlists created by user with provided address.
+
+#### createPlaylist(playlist: Omit<[IPlaylist](https://spinamp.gitbook.io/spinamp-sdk/reference/types#iplaylist), 'id'>, signer: [Signer](https://docs.ethers.io/v5/api/signer/)): Promise<{id: string}>
+
+Creates a new playlist and returns the playlist id
+
+{% hint style="info" %}
+An ethers signer object is required for API authentication
+{% endhint %}
+
+```
+  const wallet = ethers.Wallet.createRandom();
+  const vibeyPlaylist = {
+    title: 'vibey',
+    trackIds: ['ethereum/0xd5b2c770dc0a9677cf672d53f554f6f806e75e07/1'],
+  };
+
+  const {id} = await createPlaylist(vibeyPlaylist, wallet);
+
+```
+
+#### updatePlaylist(id: string, playlist: Partial<[IPlaylist](https://spinamp.gitbook.io/spinamp-sdk/reference/types#iplaylist)>, signer: [Signer](https://docs.ethers.io/v5/api/signer/)): Promise<{id: string; title: string: trackIds: string\[] }>
+
+Updates a playlist and returns the new values
+
+{% hint style="info" %}
+Only the signer that created the playlist is able to update it
+{% endhint %}
+
+```
+  const wallet = ethers.Wallet.createRandom();
+  const vibeyPlaylist = {
+    id: 'kfF8MuFHmW6MwHIWNKQF',
+    title: 'super vibey',
+    trackIds: ['ethereum/0xd5b2c770dc0a9677cf672d53f554f6f806e75e07/1'],
+  };
+
+  const playlist = await updatePlaylist(vibeyPlaylist.id, vibeyPlaylist, wallet);
+
+```
+
+# Utilities
+
+#### getResizedArtworkUrl(originalUrl: string, width: number): string
+
+Returns remote url of image resized to provided width

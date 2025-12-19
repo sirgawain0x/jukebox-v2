@@ -15,7 +15,7 @@ export function WebsiteBanner() {
   // For Farcaster: Link to the Farcaster mini-app directory page
   const farcasterUrl = "https://farcaster.xyz/miniapps/qmW3Ymy2yYM6/jukebox";
   // For Base app: Link to the Base app URL
-  const baseAppUrl = "https://www.base.app/";
+  const baseAppUrl = "https://base.app/invite/friends/58C94JQG";
 
   // Shared button base classes matching Button component styles
   const buttonBaseClasses =

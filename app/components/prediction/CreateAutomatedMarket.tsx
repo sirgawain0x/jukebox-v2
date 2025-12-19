@@ -284,6 +284,21 @@ export function CreateAutomatedMarket() {
       // Persist metadata for the selected song if available
       if (selectedSong) {
         await persistSongMetadata(selectedSong);
+        
+        // Record prediction event for engagement scoring
+        if (selectedSong.id) {
+          try {
+            await fetch('/api/engagement/prediction', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                trackId: selectedSong.id,
+              }),
+            });
+          } catch (error) {
+            console.error('Failed to record prediction event:', error);
+          }
+        }
       } else if (normalizedTitle) {
         // If manually entered, try to find and persist metadata
         // This will be handled by the API when fetching bets
